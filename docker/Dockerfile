@@ -173,11 +173,19 @@ ENV QITS_MAVEN_CENTRAL_URL=$QITS_MAVEN_CENTRAL_URL
 # args: this image is pullable, and a build arg is recorded where anyone who pulls it can read it.
 # `.qits-maven-settings.xml` reads the two variables as the `qits-maven-network` server.
 #
-# Absent secrets leave both variables unset, which is the state every build is in today and the
-# state a host-side `docker build` is in permanently: Maven sends credentials only when a repository
-# answers 401, and the registry does not yet.
-RUN --mount=type=secret,id=qits-client-id,env=QITS_MAVEN_AUTH_USR \
-    --mount=type=secret,id=qits-client-secret,env=QITS_MAVEN_AUTH_PSW \
+# FILE FORM, NOT `env=`. The mounts are bare (`/run/secrets/<id>`, read into the command's own
+# environment by the `cat`s below) rather than the `env=` mount form they used to be. `env=` needs a
+# dockerfile frontend that supports it, and under the platform's own buildkitd the frontend is the
+# BUILDER's to pick, not this file's; the bare file mount is served identically by every frontend
+# version. See qits-buildkit-plan.md in the wrapper.
+#
+# Absent secrets leave both variables EMPTY — the `|| true` is every hand build's state — which
+# `.qits-maven-settings.xml` reads exactly as it read unset: Maven sends credentials only when a
+# repository answers 401, and the registry does not yet.
+RUN --mount=type=secret,id=qits-client-id \
+    --mount=type=secret,id=qits-client-secret \
+    export QITS_MAVEN_AUTH_USR="$(cat /run/secrets/qits-client-id 2>/dev/null || true)"; \
+    export QITS_MAVEN_AUTH_PSW="$(cat /run/secrets/qits-client-secret 2>/dev/null || true)"; \
     d=service/src/main/webui/dist/qits-spa-artifacts/browser; \
     test -f "$d/index.html" || { \
       echo "No built client at $d." >&2; \
@@ -206,9 +214,9 @@ RUN --mount=type=secret,id=qits-client-id,env=QITS_MAVEN_AUTH_USR \
 # The service module's CycloneDX document, exported so the release step can PUT it to the store the
 # image itself serves. A stage rather than a layer of the runtime image, and BEFORE the runtime
 # stage on purpose: the last stage is what a plain `docker build` builds, and that must stay the
-# image. The release step reaches this one with `--target sbom --output type=local` using the SAME
-# args and secrets as the image build, so every layer above is a cache hit and the export costs
-# seconds. `makeBom` rides on the mvnw invocation above rather than a second one, for the same
+# image. The release step reaches this one with `--opt target=sbom --output type=local` using the
+# SAME build-args and secrets as the image build, so every layer above is a cache hit and the export
+# costs seconds. `makeBom` rides on the mvnw invocation above rather than a second one, for the same
 # cache reason — one RUN, one layer, one truth.
 FROM scratch AS sbom
 COPY --from=build /src/service/target/sbom.json /sbom.json
