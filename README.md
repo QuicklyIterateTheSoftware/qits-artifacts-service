@@ -1138,7 +1138,7 @@ this platform. What each one condemns, in one line each — the sections below c
 | type | engine, window | identity that dies | what keeps it | liveness expression |
 |---|---|---|---|---|
 | `oci-images` | `own`, `P0D` | a sha tag, or a manifest no tag and no tagged manifest reaches | the last 2 calver releases; a coordinate qits-platform-deployments pins; an image a repository's Dockerfile references; an image qits-configuration would configure; an image qits-workspaces or qits-projects would launch today; the tag literally named `latest`; the newest release per image | manifest closure over surviving tags and manifests |
-| `npm-packages` | `own`, `P0D` | a published version | the last 2 releases by semver; anything a dist-tag names; anything a repository's package.json still resolves to | `npm_version.tarball_blob_id` of survivors |
+| `npm-packages` | `own`, `P0D` — **prereleases only** | a published version, and only ever a prerelease | **every published release, at any age**; anything a dist-tag names; anything a repository's package.json still resolves to | `npm_version.tarball_blob_id` of survivors |
 | `maven-packages` | `own`, `P0D` — **snapshots only** | a **coordinate** — one version's whole file set, and only ever a superseded timestamped snapshot set | **every published release, at any age and whatever the window says**; anything a repository's pom still references; the newest deployable set of every snapshot line; a path this layout cannot read | `maven_artifact.blob_id`, sized from the row |
 | `daemon-binaries` | `own`, `P0D` | a `daemon_binary` row | the last 2 versions; both rungs qits-ci names; a pinned digest's bytes | `daemon_binary.blob_id`, sized from the row |
 | `docs` | `own`, `P0D` | a published **version** of a site — never a file, because `docs_file` cascades | the last 2 versions of every site | `docs_file.blob_id` of surviving versions |
@@ -1388,26 +1388,54 @@ derived here — see "Live pins, and the whole-run abort" above.
 ### `npm-packages`, on the own engine — and the tombstone only it needs
 
 `NpmPackagesGcStrategy` is a four-line bean now: the rule is `OwnArtifactsStrategy`'s, the wiring is
-`OwnGcStrategy`'s, and npm's facts are `NpmPackagesGcAdapter`'s. The settled rule: **the last two
-releases of every package stay, anything a dist-tag names stays, anything a repository's
-package.json still resolves to stays, and everything else dies on the run that finds it.**
+`OwnGcStrategy`'s, and npm's facts are `NpmPackagesGcAdapter`'s. The rule since the evening of
+2026-09-05: **every published release stays, anything a dist-tag names stays, anything a
+repository's package.json still resolves to stays, and prereleases die on the run that finds them.**
 
 | Kept because | Spelled |
 |---|---|
-| it is one of the last two releases | the version has **no prerelease part** — `0.0.1` through `2026.801.85149` — ranked by **semver precedence** (`NpmSemver`), not by publish order. Consumers pin ranges, and `^2026.801.85149` has to keep resolving |
+| **it is a published release** | the version has **no prerelease part** — `0.0.1` through `2026.801.85149`. Every one of them, at any age and any depth in the version order. See below — this replaced the belt of two the same evening `maven-packages` lost its |
 | a pointer names it | any version a dist-tag currently names. A packument whose `dist-tags` names a version its `versions` does not list is a broken package to every npm client, so this is checked before the window rather than left to it |
 | a repository still resolves it | any `name@version` `GET /maintenance/api/pins` names in the `npm` ecosystem — the identity spelling verbatim, so the lookup is an equality test. It is what a lockfile on `main` will install the next time that consumer builds, which may be well outside the window |
 | — | there is no fourth row any more. An install used to keep a version alive for `P3D`; at `P0D` it does not, because an install moves a timestamp and a timestamp cannot say whether anything will install again. The `@main` pointer and the dependency pin say it outright, and both are above |
 
-**Two rules changed direction, and both changes are the settlement's.** Releases used to be kept
-forever and are now kept as the last two per package; an older one survives on a **reference** —
-a dist-tag or a lockfile on `main` — rather than on a recent install. And a prerelease used to die
-structurally the moment a newer main build existed; it now dies unless something names it, which is
-the same collection reached by a rule a reviewer can argue with.
+**No published release is age-collected. Withdrawn 2026-09-05, hours after the maven one and for
+the same reasons plus a sharper one.** The settlement priced releases as a belt of two with an
+access window under it; when the windows went to `P0D` that afternoon, the belt became the whole of
+what stood between a published tarball and a delete. The sweep that evening took
+`@qits/ui-components` from eight versions to **three** and `@qits/angular` to **two**. Fifteen
+frontend `package-lock.json` files pin `@qits/ui-components@2026.904.202810`, which it took; two
+services' release runs died on `npm ci` with `E404`, and two more frontends could not cut a release
+at all. Why the rule went rather than the number:
 
-A version that does not parse as semver is never a release (it cannot be ordered, so it cannot be
-one of the last two of anything), and at a zero window a pointer is what is left to save it: a
+- **An install is not a fetch of this registry.** A tarball is downloaded once and served from
+  `node_modules`, a warm npm cache and every baked build image after that. Age here measures cache
+  warmth, not need — and at `P0D` it measures nothing at all.
+- **No pin source can see an npm pin.** `MaintenanceDependencyPins` reads manifests on `main`, and a
+  frontend's lockfile is not on the service's `main`: it is reached through a **submodule gitlink**
+  that a release tag freezes. Fifteen services' gitlinks name frontend commits pinning five
+  different versions of this package, and nothing reports one of them.
+- **The disk rounds to nothing.** The whole hosted npm registry is on the order of ten megabytes
+  against a 29 GB store that is 28.8 GB of images.
+- **It used to be irreversible.** A collected version left a tombstone that refused even an
+  identical republish. That refusal has since narrowed to what it actually protects — different
+  bytes — but not needing the restore is the cheaper fix.
+
+**What still ages out** is npm's build output: **prereleases**, the per-push `-main.g<sha>` builds,
+which are the analogue of the timestamped snapshots `maven-packages` still collects. Nothing's
+lockfile pins one for long and `@main` resolves to the newest by dist-tag. A version that does not
+parse as semver is never a release either (it cannot be ordered), and a pointer is what saves one: a
 dist-tag, or the dependency pin.
+
+`NpmPackagesGcAdapter.pinnedBy` answers the release keep, so no release reaches the belt or the
+window and `OwnArtifactsStrategy` is untouched; `NpmPackagesGcStrategy.note()` carries the
+correction onto every report line, because the configuration echo beside it is the own engine's
+sentence and still describes the belt.
+
+**No whole-or-nothing repair was needed here.** The half-collected version `maven-packages` had to
+be fixed that morning cannot occur: an npm identity is one row naming one tarball, and `collect`
+removes the row and writes its tombstone in a single transaction. There is no per-file loop to leave
+half-applied.
 
 **The adapter still filters `npm_version` by the repository row's type**, although no `npm-proxy`
 row can exist here any more. It is one line and it stays: the table is shared with the cache half in

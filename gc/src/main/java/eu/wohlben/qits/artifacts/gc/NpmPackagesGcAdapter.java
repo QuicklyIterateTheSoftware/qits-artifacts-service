@@ -29,10 +29,47 @@ import java.util.Set;
  * <h2>What a release is here</h2>
  *
  * <p>A version with <b>no prerelease part</b>. Consumers pin ranges, so {@code ^2026.801.85149} has
- * to keep resolving — including to the pre-calver {@code 0.0.x} line — and the belt is the last two
- * of them per package. An older release survives on <em>use</em>: a lockfile or a range that still
- * installs it moves {@code npm_version.accessed_at}, which is how a version stays alive by being
- * wanted rather than by policy.
+ * to keep resolving — including to the pre-calver {@code 0.0.x} line.
+ *
+ * <h2>A published release is never collected. Not by age, not by a belt.</h2>
+ *
+ * <p>Releases used to be kept as the last two per package, with older ones surviving on
+ * <em>use</em>: a lockfile install moves {@code npm_version.accessed_at}. On <b>2026-09-05</b> the
+ * windows went to {@code P0D} — access decides nothing at all now — and the same evening the sweep
+ * took {@code @qits/ui-components} down to three versions and {@code @qits/angular} to two. Fifteen
+ * frontend lockfiles pin one of the versions it took; the release runs of two services died on
+ * {@code npm ci} with {@code E404}, and two more frontends could not cut a release at all. So this
+ * type takes the exemption {@code maven-packages} took that morning, for reasons that transfer
+ * exactly and one that is sharper here:
+ *
+ * <ul>
+ *   <li><b>An install is not a fetch of this registry.</b> A tarball is downloaded once and served
+ *       from {@code node_modules}, a warm npm cache and every baked build image thereafter. A
+ *       version fifteen repositories build against can show no read here for a week; with the
+ *       window at zero it shows no protection at all.
+ *   <li><b>The pin sources cannot see an npm pin.</b> {@code MaintenanceDependencyPins} names what
+ *       manifests on main reference, and a frontend's lockfile is not on the service's main — it is
+ *       reached through a <b>submodule gitlink</b> that a release tag freezes. Fifteen services'
+ *       gitlinks name frontend commits whose locks pin five different versions of this package, and
+ *       no source here reports one of them.
+ *   <li><b>The disk rounds to nothing.</b> The whole hosted npm repository is on the order of ten
+ *       megabytes against a 29 GB store that is 28.8 GB of images. There was never a trade here.
+ *   <li><b>A collection here used to be irreversible.</b> A version leaving this registry left a
+ *       tombstone that refused even an identical republish, so a mistaken sweep could only be
+ *       answered by editing every consumer. That refusal has since narrowed to what it protects —
+ *       different bytes — but the cheaper fix is not needing the restore.
+ * </ul>
+ *
+ * <p><b>What still ages out</b> is the one class npm has that is build output rather than a
+ * published coordinate: <b>prereleases</b> — the {@code -main.g<sha>} a push publishes, npm's
+ * analogue of maven's timestamped snapshots. Nothing's lockfile pins one for long, {@code @main}
+ * resolves to the newest by dist-tag, and the dist-tag belt below keeps whatever a live pointer
+ * names. A version that does not parse as semver is not a release either and is treated the same.
+ *
+ * <p>{@link #byAge()} and {@link OwnArtifactsStrategy#RELEASES_KEPT} therefore decide nothing for
+ * releases any more — every one is kept before the belt is consulted. The comparator stays because
+ * the engine's contract asks for one, it still orders prereleases, and semver precedence is the
+ * honest answer to "which of two is newer" whether or not anything currently turns on it.
  *
  * <p>Newer is <b>semver precedence</b> ({@link NpmSemver}), not a row timestamp and not insertion
  * order: {@code 2026.801.85149} outranks {@code 2026.801.63140} whichever was published first, and a
@@ -61,9 +98,26 @@ import java.util.Set;
  * <p>Deletion goes through {@code NpmRegistryCollection.collect}, which writes the republish
  * tombstone <b>in the same transaction</b> and refuses a version a dist-tag still names. Both
  * guarantees are the mechanism's, so no path around them exists to forget.
+ *
+ * <p><b>This type needs no whole-or-nothing repair.</b> The half-collected version {@code
+ * maven-packages} had to be fixed the same day cannot occur here: an npm identity is one row naming
+ * one tarball, and {@code collect} removes that row and writes its tombstone inside a single
+ * transaction. There is no per-file loop to leave half-applied — {@link #delete} iterates
+ * <em>identities</em>, and one identity is one atomic call.
  */
 @Singleton
 public class NpmPackagesGcAdapter implements GcTypeAdapter {
+
+  /**
+   * The keep every published release gets — the rule the 2026-09-05 npm sweep bought, said in full
+   * on every line it saves so a reviewer never has to ask why nothing npm died.
+   */
+  static final String KEPT_HOSTED_RELEASE =
+      "a published release of this platform's own npm registry — hosted releases are never"
+          + " collected, at any age and at any depth in the version order. An install is served from"
+          + " node_modules and a warm cache rather than from here, a lockfile reached through a"
+          + " service's submodule gitlink is named by no pin source, and the disk it would free"
+          + " rounds to nothing beside the image store";
 
   /** The belt-and-braces keep, naming the tag so a reviewer can see which pointer saved a version. */
   static String keptByDistTag(String tag) {
@@ -117,7 +171,13 @@ public class NpmPackagesGcAdapter implements GcTypeAdapter {
    * name@version} is what a package.json resolves to and it is this adapter's identity verbatim, so
    * the lookup is an equality test on the string the enumeration already built. It is asked first
    * because a consumer still building against a version is a stronger thing to report than the
-   * pointer that happens to name it as well.
+   * release rule that would have kept it anyway.
+   *
+   * <p><b>The release keep is expressed here rather than in the engine</b>, and that is the seam
+   * working as designed: what a release <em>is</em> has always been this adapter's fact, and so is
+   * what one is worth. {@link OwnArtifactsStrategy} still counts to two for the types that want a
+   * belt; this type answers before it is asked, so no release ever reaches the belt or the window.
+   * Nothing about the engine changes, and nothing about the other own types does.
    */
   @Override
   public GcPinned pinnedBy(List<GcCandidate> candidates, GcPins pins) {
@@ -136,6 +196,9 @@ public class NpmPackagesGcAdapter implements GcTypeAdapter {
       String byManifest = pins.pinsNpmCoordinate(candidate.identity());
       if (byManifest != null) {
         return byManifest;
+      }
+      if (candidate.released()) {
+        return KEPT_HOSTED_RELEASE;
       }
       String tag = tagged.get(candidate.group() + "@" + versionOf(candidate.identity()));
       return tag == null ? null : keptByDistTag(tag);

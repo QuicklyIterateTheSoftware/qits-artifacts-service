@@ -497,6 +497,28 @@ collection" section is the contract; these are the rules that get "helpfully" re
   snapshot line** — what `maven-metadata.xml` redirects `1.0.1-SNAPSHOT` to; deleting it would point
   the document at a file the store no longer has. No N-per-line rule was invented: §3.6 named the
   shape and never priced it, so the window decides.
+- **`npm-packages` DOES NOT AGE-COLLECT PUBLISHED RELEASES EITHER. Same rule, ported the same day.**
+  Withdrawn the evening of 2026-09-05, hours after maven's, when the zero-window sweep took
+  `@qits/ui-components` from eight versions to three and `@qits/angular` to two — breaking fifteen
+  frontend lockfiles and failing two services' release runs on `npm ci`. The maven reasons all
+  transfer (an install is served from `node_modules` and a warm cache, not from here; ten megabytes
+  against 28.8 GB of images) and one is sharper: **no pin source on this platform can see an npm
+  pin**, because a frontend's lockfile is not on the service's main — it is reached through a
+  SUBMODULE GITLINK a release tag freezes. Fifteen services' gitlinks name frontend commits pinning
+  five different versions of one package. The keep is `NpmPackagesGcAdapter.pinnedBy`, the
+  correction rides `NpmPackagesGcStrategy.note()`, and the window now governs **prereleases only**
+  (the per-push `-main.g<sha>` builds — npm's analogue of maven's snapshots). No whole-or-nothing
+  repair was needed: an npm identity is one row and one tarball, removed with its tombstone in one
+  transaction.
+- **A collected npm version can be RESTORED with the bytes it had.** `NpmRegistryService.publish`
+  compares the incoming tarball's blob id against the tombstone's `tarball_blob_id`: equal means a
+  restore (the stone is cleared in the same transaction), anything else is the 403 it always was,
+  and a stone with a null blob id refuses everything. The tombstone protects one property — a
+  coordinate must never come to mean DIFFERENT bytes — and an identical republish cannot violate it.
+  This works because `npm pack` is reproducible (pacote normalises mtime/uid/gid): repacking a
+  source tag reproduces the published tarball byte for byte, measured on tag `2026.904.202810` of
+  `@qits/ui-components` against the integrity fifteen lockfiles carry. Shipped in
+  qits-registries-javalib `2026.905.211257`.
 - **`maven-packages` DOES NOT AGE-COLLECT PUBLISHED RELEASES. Do not put the belt back.** Withdrawn
   2026-09-05 after the `P3D` access rule deleted 67 published `eu.wohlben.qits` coordinates at
   `01:58Z` and every gating build on the platform stopped resolving. The three reasons, so this is

@@ -53,51 +53,60 @@ class NpmPackagesGcAdapterTest extends GcFixture {
   @Inject GcPlanner planner;
 
   @Test
-  void theLastTwoReleasesOfAPackageStayAndTheThirdOneAgesOut() throws Exception {
-    // "Releases stay" in its settled npm spelling: last 2 per package, ranked by SEMVER PRECEDENCE
-    // rather than by publish order — 2026.801.85149 outranks 2026.801.63140 whichever landed first.
-    // All four here are equally cold, so only the belt separates them.
+  void noPublishedReleaseIsEverAgeCollectedHoweverColdAndHoweverDeepInTheVersionOrder()
+      throws Exception {
+    // The rule the 2026-09-05 npm sweep bought, and the case that would have caught it. Four
+    // releases of one package, every one of them cold past a year, nothing pinned, two of them below
+    // a belt of two. Under the belt-plus-window pricing the oldest two died here — and that evening
+    // the same rule at a ZERO window took this registry down to three versions of a package fifteen
+    // frontend lockfiles pin, failing two services' release runs on `npm ci`.
+    //
+    // Nothing dies now, and every kept line says why, so a reviewer reading an empty dead list is
+    // told the registry is the artifact of record rather than left to infer it.
     hosted();
-    String oldest = version(UI, "0.0.1", 11, daysAgo(400));
-    String second = version(UI, "0.0.4", 12, daysAgo(380));
+    version(UI, "0.0.1", 11, daysAgo(400));
+    version(UI, "0.0.4", 12, daysAgo(380));
     version(UI, "2026.801.63140", 13, daysAgo(360));
     version(UI, "2026.801.85149", 14, daysAgo(340));
 
     GcStrategy.Plan plan = strategy.plan(census.take(), GcPins.none());
 
+    assertEquals(List.of(), plan.dead(), "a published release is never a candidate");
+    assertEquals(Set.of(), plan.blobsReleased());
+    assertEquals(4, plan.kept().size());
     assertEquals(
-        Stream.of(UI + "@0.0.1", UI + "@0.0.4").sorted().toList(), identities(plan.dead()));
-    assertTrue(
-        plan.dead().stream()
-            .allMatch(dead -> OwnArtifactsStrategy.deadUnaccessed(WINDOW).equals(dead.rule())));
+        NpmPackagesGcAdapter.KEPT_HOSTED_RELEASE,
+        ruleFor(plan.kept(), UI + "@0.0.1"),
+        "the oldest too, and under the release rule rather than a belt slot");
     assertEquals(
-        OwnArtifactsStrategy.KEPT_RELEASE, ruleFor(plan.kept(), UI + "@2026.801.85149"));
-    assertEquals(Set.of(oldest, second), plan.blobsReleased(), "one version, one tarball");
+        NpmPackagesGcAdapter.KEPT_HOSTED_RELEASE, ruleFor(plan.kept(), UI + "@2026.801.85149"));
   }
 
   @Test
-  void anInstallNoLongerKeepsAnOlderReleaseAliveAndTheLockfileReferenceIsWhatDoes()
-      throws Exception {
-    // THE FLIP of 2026-09-05: this case used to say that ^0.0.1 resolving yesterday kept 0.0.1
-    // alive. It does not any more — an install moves a timestamp, and the timestamp stopped being a
-    // keep-class. What the install actually proves is that some repository's package.json still
-    // resolves that version, and THAT is a fact qits-platform-maintenance answers by name. So the
-    // same store is planned twice: once on the install alone, once with the reference stated.
+  void theReleaseKeepIsARuleAboutReleasesRatherThanAboutNpmNothingEverDying() throws Exception {
+    // The other direction, so the rule above is pinned as a rule rather than as "this type stopped
+    // collecting". One release and two prereleases, identically cold and identically unpinned, in
+    // the same package: the release stays and the builds go. If the release keep ever widens into
+    // "no npm row is collected" this fails, which is the point.
+    //
+    // A prerelease is npm's build output — the per-push -main.g<sha> — and it is the analogue of the
+    // timestamped snapshot maven still collects. What a consumer of one resolves through is `@main`,
+    // and a dist-tag names that; the case below it makes that half explicit.
     hosted();
-    version(UI, "0.0.1", 21, daysAgo(1));
-    version(UI, "2026.801.63140", 22, daysAgo(360));
-    version(UI, "2026.801.85149", 23, daysAgo(340));
+    version(UI, "2026.801.85149", 21, daysAgo(400));
+    version(UI, "2026.801.85149-main.gab854a1", 22, daysAgo(400));
+    version(UI, "2026.801.85149-main.g21655ba", 23, daysAgo(400));
 
-    GcStrategy.Plan onAccessAlone = strategy.plan(census.take(), GcPins.none());
+    GcStrategy.Plan plan = strategy.plan(census.take(), GcPins.none());
 
-    assertEquals(List.of(UI + "@0.0.1"), identities(onAccessAlone.dead()));
     assertEquals(
-        OwnArtifactsStrategy.deadUnaccessed(WINDOW), onAccessAlone.dead().get(0).rule());
-
-    GcStrategy.Plan referenced = strategy.plan(census.take(), referencing(UI + "@0.0.1"));
-
-    assertEquals(List.of(), referenced.dead());
-    assertEquals(GcPins.BY_MANIFEST, ruleFor(referenced.kept(), UI + "@0.0.1"));
+        Stream.of(UI + "@2026.801.85149-main.g21655ba", UI + "@2026.801.85149-main.gab854a1")
+            .sorted()
+            .toList(),
+        identities(plan.dead()).stream().sorted().toList(),
+        "build output this registry regenerates on the next push");
+    assertEquals(
+        NpmPackagesGcAdapter.KEPT_HOSTED_RELEASE, ruleFor(plan.kept(), UI + "@2026.801.85149"));
   }
 
   @Test
@@ -143,12 +152,11 @@ class NpmPackagesGcAdapterTest extends GcFixture {
   }
 
   @Test
-  void aVersionSomeRepositorysLockfileStillResolvesOutlivesTheWindow() throws Exception {
-    // The keep that makes P3D defensible for a published package. A repository's package.json on
-    // main resolves 0.0.4 and nothing has installed it in a year — no belt slot with two calver
-    // releases above it, and no access. Before the dependency pin the only thing that could save it
-    // was an install inside the window, which says more about how often that consumer builds than
-    // about whether the version is needed.
+  void aVersionSomeRepositorysLockfileStillResolvesIsKeptUnderThePinItIsNamedBy() throws Exception {
+    // The invariant, stated where it can be read: anything a lockfile on main resolves to survives.
+    // For a release it is belt and braces now — it would be kept for being a release anyway — and it
+    // is still asked FIRST, because a reviewer of the report wants to know which repository builds
+    // against a version rather than that it happens to be a release.
     //
     // The pin joins on the identity UNCHANGED: "name@version" is what a lockfile resolves to and
     // what this adapter spells its identities with, so both sides of the case are the same string.
@@ -156,18 +164,26 @@ class NpmPackagesGcAdapterTest extends GcFixture {
     version(UI, "0.0.1", 111, daysAgo(400));
     version(UI, "0.0.4", 112, daysAgo(400));
     version(UI, "2026.801.63140", 113, daysAgo(360));
-    version(UI, "2026.801.85149", 114, daysAgo(340));
 
     GcStrategy.Plan referenced = strategy.plan(census.take(), referencing(UI + "@0.0.4"));
 
-    assertEquals(List.of(UI + "@0.0.1"), identities(referenced.dead()));
+    assertEquals(List.of(), referenced.dead());
     assertEquals(GcPins.BY_MANIFEST, ruleFor(referenced.kept(), UI + "@0.0.4"));
 
-    // And the other half, so the keep is a fact about the pin and not about this fixture.
-    GcStrategy.Plan unreferenced = strategy.plan(census.take(), GcPins.none());
+    // And the half that matters most: the pin reaches a PRERELEASE too, which is the one class this
+    // type still collects. A cold build some lockfile still resolves outlives its unpinned neighbour.
+    version(UI, "2026.801.85149-main.gab854a1", 114, daysAgo(400));
+    version(UI, "2026.801.85149-main.g21655ba", 115, daysAgo(400));
+
+    GcStrategy.Plan pinnedBuild =
+        strategy.plan(census.take(), referencing(UI + "@2026.801.85149-main.gab854a1"));
+
     assertEquals(
-        Stream.of(UI + "@0.0.1", UI + "@0.0.4").sorted().toList(),
-        identities(unreferenced.dead()).stream().sorted().toList());
+        GcPins.BY_MANIFEST, ruleFor(pinnedBuild.kept(), UI + "@2026.801.85149-main.gab854a1"));
+    assertEquals(
+        List.of(UI + "@2026.801.85149-main.g21655ba"),
+        identities(pinnedBuild.dead()),
+        "and the unpinned build beside it still goes");
   }
 
   @Test
@@ -198,8 +214,9 @@ class NpmPackagesGcAdapterTest extends GcFixture {
   @Test
   void theBeltIsPerPackageAndOnePackagesReleasesNeverSpendAnothers() throws Exception {
     // The rule reads "per package" and the tables are keyed that way, so this is the case that would
-    // catch a group that forgot the package name — and a package with fewer releases than the belt
-    // keeps all of them.
+    // catch a group that forgot the package name. The belt half went with the release rule — no
+    // number of releases can push another package's off anything now — and the grouping still has to
+    // be right, because it is what the enumeration reads dist-tags per and what a report attributes.
     hosted();
     version("@qits/angular", "0.0.1", 51, daysAgo(600));
     version(UI, "1.0.0", 52, daysAgo(400));
@@ -209,8 +226,9 @@ class NpmPackagesGcAdapterTest extends GcFixture {
 
     assertEquals(List.of(), plan.dead());
     assertEquals(
-        OwnArtifactsStrategy.KEPT_RELEASE, ruleFor(plan.kept(), "@qits/angular@0.0.1"),
-        "a package with one release keeps it, however cold");
+        NpmPackagesGcAdapter.KEPT_HOSTED_RELEASE, ruleFor(plan.kept(), "@qits/angular@0.0.1"),
+        "a package with one release keeps it, however cold — under the release rule now, which is"
+            + " what the belt was standing in for");
   }
 
   @Test
@@ -249,20 +267,23 @@ class NpmPackagesGcAdapterTest extends GcFixture {
     // name for a publish with different bytes, which is one coordinate resolving to two tarballs
     // over its lifetime. The guarantee is the funnel's rather than this rule's, and the property
     // asserted here is that the collector really goes through it.
+    //
+    // Written over a PRERELEASE since 2026-09-05, because a release cannot be condemned any more and
+    // a case whose subject is what happens to a condemned version needs one that can be.
     hosted();
-    String doomed = version(UI, "1.0.0", 81, daysAgo(400));
+    String doomed = version(UI, "1.0.0-main.gab854a1", 81, daysAgo(400));
     version(UI, "1.1.0", 82, daysAgo(390));
     version(UI, "1.2.0", 83, daysAgo(380));
 
     GcStrategy.Plan plan = strategy.plan(census.take(), GcPins.none());
     GcStrategy.Applied applied = strategy.apply(plan, blobId -> false);
 
-    assertEquals(List.of(UI + "@1.0.0"), identities(applied.deleted()));
+    assertEquals(List.of(UI + "@1.0.0-main.gab854a1"), identities(applied.deleted()));
     assertEquals(List.of(), applied.errors());
     npmVersions.getEntityManager().clear();
-    assertTrue(npmVersions.findOne("npm", UI, "1.0.0").isEmpty(), "the row is gone");
+    assertTrue(npmVersions.findOne("npm", UI, "1.0.0-main.gab854a1").isEmpty(), "the row is gone");
     assertTrue(
-        npmVersionTombstones.findOne("npm", UI, "1.0.0").isPresent(),
+        npmVersionTombstones.findOne("npm", UI, "1.0.0-main.gab854a1").isPresent(),
         "and the name can never be silently republished");
   }
 
@@ -271,8 +292,9 @@ class NpmPackagesGcAdapterTest extends GcFixture {
       throws Exception {
     // The strand hazard: a row deleted over a young file leaves the file row-less, and row-less
     // blobs are untouchable by construction. No tombstone either — the version is not collected yet.
+    // Over a prerelease, for the reason the case above gives.
     hosted();
-    String doomed = version(UI, "1.0.0", 91, daysAgo(400));
+    String doomed = version(UI, "1.0.0-main.gab854a1", 91, daysAgo(400));
     version(UI, "1.1.0", 92, daysAgo(390));
     version(UI, "1.2.0", 93, daysAgo(380));
 
@@ -280,10 +302,10 @@ class NpmPackagesGcAdapterTest extends GcFixture {
     GcStrategy.Applied applied = strategy.apply(plan, blobId -> blobId.equals(doomed));
 
     assertEquals(List.of(), applied.deleted());
-    assertEquals(List.of(UI + "@1.0.0"), identities(applied.withheldByGraceWindow()));
+    assertEquals(List.of(UI + "@1.0.0-main.gab854a1"), identities(applied.withheldByGraceWindow()));
     npmVersions.getEntityManager().clear();
-    assertTrue(npmVersions.findOne("npm", UI, "1.0.0").isPresent(), "the row stays");
-    assertTrue(npmVersionTombstones.findOne("npm", UI, "1.0.0").isEmpty(), "no tombstone");
+    assertTrue(npmVersions.findOne("npm", UI, "1.0.0-main.gab854a1").isPresent(), "the row stays");
+    assertTrue(npmVersionTombstones.findOne("npm", UI, "1.0.0-main.gab854a1").isEmpty(), "no tombstone");
   }
 
   @Test
