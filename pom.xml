@@ -59,7 +59,7 @@
     </modules>
 
     <properties>
-        <qits.auth-core.version>2026.904.82648</qits.auth-core.version>
+        <qits.auth-core.version>2026.905.91442</qits.auth-core.version>
         <!-- The two shared libraries the byte plane was carved into. Published from their own
              repositories (libs/qits-blobstore, libs/qits-registries) and consumed here like any
              other artifact.
@@ -79,7 +79,7 @@
              dependencies here that is neither on Maven Central nor in the Quarkus platform — see
              the <repositories> block below. It also arrives transitively on qits-blobstore; it is
              named here because this repository's own config names the driver class. -->
-        <qits.db-core.version>2026.904.82648</qits.db-core.version>
+        <qits.db-core.version>2026.905.91442</qits.db-core.version>
         <!-- The user-story framework (test scope): the 21 story classes and
              TokenValidationBootstrapIT are userflows, so a `mvn verify` also regenerates
              service/target/userstories/ — the stories' documentation, network diagrams and
@@ -95,14 +95,14 @@
              assertEdgeCount) that let a story pin what did NOT happen. It also validates a
              declared edge's fields against Labels.scrub — nothing here declares one. See
              AGENTS.md, "The network diagram is observed, never narrated". -->
-        <qits.userflows.version>2026.904.223009</qits.userflows.version>
+        <qits.userflows.version>2026.905.91808</qits.userflows.version>
         <!-- The recording service mocks the same IT boots against (the generic MockService plus
              idp.MockIdp), released out of libs/qits-integrations-quarkus like qits-db-core above
              (the same-string policy applies the day this repo consumes a newer reactor).
              2026.829.201505 is what makes a recorded request carry the STATUS the mock answered
              with, which is the half TokenValidationBootstrapIT's far-side edge label needs: a
              method and a path say the keys were asked for, the status says they were served. -->
-        <qits.service-mock.version>2026.904.82648</qits.service-mock.version>
+        <qits.service-mock.version>2026.905.91442</qits.service-mock.version>
         <qits.maven.repository.url>http://registry.dev.localhost:8080/artifacts/maven/maven</qits.maven.repository.url>
         <maven.compiler.release>25</maven.compiler.release>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
