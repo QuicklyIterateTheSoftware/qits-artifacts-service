@@ -71,8 +71,8 @@
              reactor and ships on its version. The coordinate is unchanged, the config keys are
              unchanged, and the store's packages are eu.wohlben.qits.blobstore.* — so the pins
              cannot be moved one at a time. -->
-        <qits.blobstore.version>2026.905.211257</qits.blobstore.version>
-        <qits.registries.version>2026.905.211257</qits.registries.version>
+        <qits.blobstore.version>2026.906.33616</qits.blobstore.version>
+        <qits.registries.version>2026.906.33616</qits.registries.version>
         <!-- The platform's datasource resilience baseline: qits-db-core carries PatientPgDriver,
              which the datasource block in the artifacts jar's microprofile-config.properties names,
              and DbRetry. Published by libs/qits-integrations-quarkus, so it is one of the few
