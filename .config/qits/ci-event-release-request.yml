@@ -18,11 +18,11 @@
 # release request cannot alter the CI that gates it by folding in a commit that edits this file.
 #
 # ONE FILE, TWO HALVES, and "a red verify must not cost the image" still holds — bought now with
-# ORDERING plus PER-STEP CLASSIFICATION rather than with two files that cannot share a verdict. The
-# gating half is FIRST, so whatever it produces is produced before a non-gating step can fail; the
-# userflow half declares `gating: false`, which still fails the run and shows red but does not hold
-# the fold for qits-projects' build gate. Keep the non-gating step LAST: a failing step skips
-# everything after it, which is fine for a publish and wrong for a build.
+# ORDERING, and EVERY STEP GATES. The build half is FIRST, so whatever it produces is produced
+# before a later step can fail; the story half used to declare `gating: false` so its red did not
+# hold the fold. That flag is gone — it erased the gating half's passing verdict instead of
+# preserving it, so a flaky story stalled the request rather than failing it. Keep the story step
+# LAST: a failing step skips everything after it, which is fine for a publish and wrong for a build.
 #
 # THE SHA IMAGE IS GONE. The old build step ended in `docker push
 # $QITS_REGISTRY/$QITS_IMAGE_REPOSITORY/qits-artifacts:$QITS_CI_SHA`, the per-push coordinate cd
@@ -221,10 +221,10 @@ steps:
         --secret id=qits-client-id,src=/tmp/qits-client-id \
         --secret id=qits-client-secret,src=/tmp/qits-client-secret
 
-  # --- the NON-GATING half: verify, and publish what the run observed -----------------------------
-  # ci-event-userflows.yml's step, unchanged but for the settle-hold (see below) and `gating: false`,
-  # which is the whole of what that separate file was. This step failing leaves the run FAILED and
-  # visible, and leaves the fold's build gate untouched.
+  # --- the stories half: verify, and publish what the run observed --------------------------------
+  # ci-event-userflows.yml's step, unchanged but for the settle-hold (see below); that separate
+  # file's whole content is now this step. This step failing leaves the run FAILED and holds the
+  # fold, like any other step here.
   #
   # `mvn verify` at the fold — which regenerates service/target/userstories/ through
   # TokenValidationBootstrapIT (the two `authentication` stories, on their own mock-idp profile) and
@@ -288,7 +288,6 @@ steps:
   # swap to wait out. The deployed qits-artifacts this step dials is simply whatever is running.
   - image: qits/build-images/userflows-base:latest
     user: pwuser
-    gating: false
     # 23 stories: seven Chromium-plus-video explore runs, two skopeo copies, an npm publish and
     # install, two forked maven JVMs pulling their plugins from central on a cold ~/.m2, and the
     # whole unit suite plus the SPA build in front of all of it.
