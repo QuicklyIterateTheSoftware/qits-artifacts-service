@@ -127,8 +127,8 @@ into another context's tables.
 
     PUT  /artifacts/api/repositories/{repo}                 ensure a repository — qits:system
     POST /artifacts/api/repositories/{repo}/blobs           upload, raw body + X-Artifacts-Meta-* — qits:system
-    GET  /artifacts/api/repositories/{repo}/blobs/{id}      serve — qits:admin, cacheable, immutable
-    GET  /artifacts/api/repositories/{repo}/blobs?meta.…    query — qits:admin
+    GET  /artifacts/api/repositories/{repo}/blobs/{id}      serve — qits:admin or qits:agent, cacheable, immutable
+    GET  /artifacts/api/repositories/{repo}/blobs?meta.…    query — qits:admin or qits:agent
 
 A **repository** here is a named bucket of artifacts — the Maven/npm sense of the word, not
 `domain.repository`. The resource keeps that name; the `artifacts` the path used to repeat is gone,
@@ -721,7 +721,7 @@ discovery by probing is impossible. npm's `/-/all` and `/-/v1/search` are absent
 repository, because those paths never write `artifact_record` — it looks like an empty registry and
 is not. So these routes are new machinery rather than a view over an existing one.
 
-All are reads, and **a read here is `@RolesAllowed("qits:admin")`** — every browse controller
+All are reads, and **a read here is `@RolesAllowed({"qits:admin", "qits:agent"})`** — every browse controller
 carries the annotation at class level, answered from the `X-Qits-User`/`X-Qits-Roles` pair
 qits-gateway asserts for a signed-in operator. `AdminWriteGuard` is a *separate* mechanism and
 covers write methods only (`MachineAuth.require()` under the `qits.auth.machine.required` rollout
@@ -1238,7 +1238,7 @@ truths. Nothing about the fail-closed rule softens: a member the caller left out
 exactly as an unreachable service does. A deployments document of `{"pins":[]}` is the opposite and
 is a real answer — a platform with nothing deployed, pinning nothing, and a run may proceed on it. A body that is not that shape is a `400` rather
 than a quiet fall back to the readers. **`POST /gc/plan` accepts `qits:admin` or `qits:system`** —
-the `GET` stays `qits:admin`-only and both sweeps stay `qits:system` — because the caller that needs
+the `GET` takes `qits:admin` or `qits:agent` and both sweeps stay `qits:system` — because the caller that needs
 it is a machine: the orchestrator authenticates as `qits:system,qits-platform:system` and never
 holds `qits:admin`, and it is the same machine already allowed to run the sweep. Being a `POST` also
 puts it inside `AdminWriteGuard`, so once `qits.auth.machine.required` is on it needs the machine
@@ -1724,7 +1724,7 @@ Details a reader trips over otherwise:
   unlink may happen, not about what a rule structurally frees, and a strategy's worth should not read
   as zero because its content was pushed this morning.
 
-`GET /gc/plan` is `@RolesAllowed("qits:admin")` like every other read on this API; its `POST` twin
+`GET /gc/plan` is `@RolesAllowed({"qits:admin", "qits:agent"})` like every other read on this API; its `POST` twin
 allows `qits:admin` **or** `qits:system`, because the orchestrator that sends a pin set is a machine
 and is already allowed to run the sweep this plan feeds. `AdminWriteGuard` covers write methods
 only, so no read passes through it — the sweep `POST` is the write the `gc` prefix was pre-listed

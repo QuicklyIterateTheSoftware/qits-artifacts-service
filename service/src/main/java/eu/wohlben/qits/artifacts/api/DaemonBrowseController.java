@@ -44,7 +44,7 @@ import org.eclipse.microprofile.openapi.annotations.Operation;
  */
 @Path("/repositories/{repo}/daemons")
 @Produces(MediaType.APPLICATION_JSON)
-@jakarta.annotation.security.RolesAllowed("qits:admin")
+@jakarta.annotation.security.RolesAllowed({"qits:admin", "qits:agent"})
 public class DaemonBrowseController {
 
   @Inject ArtifactExplorerService explorer;

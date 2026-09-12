@@ -69,7 +69,7 @@ public class BlobController {
   @GET
   @Path("/{id}")
   @Operation(hidden = true)
-  @jakarta.annotation.security.RolesAllowed("qits:admin")
+  @jakarta.annotation.security.RolesAllowed({"qits:admin", "qits:agent"})
   public Response serve(@PathParam("repo") String repo, @PathParam("id") String id) {
     BlobService.BlobContent content = blobService.serve(repo, id);
     return Response.ok(content.stream())
@@ -85,7 +85,7 @@ public class BlobController {
   @GET
   @Produces(MediaType.APPLICATION_JSON)
   @Operation(hidden = true)
-  @jakarta.annotation.security.RolesAllowed("qits:admin")
+  @jakarta.annotation.security.RolesAllowed({"qits:admin", "qits:agent"})
   public ListBlobsResponse query(
       @PathParam("repo") String repo,
       @Context UriInfo uriInfo,

@@ -37,7 +37,7 @@ import org.eclipse.microprofile.openapi.annotations.Operation;
  */
 @Path("/repositories/{repo}/images")
 @Produces(MediaType.APPLICATION_JSON)
-@jakarta.annotation.security.RolesAllowed("qits:admin")
+@jakarta.annotation.security.RolesAllowed({"qits:admin", "qits:agent"})
 public class ImageBrowseController {
 
   @Inject ArtifactExplorerService explorer;

@@ -25,7 +25,7 @@ import org.eclipse.microprofile.openapi.annotations.Operation;
  */
 @Path("/store")
 @Produces(MediaType.APPLICATION_JSON)
-@jakarta.annotation.security.RolesAllowed({"qits:admin", "qits:system"})
+@jakarta.annotation.security.RolesAllowed({"qits:admin", "qits:system", "qits:agent"})
 public class StoreController {
 
   @Inject ArtifactExplorerService explorer;

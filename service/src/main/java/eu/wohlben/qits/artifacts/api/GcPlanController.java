@@ -76,7 +76,7 @@ public class GcPlanController {
   @GET
   @Path("/plan")
   @Operation(hidden = true)
-  @jakarta.annotation.security.RolesAllowed("qits:admin")
+  @jakarta.annotation.security.RolesAllowed({"qits:admin", "qits:agent"})
   public GcPlanReport plan() {
     return planner.plan();
   }
@@ -128,7 +128,7 @@ public class GcPlanController {
   @GET
   @Path("/repositories")
   @Operation(hidden = true)
-  @jakarta.annotation.security.RolesAllowed("qits:admin")
+  @jakarta.annotation.security.RolesAllowed({"qits:admin", "qits:agent"})
   public GcRepositoriesPlanResponse repositories() {
     return planner.planForRepositories();
   }
@@ -147,7 +147,7 @@ public class GcPlanController {
   @GET
   @Path("/repositories/{repository}/plan")
   @Operation(hidden = true)
-  @jakarta.annotation.security.RolesAllowed("qits:admin")
+  @jakarta.annotation.security.RolesAllowed({"qits:admin", "qits:agent"})
   public GcRepositoryPlanReport repositoryPlan(@PathParam("repository") String repository) {
     return planner.planForRepository(repository);
   }

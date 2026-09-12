@@ -15,7 +15,7 @@ import org.eclipse.microprofile.openapi.annotations.Operation;
 /** Read-only Maven coordinate drill-down for the artifacts explorer. */
 @Path("/repositories/{repo}/maven-packages")
 @Produces(MediaType.APPLICATION_JSON)
-@jakarta.annotation.security.RolesAllowed("qits:admin")
+@jakarta.annotation.security.RolesAllowed({"qits:admin", "qits:agent"})
 public class MavenBrowseController {
   @Inject ArtifactExplorerService explorer;
   public record ListPackagesResponse(List<MavenPackageSummary> packages) {}
