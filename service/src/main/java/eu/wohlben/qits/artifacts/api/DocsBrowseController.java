@@ -45,12 +45,13 @@ import org.eclipse.microprofile.openapi.annotations.Operation;
  * reached from a browser, so it has to answer both.
  *
  * <p>Reads, so unguarded by {@code AdminWriteGuard}, which covers write methods only — but
- * {@code @RolesAllowed({"qits:admin", "qits:agent"})} like every browse surface. Hidden from the OpenAPI document
- * like every operation this service ships; the contract is written out in the README.
+ * open to people, agents, platform services and CI runs like every browse surface. Hidden from the
+ * OpenAPI document like every operation this service ships; the contract is written out in the
+ * README.
  */
 @Path("/repositories/{repo}/docs")
 @Produces(MediaType.APPLICATION_JSON)
-@jakarta.annotation.security.RolesAllowed({"qits:admin", "qits:agent"})
+@jakarta.annotation.security.RolesAllowed({"qits:admin", "qits:agent", "qits:system", "qits:ci-run"})
 public class DocsBrowseController {
 
   @Inject ArtifactExplorerService explorer;

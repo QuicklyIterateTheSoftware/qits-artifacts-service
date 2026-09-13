@@ -79,7 +79,7 @@ public class RepositoryController {
    */
   @GET
   @Operation(hidden = true)
-  @jakarta.annotation.security.RolesAllowed({"qits:admin", "qits:agent"})
+  @jakarta.annotation.security.RolesAllowed({"qits:admin", "qits:agent", "qits:system", "qits:ci-run"})
   public ListRepositoriesResponse list() {
     return new ListRepositoriesResponse(explorer.listRepositories());
   }

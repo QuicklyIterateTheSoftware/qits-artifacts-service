@@ -38,13 +38,15 @@ import org.eclipse.microprofile.openapi.annotations.Operation;
  * to {@code [a-z0-9][a-z0-9._-]{0,63}}, which cannot contain a slash, so the encoded/literal question
  * the image and package listings have to answer does not arise here.
  *
- * <p>Reads, so unguarded by {@code AdminWriteGuard}, which covers write methods only — but
- * {@code @RolesAllowed("qits:admin")} like every browse surface. Hidden from the OpenAPI document
+ * <p>Reads, so unguarded by {@code AdminWriteGuard}, which covers write methods only — but open to
+ * people, agents, platform services and CI runs like every browse surface. A CI run reads it: the
+ * composed release prelude resolves the latest {@code qits} CLI from this listing with the run's
+ * {@code qits:ci-run} credential before it downloads the binary. Hidden from the OpenAPI document
  * like every operation this service ships; the contract is written out in the README.
  */
 @Path("/repositories/{repo}/daemons")
 @Produces(MediaType.APPLICATION_JSON)
-@jakarta.annotation.security.RolesAllowed({"qits:admin", "qits:agent"})
+@jakarta.annotation.security.RolesAllowed({"qits:admin", "qits:agent", "qits:system", "qits:ci-run"})
 public class DaemonBrowseController {
 
   @Inject ArtifactExplorerService explorer;
