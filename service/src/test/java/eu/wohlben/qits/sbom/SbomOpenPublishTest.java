@@ -15,26 +15,14 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 /**
- * The SBOM publish carries no write guard, and this suite pins that it stays that way <b>even with
- * the machine-token gate on</b> — the twin of {@code registry/RegistryOpenPushTest}, {@code
- * npm/NpmOpenPublishTest} and {@code daemon/DaemonOpenPublishTest}, asserting the same property for
- * the newest wire surface.
+ * An anonymous SBOM publish still lands with the machine-token gate on — the known gap of the
+ * CI-only publish rule (USER RULING 2026-09-13), the twin of {@code registry/RegistryOpenPushTest}.
+ * CI release steps submit SBOMs with no credential today, so {@code PublishGuard} judges only an
+ * identity that is presented ({@code artifacts/api/PublishGuardTest}).
  *
- * <p>It is worth its lines for the same reason the daemon one is: a bill of materials reads like
- * security metadata, so "surely <em>this</em> one should need a token" is the change most likely to
- * be proposed. It must not be proposed piecemeal. Machine auth arrives wholesale with
- * qits-platform-idp, for every publish path at once — gating this one alone reports a posture the
- * other five do not have.
- *
- * <p><b>What stands in for write auth.</b> A stored document is immutable: a re-PUT of an identity
- * stores nothing and answers {@code 200 alreadyPublished}, so an open publish can add a document and
- * can never change one. Consumers verify against the digest this route echoes, so what a
- * maintenance scan reads is decided by content addressing rather than by who was allowed to PUT.
- * First-write-wins is <em>weaker</em> than a 409 about replays and exactly as strong about this.
- *
- * <p>It cannot come back by accident either: {@code AdminWriteGuard} is a JAX-RS filter and these
- * are raw Vert.x routes, so turning the gate on guards the JSON admin API and leaves this route
- * exactly as it is.
+ * <p><b>What stands in for write auth meanwhile.</b> A stored document is immutable: a re-PUT of an
+ * identity stores nothing and answers {@code 200 alreadyPublished}, so an open publish can add a
+ * document and can never change one. Consumers verify against the digest this route echoes.
  */
 @QuarkusTest
 @TestProfile(MachineTokens.Enforced.class)

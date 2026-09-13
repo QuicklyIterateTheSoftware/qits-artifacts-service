@@ -34,7 +34,7 @@ import org.junit.jupiter.api.condition.EnabledIf;
  *
  * <p>The wire difference is a single metadata key: a recording declares {@code
  * media.resolution.length} where a still declares a width and a height. Everything else — the six
- * pairing keys, the {@code qits:system} upload, the content-addressed id — is identical, which is
+ * pairing keys, the {@code qits:ci-run} upload, the content-addressed id — is identical, which is
  * exactly why the difference is worth a story rather than a comment. <b>The retention rules are not
  * identical and were never meant to be</b>: screenshots are branch-scoped (keep the newest per
  * branch and flow while the branch lives), videos are byte-budgeted (keep the newest N per flow
@@ -132,7 +132,7 @@ public class VideoPublishIT {
             ScreenshotPublishIT.header(meta, "qits.diff.hash"),
             ScreenshotPublishIT.header(meta, "media.resolution.length"),
             "X-Qits-User: " + ScreenshotPublishIT.PUBLISHER,
-            "X-Qits-Roles: qits:system",
+            "X-Qits-Roles: qits:ci-run",
             "recording.webm",
             "publish-response.json",
             target.apiBase() + "/repositories/" + REPOSITORY + "/blobs")

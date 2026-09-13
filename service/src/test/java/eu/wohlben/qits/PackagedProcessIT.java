@@ -153,7 +153,8 @@ public class PackagedProcessIT {
 
   /**
    * The gateway's asserted identity, played by this suite for the JSON API. Every read there is
-   * {@code @RolesAllowed("qits:admin")} and the repository/blob writes {@code "qits:system"}; a
+   * {@code @RolesAllowed("qits:admin")}, the repository write {@code "qits:system"} and the blob
+   * upload {@code "qits:ci-run"} (see {@link #asCiRun()}); a
    * {@code @QuarkusTest} passes them on the %test synthetic dev-user, but the PACKAGED process runs
    * {@code LaunchMode.NORMAL}, where {@code ForwardAuthMechanism} deliberately stays anonymous — so
    * this suite asserts the header pair qits-gateway would, believed by contract (the gateway strips
@@ -165,6 +166,11 @@ public class PackagedProcessIT {
     return given()
         .header("X-Qits-User", "packaged-it")
         .header("X-Qits-Roles", "qits:admin,qits:system");
+  }
+
+  /** A CI run's asserted identity — the only one that publishes (USER RULING 2026-09-13). */
+  private static io.restassured.specification.RequestSpecification asCiRun() {
+    return given().header("X-Qits-User", "packaged-it-ci-run").header("X-Qits-Roles", "qits:ci-run");
   }
 
   @Test
@@ -265,7 +271,7 @@ public class PackagedProcessIT {
 
     byte[] png = png(120, 80);
     String id =
-        asOperator()
+        asCiRun()
             .contentType("image/png")
             .headers(screenshotHeaders("main", "packaged-it"))
             .body(png)

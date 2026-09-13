@@ -54,6 +54,12 @@ public final class OciClient implements AutoCloseable {
     return this;
   }
 
+  /** What a docker client sends after the edge's token exchange. */
+  public OciClient bearer(String token) {
+    authorization = "Bearer " + token;
+    return this;
+  }
+
   @Override
   public void close() {
     http.close();

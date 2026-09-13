@@ -985,16 +985,23 @@ the new store up either way, and the next release publishes clean.
   stays a choice rather than an accident. It guards writes only, by design, and is a no-op while the
   rollout gate `qits.auth.machine.required` is off.
   **It is JAX-RS, so it runs on no raw Vert.x route** — adding a prefix for one would look exactly
-  like guarding it and guard nothing. **All four wire surfaces are unguarded on purpose** (qits-net
-  trust): `/v2`, `/artifacts/npm`, `/artifacts/maven` and the daemon publish `PUT`. The daemon one
-  is the one to expect a proposal about, because it carries the platform's own executables — a
-  `DaemonPublishGuard` calling `HttpAuthenticator.attemptAuthentication` under the `MachineAuth`
-  keys existed for one commit and was removed as a decision, not a simplification. What replaces
-  write auth is what replaces it on the other three: versions are immutable (`409` on republish), so
-  an open publish can add a version and never change one, and consumers pin the digest the route
-  echoes. **No publish surface is gated piecemeal** — machine auth arrives wholesale with qits-platform-idp,
-  for all of them at once. `RegistryOpenPushTest`, `NpmOpenPublishTest` and `DaemonOpenPublishTest`
-  each run the gate on and assert their route stays open.
+  like guarding it and guard nothing.
+- **Only CI publishes (USER RULING 2026-09-13).** `PublishGuard` guards all six wire publish routes
+  at once: `/v2` `POST`/`PATCH`/`PUT`, and the `PUT`s under `/artifacts/npm`, `/artifacts/maven`,
+  `/artifacts/daemons`, `/artifacts/docs` and `/artifacts/sboms`. It is a Quarkus `Filters` entry,
+  not a JAX-RS filter, because the npm, maven and `/v2` routes come from the qits-registries jars.
+  It refuses every identity a caller presents unless it holds `qits:ci-run`: a forwarded
+  `X-Qits-*` pair (403), a JWT (validated; 403 for other roles, 401 when invalid), and any Basic
+  credential (401 — the edge passes a client's `id:secret` through unchanged). `qits:system` is
+  refused too, an explicit exception to the open calling model. The CI media upload
+  (`POST …/blobs`) takes `qits:ci-run` only, for the same reason.
+  **A caller with no identity still publishes, and that is a known gap, not a decision.** Every
+  CI step on qits-net and every bootstrap seed publishes anonymously today. Refusing anonymous
+  writes before they present the run's credential stops every release. A bearer that is not a JWT
+  (npm's `_authToken` ceremony) counts as no identity and never reaches quarkus-oidc. A bearer is
+  judged only while `qits.auth.machine.required` is on. `PublishGuardTest` proves the role table;
+  `RegistryOpenPushTest`, `NpmOpenPublishTest`, `DaemonOpenPublishTest` and `SbomOpenPublishTest`
+  pin the anonymous half.
 - `service` ships `quarkus.http.limits.max-body-size=1088M`, which is a **global** ceiling — every
   route in the process, not just the upload. Tracked as an open tradeoff in
   `docs/issues/2026-07-19_artifacts-global-max-body-size-widens-public-ingest-dos.md`, which now

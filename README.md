@@ -126,7 +126,7 @@ foreign key.** Nothing here breaks when qits' schema moves, and nothing here nee
 into another context's tables.
 
     PUT  /artifacts/api/repositories/{repo}                 ensure a repository — qits:system
-    POST /artifacts/api/repositories/{repo}/blobs           upload, raw body + X-Artifacts-Meta-* — qits:system
+    POST /artifacts/api/repositories/{repo}/blobs           upload, raw body + X-Artifacts-Meta-* — qits:ci-run
     GET  /artifacts/api/repositories/{repo}/blobs/{id}      serve — qits:admin or qits:agent, cacheable, immutable
     GET  /artifacts/api/repositories/{repo}/blobs?meta.…    query — qits:admin or qits:agent
 
@@ -137,6 +137,8 @@ because the segment already says it.
 Writes require a machine token from qits-platform-idp — a bearer with `aud=qits-platform-artifacts`, checked by
 `AdminWriteGuard`. The check sits behind the platform-wide rollout gate `qits.auth.machine.required`,
 which is off by default: off, the write surface is open exactly as it was before qits-platform-idp existed.
+The upload is a publish, so it takes `qits:ci-run` only: CI is the only publisher (USER RULING
+2026-09-13; see "Who may publish").
 Reads are never guarded — a blob must be usable directly as an `<img>`/`<video>` src.
 
 ## The git host
@@ -258,25 +260,27 @@ routes it from the **artifacts** `proxy-hosts` entry (there is no `…_V2` key) 
 navigation from a background request, so an unlisted `/v2` would answer a 302 into the IdP that
 docker reads as "not a v2 registry".
 
-### No login, in either direction
+### Who may publish
 
-Reads are anonymous, always — image names are meant to be shared, which is also why `/v2/_catalog`
-stays unimplemented and the posture stays private-network rather than capability-URL. **Writes are
-anonymous too**: the registry carries no credential of its own, and the machine-token gate guards
-the blob-store JSON admin API and nothing else (`RegistryOpenPushTest` pins that turning it on does
-not drag `/v2` back behind a docker login).
+Reads are open at the store; the edge asks for a credential on the `registry` host. **Writes follow
+the USER RULING of 2026-09-13: only a CI run publishes.** `PublishGuard` sits in front of every
+`/v2` write (`POST`, `PATCH`, `PUT`) and of the publish `PUT` of every other wire (npm, maven,
+daemons, docs, SBOMs), and judges the identity the caller presents:
 
-That is a decision with two halves, one per direction:
+| Caller | Publish |
+|---|---|
+| bearer with `qits:ci-run` — a CI run, e.g. `docker push` after the edge's token exchange | accepted |
+| bearer with `qits:admin`, `qits:agent` or `qits:system` | 403 |
+| forwarded `X-Qits-User`/`X-Qits-Roles` without `qits:ci-run` — a browser session through the edge | 403 |
+| a JWT this service does not accept (other audience, expired, foreign key) | 401 |
+| HTTP Basic — the edge passes a client's `id:secret` through unchanged, and the store cannot check it | 401 |
+| no credential, or a bearer that is not a JWT (npm's `_authToken` ceremony) | accepted — **known gap** |
 
-- **Inside the deployment**, producers on qits-net are trusted — the platform posture everywhere —
-  and a tokenless registry is what lets an automated publisher (the CI/CD image-build story) push
-  with no credential store. Every client works: `docker push`, `skopeo copy`, `podman push`, with
-  no login step at all.
-- **From outside**, write protection is qits-gateway's: `/v2` is on its token-free allowlist for
-  **read methods only**, so an internet `docker push` is challenged for a session no registry
-  client can hold and dies at the front door. Re-allowlisting `/v2` writes there without restoring
-  a guard here would open push to the internet — the gateway's `PublicPathsTest` and the comment in
-  `RegistryRoutes.init` both hold that line.
+The last row stays open because every CI step on qits-net (`buildctl` push, `mvn deploy`, `npm
+publish`, the docs, daemon and SBOM `PUT`s) and every bootstrap seed publishes anonymously today.
+Closing it needs those publishers to present the run's credential first. A bearer is judged only
+while `qits.auth.machine.required` is on; the forwarded pair and Basic are judged always.
+`PublishGuardTest` proves the table; `RegistryOpenPushTest` pins the anonymous row.
 
 The registry once guarded writes with a static token as an HTTP Basic password. That
 bought a measured, awkward tradeoff — docker could push after a `docker login`, skopeo/podman
@@ -467,20 +471,15 @@ behind to omit from a listing, and no path through this service dials npmjs: `Np
 rides in on the shared jar, and reaching it needs a repository row of a type that cannot be
 created.
 
-### No login here either
+### Who may publish here
 
-**None. Not a token, not a guard, nothing** — the OCI registry's threat model verbatim (see "No
-login, in either direction" above). Producers and consumers are internal, dialling
-`qits-platform-artifacts:8080` on qits-net, and from outside `/artifacts/npm/**` falls under qits-gateway's
-usual session auth like any other non-allowlisted artifacts path. No `PublicPaths` entry, no method
-split, nothing npm-specific; whether an npm client can operate *through* that auth from outside is
-deliberately out of scope.
+The OCI registry's rule verbatim (see "Who may publish" above): `PublishGuard` judges the identity a
+`PUT` presents, and only a CI run publishes. Reads are open at the store.
 
-The one wrinkle is client-side and never reaches the wire: the npm CLI has historically refused
-`npm publish` when no credential is configured for the target registry (`ENEEDAUTH` is a pre-flight
-check). If current npm still enforces it, a pipeline's `.npmrc` carries one dummy `_authToken` line
-that **this server neither reads nor knows about** — npm-client ceremony, not an auth scheme, and it
-disappears the moment npm accepts an anonymous publish.
+The one wrinkle is client-side: the npm CLI refuses `npm publish` when no credential is configured
+for the target registry (`ENEEDAUTH` is a pre-flight check), so a pipeline's `.npmrc` carries one
+dummy `_authToken` line. It is npm-client ceremony, not an auth scheme: the guard treats a bearer
+that is not a JWT as no identity. A real CI run token in that line would be judged as one.
 
 ### Deliberately not implemented
 
@@ -599,14 +598,11 @@ pin keep working exactly as they are, and the digest stays what the pin holds. T
 it answers with `Docker-Content-Digest` so a consumer can check it against its pin without a second
 request.
 
-**Nothing here is authenticated**, in either direction — the same posture `/v2`, `/artifacts/npm`
-and `/artifacts/maven` hold, and deliberately not a weaker one. On qits-net producers are trusted,
-which is what lets a release pipeline publish with no credential store. Integrity does not come from
-write auth: a version is immutable, so an open publish can add a version and can never change one,
-and a consumer pins the digest this route echoes, so what a launcher runs is decided by content
-addressing. Machine auth arrives wholesale with qits-platform-idp, for every publish path at once — gating
-this one alone would report a posture the other three do not have. `DaemonOpenPublishTest` pins it
-with the machine-token gate turned on, beside the npm and registry twins.
+**Only a CI run publishes** — `PublishGuard`, the rule every wire shares (see "Who may publish"
+under the OCI registry). An anonymous publish still passes today, the known gap
+`DaemonOpenPublishTest` pins. Integrity does not come from write auth alone: a version is
+immutable, so a publish can add a version and can never change one, and a consumer pins the digest
+this route echoes, so what a launcher runs is decided by content addressing.
 
 Reads are anonymous for the extra reason that the cold-start path is a bootstrap script with no
 credential: a fresh platform has to be able to fetch a daemon before it has any CI to mint one with.
@@ -664,9 +660,9 @@ to send — so the cap (`qits.artifacts.docs.max-bundle-size`, default 256M) is 
 **uncompressed** running total and the file count, not against `Content-Length`, which measures the
 wrong number entirely.
 
-**Nothing here is authenticated**, the posture `/v2`, `/artifacts/npm`, `/artifacts/maven` and
-`/artifacts/daemons` all hold, and for the same reason: a version is immutable, so an open publish
-can add one and can never change one.
+**Only a CI run publishes**, the rule every wire shares (see "Who may publish" under the OCI
+registry); reads are open. A version is immutable, so a publish can add one and can never change
+one.
 
 `media_type` is resolved from the file **extension** at publish and stored, never sniffed —
 `MediaTypeSniffer` has no `woff2` entry and would reject exactly the files a static site is made of.
@@ -699,8 +695,8 @@ turn every replay of a green release into a red one over a document already exac
 belongs. The property that matters is immutability, which holds either way: the stored bytes never
 change, and the route echoes their digest.
 
-**Nothing here is authenticated**, the posture every other wire under `/artifacts` holds, and the
-publish streams rather than buffers — no `BodyHandler`, capped by `qits.artifacts.sbom.max-size`
+**Only a CI run publishes**, the rule every wire shares (see "Who may publish" under the OCI
+registry); reads are open. The publish streams rather than buffers — no `BodyHandler`, capped by `qits.artifacts.sbom.max-size`
 (default 16M).
 
 GC keeps the last 2 **released** documents of every package and nothing else — the window is `P0D`,
@@ -1767,7 +1763,7 @@ app's `application.properties` overrides them.
 | `qits.artifacts.gc.pins.projects-timeout` | `PT10S` | per-request timeout on that fetch |
 | `qits.artifacts.gc.type.<wire-name>.strategy` | per type, see "The settlement" | which engine collects a repository type: `own` or `excluded` here — the `cache` engine is qits-platform-mirror's. Every registered type must have one, and a missing entry is refused, not defaulted |
 | `qits.artifacts.gc.type.<wire-name>.window` | `P0D` for all six own types | how long an identity may sit unaccessed before it is eligible, ISO-8601. At the shipped zero the keep-classes are the whole retention policy. Absent for an `excluded` type |
-| `qits.auth.machine.required` | `false` | the machine-token rollout gate. Off, the JSON admin write surface is open — network trust. On, its writes need a bearer with `aud=qits-platform-artifacts` |
+| `qits.auth.machine.required` | `false` | the machine-token rollout gate. Off, the JSON admin write surface is open — network trust. On, its writes need a bearer with `aud=qits-platform-artifacts`, and `PublishGuard` validates a bearer presented on a publish route |
 | `qits.auth.machine.audience` | `qits-platform-artifacts` | this service's own id, and the `aud` its tokens must carry |
 | `qits.artifacts.startup-seed.enabled` | `true` | self-seed the hosted roots: `ci-screenshots`, `ci-videos`, `qits`, `npm`, `maven`, `daemons`, `docs`, `sboms`. No cache root — those are qits-platform-mirror's |
 | `quarkus.oidc.auth-server-url` | `http://qits-platform-idp:8080/idp` | the idp, reached direct on qits-net, for validating an inbound machine token |

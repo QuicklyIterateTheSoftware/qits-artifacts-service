@@ -86,6 +86,31 @@ public final class MachineTokens {
    * itself collapses a single value to a bare string, which would test a shape no token ever has.
    */
   public static String token(String... audiences) {
+    return withRoles(Set.of("qits:system", "qits-platform:system"), audiences);
+  }
+
+  /** A CI run's commissioned credential: {@code qits:ci-run}, the platform audience. */
+  public static String forCiRun() {
+    return withRoles(Set.of("qits:ci-run"), "qits-platform");
+  }
+
+  /** A platform service's credential: {@code qits:system}, the platform audience. */
+  public static String forSystem() {
+    return withRoles(Set.of("qits:system", "qits-platform:system"), "qits-platform");
+  }
+
+  /** A person's {@code qits} CLI token: {@code qits:admin}, the platform audience. */
+  public static String forAdmin() {
+    return withRoles(Set.of("qits:admin"), "qits-platform");
+  }
+
+  /** An agent's commissioned credential: {@code qits:agent}, the platform audience. */
+  public static String forAgent() {
+    return withRoles(Set.of("qits:agent"), "qits-platform");
+  }
+
+  /** A signed token with exactly these roles in {@code groups}, for the given audiences. */
+  public static String withRoles(Set<String> roles, String... audiences) {
     return Jwt.claims()
         .issuer(ISSUER)
         .subject(AUDIENCE)
@@ -93,7 +118,7 @@ public final class MachineTokens {
         // The IDP copies the configured client roles into `groups`; @RolesAllowed consumes this
         // claim after OIDC has authenticated the token. Audience-only tokens authenticate but are
         // correctly forbidden, which was the stale fixture behind the service-suite failures.
-        .groups(Set.of("qits:system", "qits-platform:system"))
+        .groups(roles)
         .expiresIn(Duration.ofMinutes(5))
         .sign(signingKey());
   }

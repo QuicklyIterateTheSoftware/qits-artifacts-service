@@ -15,26 +15,14 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 /**
- * The daemon publish carries no write guard, and this suite pins that it stays that way <b>even with
- * the machine-token gate on</b> — the twin of {@code registry/RegistryOpenPushTest} and {@code
- * npm/NpmOpenPublishTest}, asserting the same property for the fourth wire surface.
+ * An anonymous daemon publish still lands with the machine-token gate on — the known gap of the
+ * CI-only publish rule (USER RULING 2026-09-13), the twin of {@code registry/RegistryOpenPushTest}.
+ * CI steps publish the daemons with a bare {@code curl -X PUT} today, so {@code PublishGuard} judges
+ * only an identity that is presented ({@code artifacts/api/PublishGuardTest}).
  *
- * <p>A guard here existed for one commit and was removed as a decision, which is why this suite is
- * worth its lines: the surface reads like the one that ought to be gated (it is the platform's own
- * executables), so "add a token check to the daemon publish" is the change most likely to be
- * proposed again. It must not be proposed piecemeal. Machine auth arrives wholesale with
- * qits-platform-idp, for every publish path at once — gating this one alone reports a posture the
- * other three do not have.
- *
- * <p><b>What stands in for write auth.</b> A version is immutable: republishing {@code
+ * <p><b>What stands in for write auth meanwhile.</b> A version is immutable: republishing {@code
  * (name, version)} is {@code 409} even for identical bytes, so an open publish can add a version and
- * can never change one. Consumers pin the digest this route echoes, so what a launcher runs is
- * decided by content addressing rather than by who was allowed to PUT. That is the same trade {@code
- * /v2} and {@code /artifacts/npm} make.
- *
- * <p>It cannot come back by accident either: {@code AdminWriteGuard} is a JAX-RS filter and these
- * are raw Vert.x routes, so turning the gate on guards the JSON admin API and leaves this route
- * exactly as it is.
+ * can never change one. Consumers pin the digest this route echoes.
  */
 @QuarkusTest
 @TestProfile(MachineTokens.Enforced.class)

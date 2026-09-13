@@ -56,7 +56,9 @@ public class BlobController {
   @POST
   @Produces(MediaType.APPLICATION_JSON)
   @Operation(hidden = true)
-  @jakarta.annotation.security.RolesAllowed("qits:system")
+  // Only CI publishes (USER RULING 2026-09-13): CI media is a CI run's upload, never a person's,
+  // an agent's or a platform service's.
+  @jakarta.annotation.security.RolesAllowed(PublishGuard.CI_RUN)
   public Response upload(
       @PathParam("repo") String repo,
       @HeaderParam(HttpHeaders.CONTENT_TYPE) String contentType,

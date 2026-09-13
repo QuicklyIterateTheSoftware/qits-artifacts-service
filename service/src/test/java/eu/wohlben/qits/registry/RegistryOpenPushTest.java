@@ -16,21 +16,13 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 /**
- * The registry carries no write guard, and this suite pins that it stays that way <b>even with the
- * machine-token gate on</b> — that gate guards the blob-store JSON admin API and must not drag
- * {@code /v2} back behind a docker login. The coupling existed once (the retired {@code
- * RegistryAuthGuard} shared the JSON API's static secret), so the regression this profile exists to
- * catch is precisely "someone turned enforcement on and every producer's push started failing".
- *
- * <p>It cannot come back by accident either: {@code AdminWriteGuard} is a JAX-RS filter and these
- * are raw Vert.x routes, and no docker client can present a bearer from qits-platform-idp anyway.
- * Guarding {@code /v2} would be its own decision, with its own credential.
- *
- * <p>Why the registry is open: on qits-net, producers are trusted (the platform posture — and what
- * lets an automated publisher push with no credential store), and from outside, qits-gateway keeps
- * {@code /v2} write methods off its token-free allowlist, so an internet push dies on a session
- * challenge no registry client can answer. External write protection is the gateway's; see the
- * comment in {@code RegistryRoutes.init}.
+ * An anonymous push still lands with the machine-token gate on — the known gap of the CI-only
+ * publish rule (USER RULING 2026-09-13). Every CI step on qits-net pushes with no credential today
+ * ({@code buildctl} to the store's alias), so {@code PublishGuard} lets a caller with no identity
+ * through and judges only an identity that is presented; {@code artifacts/api/PublishGuardTest}
+ * proves that half. The regression this suite catches is "enforcement went on and every CI push
+ * started failing". When the publishers present the run's credential, it flips to "an anonymous
+ * push is refused".
  */
 @QuarkusTest
 @TestProfile(MachineTokens.Enforced.class)

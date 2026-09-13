@@ -14,7 +14,11 @@ import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-/** npm's ceremonial publish token must not become an OIDC credential on the tokenless raw route. */
+/**
+ * npm's ceremonial publish token is no identity: it never reaches OIDC, and the publish lands. CI's
+ * {@code .npmrc} carries {@code _authToken=qits-ci}, so this is the anonymous half of the CI-only
+ * publish rule ({@code artifacts/api/PublishGuardTest} proves the other half).
+ */
 @QuarkusTest
 @TestProfile(MachineTokens.Enforced.class)
 class NpmOpenPublishTest {

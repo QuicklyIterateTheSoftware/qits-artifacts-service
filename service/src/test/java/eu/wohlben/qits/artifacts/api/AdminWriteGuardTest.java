@@ -80,9 +80,21 @@ class AdminWriteGuardTest {
         .then()
         .statusCode(200);
 
+    // The upload is a publish, so it takes a CI run's token; the service token that ensured the
+    // repository is refused on it.
+    given()
+        .header("Authorization", token)
+        .contentType("image/png")
+        .headers(ArtifactsTestMedia.screenshotHeaders("main", "checkout", 100, 50))
+        .body(ArtifactsTestMedia.png(100, 50, 10))
+        .when()
+        .post("/artifacts/api/repositories/guarded/blobs")
+        .then()
+        .statusCode(403);
+
     String id =
         given()
-            .header("Authorization", token)
+            .header("Authorization", bearer(MachineTokens.forCiRun()))
             .contentType("image/png")
             .headers(ArtifactsTestMedia.screenshotHeaders("main", "checkout", 100, 50))
             .body(ArtifactsTestMedia.png(100, 50, 11))

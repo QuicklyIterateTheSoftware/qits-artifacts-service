@@ -49,11 +49,11 @@ import org.junit.jupiter.api.condition.EnabledIf;
  *       any of them with a {@code 400}, so a partial header set reads as a malformed image rather
  *       than as an incomplete declaration. {@link StoryMedia#screenshotHeaders} is the complete set
  *       precisely so a caller cannot drift from it.
- *   <li><b>The upload is {@code @RolesAllowed("qits:system")}</b>, unlike every other publish wire
- *       in this repository. The CI media plane is a JAX-RS boundary rather than a raw-Vert.x one,
- *       so tokenless-on-qits-net does not apply to it: the request carries the {@code
- *       X-Qits-User}/{@code X-Qits-Roles} pair qits-gateway would assert for a machine, because the
- *       packaged process runs {@code LaunchMode.NORMAL} and is anonymous without them.
+ *   <li><b>The upload is {@code @RolesAllowed("qits:ci-run")}</b>: only a CI run publishes. The CI
+ *       media plane is a JAX-RS boundary rather than a raw-Vert.x one, so tokenless-on-qits-net
+ *       does not apply to it: the request carries an {@code X-Qits-User}/{@code X-Qits-Roles} pair
+ *       naming a CI run, because the packaged process runs {@code LaunchMode.NORMAL} and is
+ *       anonymous without them.
  * </ul>
  */
 @QuarkusIntegrationTest
@@ -169,7 +169,7 @@ public class ScreenshotPublishIT {
             header(meta, "media.resolution.width"),
             header(meta, "media.resolution.height"),
             "X-Qits-User: " + PUBLISHER,
-            "X-Qits-Roles: qits:system",
+            "X-Qits-Roles: qits:ci-run",
             "screenshot.png",
             "publish-response.json",
             target.apiBase() + "/repositories/" + REPOSITORY + "/blobs")
