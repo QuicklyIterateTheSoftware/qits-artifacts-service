@@ -29,7 +29,7 @@ class NpmOpenPublishTest {
   void ensureRepository() {
     given()
         .contentType(ContentType.JSON)
-        .header("Authorization", "Bearer " + MachineTokens.forThisService())
+        .header("Authorization", "Bearer " + MachineTokens.forSystem())
         .body(Map.of("type", "npm-packages"))
         .when()
         .put("/artifacts/api/repositories/npm")

@@ -26,9 +26,11 @@ import java.util.Set;
  * initialiser would be two different keypairs and every signature would fail verification. A
  * checked-in test key signs nothing a deployment trusts.
  *
- * <p>Use {@link Enforced} as the test profile and {@link #forThisService()} as the Authorization
- * value. {@link #forAnotherService()} is a correctly signed token minted for qits-ci, which is how
- * "a token exists but is not ours" gets asserted without collapsing into "no token".
+ * <p>Use {@link Enforced} as the test profile and one of the role factories below as the
+ * Authorization value — each mints the one platform audience and differs only in {@code groups},
+ * which is what decides anything here. {@link #forAnotherAudience()} is a correctly signed token
+ * addressed somewhere else entirely, which is how "a token exists but is not ours" gets asserted
+ * without collapsing into "no token".
  */
 public final class MachineTokens {
 
@@ -38,8 +40,14 @@ public final class MachineTokens {
    */
   public static final String ISSUER = "https://qits-platform-idp.test/idp";
 
-  /** This service's id — its {@code aud}, and {@code qits.auth.machine.audience}. */
-  public static final String AUDIENCE = "qits-platform-artifacts";
+  /**
+   * The one platform audience — the {@code aud} every machine token carries, and {@code
+   * qits.auth.machine.audience}.
+   */
+  public static final String AUDIENCE = "qits-platform";
+
+  /** The client qits-platform-idp minted the token for, which is what lands in {@code sub}. */
+  private static final String SUBJECT = "qits-platform-artifacts";
 
   private static final String SIGNING_KEY = "/machine-token-signing-key.pem";
 
@@ -70,50 +78,44 @@ public final class MachineTokens {
     }
   }
 
-  /** A valid bearer for qits-platform-artifacts — what a client granted this audience presents. */
-  public static String forThisService() {
-    return token(AUDIENCE);
-  }
-
-  /** A valid bearer minted for qits-ci: correctly signed, addressed elsewhere. */
-  public static String forAnotherService() {
-    return token("qits-ci");
-  }
-
   /**
-   * A signed token for the given audiences. {@code aud} is spelled as a JSON array explicitly,
-   * because that is what qits-platform-idp emits even for one audience — and a builder left to
-   * itself collapses a single value to a bare string, which would test a shape no token ever has.
+   * A valid bearer carrying an audience this platform never issues: correctly signed, and refused
+   * by quarkus-oidc before any guard runs.
    */
-  public static String token(String... audiences) {
-    return withRoles(Set.of("qits:system", "qits-platform:system"), audiences);
+  public static String forAnotherAudience() {
+    return withRoles(Set.of("qits:system"), "some-other-audience");
   }
 
   /** A CI run's commissioned credential: {@code qits:ci-run}, the platform audience. */
   public static String forCiRun() {
-    return withRoles(Set.of("qits:ci-run"), "qits-platform");
+    return withRoles(Set.of("qits:ci-run"), AUDIENCE);
   }
 
   /** A platform service's credential: {@code qits:system}, the platform audience. */
   public static String forSystem() {
-    return withRoles(Set.of("qits:system", "qits-platform:system"), "qits-platform");
+    return withRoles(Set.of("qits:system"), AUDIENCE);
   }
 
   /** A person's {@code qits} CLI token: {@code qits:admin}, the platform audience. */
   public static String forAdmin() {
-    return withRoles(Set.of("qits:admin"), "qits-platform");
+    return withRoles(Set.of("qits:admin"), AUDIENCE);
   }
 
   /** An agent's commissioned credential: {@code qits:agent}, the platform audience. */
   public static String forAgent() {
-    return withRoles(Set.of("qits:agent"), "qits-platform");
+    return withRoles(Set.of("qits:agent"), AUDIENCE);
   }
 
-  /** A signed token with exactly these roles in {@code groups}, for the given audiences. */
+  /**
+   * A signed token with exactly these roles in {@code groups}, for the given audiences. {@code aud}
+   * is spelled as a JSON array explicitly, because that is what qits-platform-idp emits even for one
+   * audience — and a builder left to itself collapses a single value to a bare string, which would
+   * test a shape no token ever has.
+   */
   public static String withRoles(Set<String> roles, String... audiences) {
     return Jwt.claims()
         .issuer(ISSUER)
-        .subject(AUDIENCE)
+        .subject(SUBJECT)
         .claim("aud", Json.createArrayBuilder(List.of(audiences)).build())
         // The IDP copies the configured client roles into `groups`; @RolesAllowed consumes this
         // claim after OIDC has authenticated the token. Audience-only tokens authenticate but are

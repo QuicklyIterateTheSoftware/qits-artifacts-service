@@ -83,7 +83,7 @@ class PublishGuardTest {
         .forEach(
             (repository, type) ->
                 given()
-                    .header("Authorization", "Bearer " + MachineTokens.forThisService())
+                    .header("Authorization", "Bearer " + MachineTokens.forSystem())
                     .contentType(ContentType.JSON)
                     .body(Map.of("type", type))
                     .when()
@@ -129,7 +129,7 @@ class PublishGuardTest {
   @ParameterizedTest
   @EnumSource(Wire.class)
   void aForwardedServiceOrAgentIsRefused(Wire wire) {
-    assertStatus(403, publish(wire, forwarded("dev-qits-ci", "qits:system,qits-platform:system")));
+    assertStatus(403, publish(wire, forwarded("dev-qits-ci", "qits:system")));
     assertStatus(403, publish(wire, forwarded("dyn-workspace-1", "qits:agent")));
   }
 
@@ -155,8 +155,9 @@ class PublishGuardTest {
   @ParameterizedTest
   @EnumSource(Wire.class)
   void aTokenThisServiceDoesNotAcceptIsRefused(Wire wire) {
-    // Correctly signed, but addressed to another service: quarkus-oidc refuses it.
-    assertStatus(401, publish(wire, bearer(MachineTokens.forAnotherService())));
+    // Correctly signed, but addressed to an audience this platform never issues: quarkus-oidc
+    // refuses it.
+    assertStatus(401, publish(wire, bearer(MachineTokens.forAnotherAudience())));
   }
 
   // --- the known gap, pinned so that closing it is a visible change --------------------------

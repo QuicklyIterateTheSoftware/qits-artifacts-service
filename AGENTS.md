@@ -405,9 +405,9 @@ collection" section is the contract; these are the rules that get "helpfully" re
   sends it: one platform-wide pin set, read once per run, given to every deleter. A missing member
   is that source **unanswered**, not "nothing is pinned", so the run refuses as before; no body is
   the old call exactly. `POST /gc/plan` allows `qits:admin` **or** `qits:system` (the `GET` stays
-  admin-only, the sweeps stay `qits:system`): the orchestrator is a machine, holds
-  `qits:system,qits-platform:system`, and is already allowed to run the sweep this plan feeds. As a
-  write method it also sits inside `AdminWriteGuard`. **`GET /store/summary` allows the same pair**,
+  admin-only, the sweeps stay `qits:system`): the orchestrator is a machine, holds `qits:system`,
+  and is already allowed to run the sweep this plan feeds. As a write method it also sits inside
+  `AdminWriteGuard`. **`GET /store/summary` allows the same pair**,
   for the same caller and the same reason: the orchestrator reads the store summary before and after
   a run so the run's own receipt states what the sweep cost, and a machine allowed to execute the
   sweep but not to read the number it moved would be the strange posture. The readers are the no-body fallback and

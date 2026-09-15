@@ -11,7 +11,7 @@ import org.junit.jupiter.api.Test;
 
 /**
  * The JSON admin API with the machine-token gate ON — the posture a deployment with
- * qits-platform-idp runs. Writes (PUT/POST/DELETE) need a bearer minted for qits-platform-artifacts;
+ * qits-platform-idp runs. Writes (PUT/POST/DELETE) need a bearer carrying the platform audience;
  * reads stay open so a blob is usable directly as an {@code <img>} src.
  *
  * <p>The gate-OFF posture is what every other suite here runs under, so "unchanged when the gate is
@@ -37,12 +37,12 @@ class AdminWriteGuardTest {
   }
 
   @Test
-  void aWriteWithATokenForAnotherServiceIsRejected() {
+  void aWriteWithATokenForAnotherAudienceIsRejected() {
     // Signed by the same issuer and perfectly valid — just not addressed to us. quarkus-oidc
     // refuses it on quarkus.oidc.token.audience before MachineAuth's own audience check is even
     // reached, so this is a 401 rather than the 403 an already-authenticated caller would get.
     given()
-        .header("Authorization", bearer(MachineTokens.forAnotherService()))
+        .header("Authorization", bearer(MachineTokens.forAnotherAudience()))
         .contentType(ContentType.JSON)
         .body(Map.of("type", "ci-screenshots"))
         .when()
@@ -68,8 +68,8 @@ class AdminWriteGuardTest {
   }
 
   @Test
-  void aWriteWithOurTokenSucceedsAndReadsStayOpen() {
-    String token = bearer(MachineTokens.forThisService());
+  void aWriteWithAPlatformTokenSucceedsAndReadsStayOpen() {
+    String token = bearer(MachineTokens.forSystem());
 
     given()
         .header("Authorization", token)
@@ -132,7 +132,7 @@ class AdminWriteGuardTest {
         .statusCode(401);
 
     given()
-        .header("Authorization", bearer(MachineTokens.forThisService()))
+        .header("Authorization", bearer(MachineTokens.forSystem()))
         .contentType(ContentType.JSON)
         .body(Map.of("type", "oci-images"))
         .when()
@@ -143,7 +143,7 @@ class AdminWriteGuardTest {
 
   @Test
   void theMachineIdentityMayPostTheGcPlanItIsAllowedToSweep() {
-    // qits-platform-orchestrator authenticates as qits:system,qits-platform:system and never holds
+    // qits-platform-orchestrator authenticates as qits:system and never holds
     // qits:admin, so a qits:admin-only POST /gc/plan would 403 the one caller the route exists for
     // — while the sweep it feeds stayed open to that same token. This asserts the pair: the machine
     // reads the plan, and it reads it with a body of supplied pins, which is the whole call.
@@ -152,7 +152,7 @@ class AdminWriteGuardTest {
     // that source unanswered. Empty answers throughout, because what is on trial here is the role
     // rather than the keep-set.
     given()
-        .header("Authorization", bearer(MachineTokens.forThisService()))
+        .header("Authorization", bearer(MachineTokens.forSystem()))
         .contentType(ContentType.JSON)
         .body(
             """

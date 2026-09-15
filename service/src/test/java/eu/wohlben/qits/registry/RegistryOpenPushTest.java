@@ -37,7 +37,7 @@ class RegistryOpenPushTest {
   void ensureRepository() {
     given()
         .contentType(ContentType.JSON)
-        .header("Authorization", "Bearer " + MachineTokens.forThisService())
+        .header("Authorization", "Bearer " + MachineTokens.forSystem())
         .body(Map.of("type", "oci-images"))
         .when()
         .put("/artifacts/api/repositories/qits")

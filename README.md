@@ -134,7 +134,7 @@ A **repository** here is a named bucket of artifacts — the Maven/npm sense of 
 `domain.repository`. The resource keeps that name; the `artifacts` the path used to repeat is gone,
 because the segment already says it.
 
-Writes require a machine token from qits-platform-idp — a bearer with `aud=qits-platform-artifacts`, checked by
+Writes require a machine token from qits-platform-idp — a bearer with `aud=qits-platform`, checked by
 `AdminWriteGuard`. The check sits behind the platform-wide rollout gate `qits.auth.machine.required`,
 which is off by default: off, the write surface is open exactly as it was before qits-platform-idp existed.
 The upload is a publish, so it takes `qits:ci-run` only: CI is the only publisher (USER RULING
@@ -1237,8 +1237,8 @@ exactly as an unreachable service does. A deployments document of `{"pins":[]}` 
 is a real answer — a platform with nothing deployed, pinning nothing, and a run may proceed on it. A body that is not that shape is a `400` rather
 than a quiet fall back to the readers. **`POST /gc/plan` accepts `qits:admin` or `qits:system`** —
 the `GET` takes `qits:admin`, `qits:agent`, `qits:system` or `qits:ci-run` and both sweeps stay `qits:system` — because the caller that needs
-it is a machine: the orchestrator authenticates as `qits:system,qits-platform:system` and never
-holds `qits:admin`, and it is the same machine already allowed to run the sweep. Being a `POST` also
+it is a machine: the orchestrator authenticates as `qits:system` and never holds `qits:admin`, and
+it is the same machine already allowed to run the sweep. Being a `POST` also
 puts it inside `AdminWriteGuard`, so once `qits.auth.machine.required` is on it needs the machine
 audience the sweep needs. Sending no body at all is unchanged in every respect, which
 is what the SPA and every operator recipe do, and the HTTP readers stay the fallback for them.
@@ -1765,8 +1765,8 @@ app's `application.properties` overrides them.
 | `qits.artifacts.gc.pins.projects-timeout` | `PT10S` | per-request timeout on that fetch |
 | `qits.artifacts.gc.type.<wire-name>.strategy` | per type, see "The settlement" | which engine collects a repository type: `own` or `excluded` here — the `cache` engine is qits-platform-mirror's. Every registered type must have one, and a missing entry is refused, not defaulted |
 | `qits.artifacts.gc.type.<wire-name>.window` | `P0D` for all six own types | how long an identity may sit unaccessed before it is eligible, ISO-8601. At the shipped zero the keep-classes are the whole retention policy. Absent for an `excluded` type |
-| `qits.auth.machine.required` | `false` | the machine-token rollout gate. Off, the JSON admin write surface is open — network trust. On, its writes need a bearer with `aud=qits-platform-artifacts`, and `PublishGuard` validates a bearer presented on a publish route |
-| `qits.auth.machine.audience` | `qits-platform-artifacts` | this service's own id, and the `aud` its tokens must carry |
+| `qits.auth.machine.required` | `false` | the machine-token rollout gate. Off, the JSON admin write surface is open — network trust. On, its writes need a bearer with `aud=qits-platform`, and `PublishGuard` validates a bearer presented on a publish route |
+| `qits.auth.machine.audience` | `qits-platform` | the one platform audience, and the `aud` every machine token carries. `quarkus.oidc.token.audience` is the same value one layer down |
 | `qits.artifacts.startup-seed.enabled` | `true` | self-seed the hosted roots: `ci-screenshots`, `ci-videos`, `qits`, `npm`, `maven`, `daemons`, `docs`, `sboms`. No cache root — those are qits-platform-mirror's |
 | `quarkus.oidc.auth-server-url` | `http://qits-platform-idp:8080/idp` | the idp, reached direct on qits-net, for validating an inbound machine token |
 | `qits.artifacts.oci.max-layer-size` | `1G` | the registry's per-layer cap, enforced while streaming |

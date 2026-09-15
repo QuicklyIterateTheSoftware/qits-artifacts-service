@@ -13,9 +13,10 @@ import java.util.Set;
  * its callers are CI processes and platform services, never a browser session.
  *
  * <p>{@link MachineAuth#require()} is the whole check, and {@code qits.auth.machine.audience} is
- * {@code qits-platform-artifacts}, so it reads as "a validated bearer minted for this service". No
- * claim is inspected: nothing under this API belongs to one project, and a token that reaches here
- * at all was issued to a client qits-platform-idp trusts with the blob store.
+ * {@code qits-platform}, the one audience every machine token carries, so it reads as "a validated
+ * bearer this platform minted". No claim is inspected: nothing under this API belongs to one
+ * project, and a token that reaches here at all was issued to a client qits-platform-idp trusts
+ * with the blob store.
  *
  * <p><b>The rollout gate decides whether it does anything.</b> With {@code
  * qits.auth.machine.required} off — the shipped default — every call returns at once and the write

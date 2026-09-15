@@ -76,7 +76,7 @@ public class TokenValidationBootstrapIT {
   public static class PackagedWithMockIdp implements QuarkusTestProfile {
 
     /** The shipped {@code qits.auth.machine.audience} — deliberately NOT overridden. */
-    static final String AUDIENCE = "qits-platform-artifacts";
+    static final String AUDIENCE = "qits-platform";
 
     @Override
     public Map<String, String> getConfigOverrides() {
@@ -173,7 +173,7 @@ public class TokenValidationBootstrapIT {
         .as("jwks-fetched");
 
     // End (b), the registry side: those keys are what token validation now runs on. A platform
-    // service's bearer (aud = this service, roles in `groups`) opens the guarded admin write —
+    // service's bearer (aud = the platform, roles in `groups`) opens the guarded admin write —
     // AdminWriteGuard's MachineAuth.require(), behind the same PUT every CI process uses.
     //
     // The actor is set BEFORE the call: the tap sees a request, never a narrative role, and this is
@@ -204,8 +204,8 @@ public class TokenValidationBootstrapIT {
   @UserStoryDescription(
       """
       The flip side of trusting the platform's keys: a token signed by a key the published JWKS
-      never carried, or minted for another service's audience, is refused at the admin door —
-      however well-formed it looks. The refusal is scoped to that door: the byte wires (`docker`,
+      never carried, or carrying an audience this platform never issues, is refused at the admin
+      door — however well-formed it looks. The refusal is scoped to that door: the byte wires (`docker`,
       `npm`, `mvn`) keep answering on qits-net trust, gate on or off, until machine auth arrives
       for all of them at once.
       """)
@@ -237,7 +237,7 @@ public class TokenValidationBootstrapIT {
         .as("unknown-key-refused");
 
     String wrongAudienceToken =
-        idp.token().audience("some-other-service").groups("qits:system").mint();
+        idp.token().audience("some-other-audience").groups("qits:system").mint();
     given()
         .header("Authorization", "Bearer " + wrongAudienceToken)
         .contentType("application/json")
@@ -246,7 +246,7 @@ public class TokenValidationBootstrapIT {
         .then()
         .statusCode(401);
     story
-        .note("a token minted for another service's audience is refused just the same")
+        .note("a token carrying an audience this platform never issues is refused just the same")
         .as("wrong-audience-refused");
 
     // The scope of the refusal, asserted from the other side: an anonymous docker ping still

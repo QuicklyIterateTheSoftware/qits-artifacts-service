@@ -36,7 +36,7 @@ class SbomOpenPublishTest {
   @BeforeEach
   void ensureRepository() {
     given()
-        .header("Authorization", "Bearer " + MachineTokens.forThisService())
+        .header("Authorization", "Bearer " + MachineTokens.forSystem())
         .contentType("application/json")
         .body("{\"type\":\"sboms\"}")
         .when()

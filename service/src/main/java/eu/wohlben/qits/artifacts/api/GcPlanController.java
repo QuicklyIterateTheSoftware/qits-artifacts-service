@@ -92,11 +92,10 @@ public class GcPlanController {
    *
    * <p><b>{@code qits:system} may read it as well as {@code qits:admin}</b>, which is the one place
    * this route's roles differ from the {@code GET}'s. The caller that needs it is a machine —
-   * qits-platform-orchestrator authenticates as {@code qits:system,qits-platform:system} and never
-   * holds {@code qits:admin} — and it is the same machine that is allowed to run the sweep
-   * afterwards. Letting it execute a plan it may not read would be the strange posture, not this
-   * one. Nothing is widened for people: a person still needs {@code qits:admin}, and the route
-   * reads.
+   * qits-platform-orchestrator authenticates as {@code qits:system} and never holds {@code
+   * qits:admin} — and it is the same machine that is allowed to run the sweep afterwards. Letting it
+   * execute a plan it may not read would be the strange posture, not this one. Nothing is widened
+   * for people: a person still needs {@code qits:admin}, and the route reads.
    *
    * <p>With no body, or a body without {@code pins}, it answers exactly what the {@code GET}
    * answers.

@@ -49,7 +49,7 @@ class MachineReadAccessTest {
         .forEach(
             (repository, type) ->
                 given()
-                    .header("Authorization", "Bearer " + MachineTokens.forThisService())
+                    .header("Authorization", "Bearer " + MachineTokens.forSystem())
                     .contentType(ContentType.JSON)
                     .body(Map.of("type", type))
                     .when()
