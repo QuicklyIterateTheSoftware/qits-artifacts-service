@@ -1,0 +1,105 @@
+archetype: java-service
+artifacts:
+  - { type: docker, name: qits/qits-artifacts, sbom: .sbom/sbom.json }
+userflows: qits-artifacts
+
+# THE VERIFY HERE RUNS WITH QUINOA ON, which is the opposite of every sibling and of the recipe.
+# The stories exercise the served SPA, so the client is built inside this step —
+# `package-manager-install` plus a pinned node version, and `quinoa.ci` — and `-Dquarkus.quinoa=false`
+# would take the thing under test away. The step also runs on `userflows-base` as `pwuser` rather
+# than on `maven-base` as `build`, and wants 3600s rather than 2400. Four reasons, one slot.
+release-request:
+  - image: qits/build-images/node-docker-base:latest
+    build: true
+    timeout-seconds: 3600
+    script: |
+      origin_parent="${QITS_CI_REPOSITORY_URL%/*}"
+      webui_dirs=""
+      if [ -f .gitmodules ]; then
+        for key in $(git config -f .gitmodules --name-only --get-regexp '^submodule\..*\.path$'); do
+          name=${key#submodule.}
+          name=${name%.path}
+          path=$(git config -f .gitmodules --get "$key")
+          git -c "submodule.$name.url=$origin_parent/$name" submodule update --init "$path"
+          if [ -f "$path/package.json" ]; then
+            webui_dirs="$webui_dirs $path"
+          fi
+        done
+      fi
+      npm_hosted_origin=$(node -p 'new URL(process.env.QITS_NPM_REGISTRY_URL).origin')
+      npm_proxy_origin=$(node -p 'new URL(process.env.QITS_NPM_PROXY_URL).origin')
+      npm_hosted_path=$(node -p 'new URL(process.env.QITS_NPM_REGISTRY_URL).pathname')
+      for dir in $webui_dirs; do
+        (
+          cd "$dir"
+          if [ -f package-lock.json ]; then
+            sed -i -E \
+              -e "s#(\"resolved\": \")https?://[^/\"]+#\1$npm_proxy_origin#" \
+              -e "s#(\"resolved\": \")https?://[^/\"]+($npm_hosted_path)#\1$npm_hosted_origin\2#" \
+              package-lock.json
+          fi
+          env npm_config_registry="$QITS_NPM_PROXY_URL" \
+              "npm_config_@qits:registry=$QITS_NPM_REGISTRY_URL" \
+              npm ci --no-audit --no-fund
+          npm run build
+        )
+      done
+      buildctl build --frontend dockerfile.v0 \
+        --local context=. --local dockerfile=docker \
+        --opt build-arg:QITS_MAVEN_REPOSITORY_URL="$QITS_MAVEN_REGISTRY_URL" \
+        --opt build-arg:QITS_MAVEN_CENTRAL_URL="${QITS_MAVEN_PROXY_URL:-}" \
+        --secret id=qits-client-id,src=/tmp/qits-client-id \
+        --secret id=qits-client-secret,src=/tmp/qits-client-secret
+
+  # `user: pwuser` and NOT a switch inside the script: a step container starts --cap-drop=ALL, so
+  # `su` cannot switch user at all. userflows-base carries a passwd-backed non-root user.
+  #
+  # THE SUBMODULE AND THE LOCKFILE ARE THIS STEP'S OWN BUSINESS TOO. A step shares no working
+  # directory with any other — each is an ephemeral container with its own clone — and the daemon's
+  # clone does not recurse, so without the walk below Quinoa finds an EMPTY webui directory, which
+  # is the one state it calls a misconfiguration rather than "no client". The origins are read with
+  # `sed` rather than `node -p`: userflows-base carries no node until Quinoa installs the pinned one.
+  - image: qits/build-images/userflows-base:latest
+    user: pwuser
+    gating: false
+    timeout-seconds: 3600
+    script: |
+      origin_parent="${QITS_CI_REPOSITORY_URL%/*}"
+      if [ -f .gitmodules ]; then
+        for key in $(git config -f .gitmodules --name-only --get-regexp '^submodule\..*\.path$'); do
+          name=${key#submodule.}
+          name=${name%.path}
+          path=$(git config -f .gitmodules --get "$key")
+          git -c "submodule.$name.url=$origin_parent/$name" submodule update --init "$path"
+          if [ -f "$path/package-lock.json" ]; then
+            npm_hosted_origin=$(echo "$QITS_NPM_REGISTRY_URL" | sed -E 's#^(https?://[^/]+).*#\1#')
+            npm_proxy_origin=$(echo "$QITS_NPM_PROXY_URL" | sed -E 's#^(https?://[^/]+).*#\1#')
+            npm_hosted_path=$(echo "$QITS_NPM_REGISTRY_URL" | sed -E 's#^https?://[^/]+##')
+            sed -i -E \
+              -e "s#(\"resolved\": \")https?://[^/\"]+#\1$npm_proxy_origin#" \
+              -e "s#(\"resolved\": \")https?://[^/\"]+($npm_hosted_path)#\1$npm_hosted_origin\2#" \
+              "$path/package-lock.json"
+          fi
+        done
+      fi
+      export npm_config_registry="$QITS_NPM_PROXY_URL"
+      export QITS_MAVEN_REPOSITORY_URL="$QITS_MAVEN_REGISTRY_URL"
+      export QITS_MAVEN_CENTRAL_URL="${QITS_MAVEN_PROXY_URL:-}"
+      env "npm_config_@qits:registry=$QITS_NPM_REGISTRY_URL" \
+        ./mvnw -B -ntp -s .qits-maven-settings.xml verify \
+        -Dqits.maven.repository.url="$QITS_MAVEN_REPOSITORY_URL" \
+        -Dquarkus.quinoa.package-manager-install=true \
+        -Dquarkus.quinoa.package-manager-install.node-version=22.22.0 \
+        -Dquarkus.quinoa.ci=true
+      tar -czf /tmp/userstories.tgz -C service/target/userstories .
+      status=$(curl -sS -o /tmp/docs-publish.out -w '%{http_code}' \
+        -X PUT --data-binary @/tmp/userstories.tgz \
+        -H "X-Artifacts-Meta-git.branch.name: $QITS_CI_BRANCH" \
+        -H "X-Artifacts-Meta-git.commit.hash: $QITS_CI_SHA" \
+        -H "X-Artifacts-Meta-git.repository.name: qits-artifacts" \
+        "$QITS_DOCS_URL/@userflows/qits-artifacts/-/$QITS_CI_SHA")
+      case "$status" in
+        201) echo "published userflows for qits-artifacts@$QITS_CI_SHA ($QITS_CI_BRANCH)" ;;
+        409) echo "userflows for qits-artifacts@$QITS_CI_SHA are already published — skipping" ;;
+        *)   echo "docs publish failed: HTTP $status"; cat /tmp/docs-publish.out; exit 1 ;;
+      esac
