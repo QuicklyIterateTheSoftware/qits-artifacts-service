@@ -685,24 +685,26 @@ precisely because it is harness plumbing and not a step in anybody's story.
   `OciConformanceIT` skip without their gates. The `service` module opts back into ITs
   (`skipITs=false` in its pom), because `TokenValidationBootstrapIT` and the 21 story classes under
   `eu.wohlben.qits.stories` are **userflows** and `target/userstories/` is a build product a plain
-  verify regenerates. The non-gating half of `.config/qits/ci-event-release-request.yml` runs the
-  same verify at the release-request fold in ONE step on `userflows-base` (Maven + baked Chromium + skopeo,
-  `user: pwuser` for zonky's initdb, the step-image contract since qits-build-images-oci 2026.828.162434) — one step because
-  step containers share no workspace (each clones for itself), so the SPA bundle must be built in
-  the same container that packages it: the lockfile origin swap runs in the script and Quinoa's
-  managed node (the pinned 22.22.0) does the real `npm ci` + build with `npm_config_*` registries
-  from the environment. The 120s settle-hold it used to open with is gone: no QA run deploys
-  anything, so there is no container swap to wait out. It publishes the reports as the
-  `@userflows/qits-artifacts` docs site, version = the fold's merged sha, and it declares
-  `gating: false` — a red story fails the run and shows red without holding the release request's
-  build gate. **Per-push CI is retired**: this repository has neither `ci-post-receive.yml` nor
-  `ci-event-build.yml` nor `ci-event-userflows.yml`, and nothing builds a branch. Two pipelines are
-  left — `ci-event-release-request.yml`, the QA pipeline above, which reacts to a release request's
-  octopus fold (`release/<id>`) and is discovered at `main`'s head so a fold cannot edit the CI that
-  gates it; and `ci-event-release.yml`, which builds the release tag on `SCMRelease` and publishes
-  the CalVer coordinate. The maintenance bump train's release call is not a trigger here either: it
-  opens a release REQUEST against qits-projects, with its own credential, on the push that creates
-  the bump.
+  verify regenerates. The userflow half of the release-request phase of `.config/qits/release.yml`
+  (composed from its archetype) runs the same verify at the release-request fold in ONE step on
+  `userflows-base` (Maven + baked Chromium + skopeo, `user: pwuser` for zonky's initdb, the
+  step-image contract since qits-build-images-oci 2026.828.162434) — one step because step
+  containers share no workspace (each clones for itself), so the SPA bundle must be built in the
+  same container that packages it: the lockfile origin swap runs in the script and Quinoa's managed
+  node (the pinned 22.22.0) does the real `npm ci` + build with `npm_config_*` registries from the
+  environment. The 120s settle-hold it used to open with is gone: no QA run deploys anything, so
+  there is no container swap to wait out. It publishes the reports as the
+  `@userflows/qits-artifacts` docs site, version = the fold's merged sha, and it **gates like every
+  other step**: a red story is a red verdict for the whole fold. A run carries ONE verdict, never
+  one per step, so a `gating: false` here would only have erased the run's pass and parked the
+  release request on "Waiting for a gating CI verdict". **Per-push CI is retired**: this repository
+  has neither `ci-post-receive.yml` nor `ci-event-build.yml` nor `ci-event-userflows.yml`, and
+  nothing builds a branch. Two pipelines are left — `ci-event-release-request.yml`, the QA pipeline
+  above, which reacts to a release request's octopus fold (`release/<id>`) and is discovered at
+  `main`'s head so a fold cannot edit the CI that gates it; and `ci-event-release.yml`, which builds
+  the release tag on `SCMRelease` and publishes the CalVer coordinate. The maintenance bump train's
+  release call is not a trigger here either: it opens a release REQUEST against qits-projects, with
+  its own credential, on the push that creates the bump.
 - **Every module's suite runs on a REAL PostgreSQL**, spawned as a child process from zonky binaries
   that resolve as ordinary Maven artifacts. Not a container: the clone-alone rule forbids one, and
   the store's only engine is postgres now — `bytea`, an advisory lock, a partial index and an

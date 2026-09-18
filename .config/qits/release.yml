@@ -61,7 +61,6 @@ release-request:
   # `sed` rather than `node -p`: userflows-base carries no node until Quinoa installs the pinned one.
   - image: qits/build-images/userflows-base:latest
     user: pwuser
-    gating: false
     timeout-seconds: 3600
     script: |
       origin_parent="${QITS_CI_REPOSITORY_URL%/*}"
