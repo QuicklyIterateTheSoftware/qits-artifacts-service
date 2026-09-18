@@ -36,6 +36,9 @@ class DaemonBinariesGcAdapterTest extends GcFixture {
 
   private static final String CI = "qits-ci-daemon";
 
+  /** The daemon qits-ci's ladder says nothing about, and the one the rot was measured on. */
+  private static final String CLI = "qits-platform-access-cli";
+
   @Inject DaemonBinariesGcStrategy strategy;
 
   @Test
@@ -94,6 +97,87 @@ class DaemonBinariesGcAdapterTest extends GcFixture {
     assertEquals(GcPins.BY_CI, ruleFor(plan.kept(), CI + "@2026.501.1"));
     assertEquals(GcPins.BY_CI, ruleFor(plan.kept(), CI + "@2026.502.2"));
     assertEquals(OwnArtifactsStrategy.KEPT_RELEASE, ruleFor(plan.kept(), CI + "@2026.802.40"));
+  }
+
+  @Test
+  void aDaemonACarrierCoordinatePinsSurvivesAVersionTheBeltWouldHaveSpent() throws Exception {
+    // The gap the ladder cannot cover, and the whole point of the second source. qits-ci's ladder is
+    // about qits-ci-daemon; this daemon is the `qits` CLI, whose version is pinned in qits-ci's pom
+    // and in qits-workspace-oci's — lines in a manifest, which nothing in this store can see. At a
+    // zero window the belt of two is then the entire keep-set, so the pinned version is condemned on
+    // the run that finds it and every pipeline fetching it 404s. That is not a hypothetical: it is
+    // what happened, and it is why the daemon row exists.
+    //
+    // The first assertion is the belt WITHOUT the pin, so the keep below is provably the pin's.
+    repository();
+    daemonRow(CLI, "2026.901.10", blob(121), daysAgo(400), null);
+    daemonRow(CLI, "2026.917.20", blob(122), daysAgo(200), null);
+    daemonRow(CLI, "2026.918.30", blob(123), daysAgo(100), null);
+
+    assertEquals(
+        List.of(CLI + "@2026.901.10"),
+        identities(strategy.plan(census.take(), GcPins.none()).dead()),
+        "the belt spends it, because the belt is two and this is the third");
+
+    GcStrategy.Plan plan = strategy.plan(census.take(), carrying(CLI + "@2026.901.10"));
+
+    assertEquals(List.of(), plan.dead());
+    assertEquals(GcPins.BY_CARRIED_DAEMON, ruleFor(plan.kept(), CLI + "@2026.901.10"));
+    assertEquals(
+        OwnArtifactsStrategy.KEPT_RELEASE,
+        ruleFor(plan.kept(), CLI + "@2026.918.30"),
+        "and the belt still speaks for the two it always kept — the pin widens, it does not replace");
+  }
+
+  @Test
+  void aCarrierPinForOneDaemonSaysNothingAboutAnotherDaemonsIdenticalVersion() throws Exception {
+    // The identity is `name@version` and the NAME is half of it. Two daemons released by the same
+    // repository on the same day carry the same version string, so a keep-set joined on the version
+    // alone would save a binary nobody pinned — and, worse, would read on the receipt as though
+    // somebody had.
+    repository();
+    daemonRow(CI, "2026.901.10", blob(131), daysAgo(400), null);
+    daemonRow(CI, "2026.917.20", blob(132), daysAgo(200), null);
+    daemonRow(CI, "2026.918.30", blob(133), daysAgo(100), null);
+
+    GcStrategy.Plan plan = strategy.plan(census.take(), carrying(CLI + "@2026.901.10"));
+
+    assertEquals(
+        List.of(CI + "@2026.901.10"),
+        identities(plan.dead()),
+        "the pinned version belongs to a different daemon, so this one is unpinned as before");
+  }
+
+  @Test
+  void theLadderAnswersForItsOwnRungEvenWhenACarrierPinsTheSameVersion() throws Exception {
+    // Both sources can name one identity, and a receipt states one reason. The ladder wins, and the
+    // order is a decision about which claim is the stronger one to print: "a runner would launch
+    // this" is about a process that exists, "a pom names a coordinate that shipped this" is about
+    // source. Neither keep is in doubt; which sentence a reviewer reads is.
+    repository();
+    daemonRow(CI, "2026.901.10", blob(141), daysAgo(400), null);
+    daemonRow(CI, "2026.917.20", blob(142), daysAgo(200), null);
+    daemonRow(CI, "2026.918.30", blob(143), daysAgo(100), null);
+
+    GcStrategy.Plan plan =
+        strategy.plan(
+            census.take(),
+            new GcPins(
+                Map.of(),
+                CI,
+                Set.of("2026.901.10"),
+                Set.of(),
+                Set.of(),
+                Set.of(),
+                Set.of(),
+                Set.of(CI + "@2026.901.10"),
+                Set.of(),
+                Set.of(),
+                Set.of(),
+                List.of()));
+
+    assertEquals(List.of(), plan.dead());
+    assertEquals(GcPins.BY_CI, ruleFor(plan.kept(), CI + "@2026.901.10"));
   }
 
   @Test
@@ -289,6 +373,27 @@ class DaemonBinariesGcAdapterTest extends GcFixture {
   /** The aggregate a run would have read, with qits-ci naming both rungs of its ladder. */
   private static GcPins ladder(String daemon, String... versions) {
     return new GcPins(Map.of(), daemon, Set.of(versions), Set.of(), List.of());
+  }
+
+  /**
+   * The aggregate a run would have read, with these daemon identities carried by a coordinate some
+   * repository's manifest on main references — and with qits-ci's ladder empty, so a keep here can
+   * only be the carrier's.
+   */
+  private static GcPins carrying(String... identities) {
+    return new GcPins(
+        Map.of(),
+        "",
+        Set.of(),
+        Set.of(),
+        Set.of(),
+        Set.of(),
+        Set.of(),
+        Set.of(identities),
+        Set.of(),
+        Set.of(),
+        Set.of(),
+        List.of());
   }
 
   private static Instant daysAgo(int days) {

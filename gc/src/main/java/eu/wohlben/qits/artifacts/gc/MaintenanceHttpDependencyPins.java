@@ -31,9 +31,19 @@ import org.eclipse.microprofile.config.inject.ConfigProperty;
  * refusal to make, and it makes it as a 503 that lands here as a failure like any other.
  *
  * <p><b>An ecosystem this cannot file is a refusal, not a skip.</b> A pin whose coordinate could not
- * be filed into one of the three keep-sets is a keep silently dropped, which is the one failure mode
- * a pin source exists to prevent. So the whole answer is refused, the run reclaims nothing, and the
- * fix is one line here rather than an image nobody can pull.
+ * be filed into one of the keep-sets is a keep silently dropped, which is the one failure mode a pin
+ * source exists to prevent. So the whole answer is refused, the run reclaims nothing, and the fix is
+ * one line here rather than an image nobody can pull.
+ *
+ * <p><b>That refusal is whole-source and fail-closed, which decides the rollout order.</b> The
+ * throw lands in {@link GcPinSources}' fold as a failed source, and a failed source aborts every
+ * sweep on the platform — not the daemon type, the run. So a maintenance that has begun serving an
+ * ecosystem this set does not hold stops GC entirely, and this half ships <b>first</b>: teaching the
+ * reader a name costs nothing while it is unused, and meeting it untaught costs every run.
+ *
+ * <p>{@link #parse} is also what {@code GcSuppliedPins.dependencyPins()} calls, so the supplied
+ * document path needs no change of its own — one reader, two ways in, and an ecosystem taught here
+ * is taught to both at once. That is the property the shared parser exists for.
  *
  * <p>The {@code HttpClient} is an <b>instance</b> field for the native-image reason every outbound
  * client in this repository carries; the rule travels with the client.
@@ -41,8 +51,17 @@ import org.eclipse.microprofile.config.inject.ConfigProperty;
 @ApplicationScoped
 public class MaintenanceHttpDependencyPins implements MaintenanceDependencyPins {
 
-  /** The three ecosystems this store hosts, and therefore the three a pin may be spelled for. */
-  static final Set<String> ECOSYSTEMS = Set.of("maven", "npm", "docker");
+  /**
+   * The ecosystems this store hosts, and therefore the ones a pin may be spelled for.
+   *
+   * <p>{@code daemon} joined the three on 2026-09-18, and it is the same kind of coordinate as the
+   * rest: the daemons store is hosted here beside the maven repository, the npm registry and the OCI
+   * registry, so a {@code daemon} row names bytes this service can file and can delete. What is
+   * different is where it comes from — no manifest spells a daemon binary, so maintenance DERIVES
+   * these from the maven or npm coordinate that carries one, and {@code via} on the row names that
+   * carrier. That is provenance and this reader drops it, exactly as it drops {@code repositories}.
+   */
+  static final Set<String> ECOSYSTEMS = Set.of("maven", "npm", "docker", "daemon");
 
   private final HttpClient client =
       HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(2)).build();

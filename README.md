@@ -1138,7 +1138,7 @@ this platform. What each one condemns, in one line each — the sections below c
 | `oci-images` | `own`, `P0D` | a sha tag, or a manifest no tag and no tagged manifest reaches | the last 2 calver releases; a coordinate qits-platform-deployments pins; an image a repository's Dockerfile references; an image qits-configuration would configure; an image qits-workspaces or qits-projects would launch today; the tag literally named `latest`; the newest release per image | manifest closure over surviving tags and manifests |
 | `npm-packages` | `own`, `P0D` — **prereleases only** | a published version, and only ever a prerelease | **every published release, at any age**; anything a dist-tag names; anything a repository's package.json still resolves to | `npm_version.tarball_blob_id` of survivors |
 | `maven-packages` | `own`, `P0D` — **snapshots only** | a **coordinate** — one version's whole file set, and only ever a superseded timestamped snapshot set | **every published release, at any age and whatever the window says**; anything a repository's pom still references; the newest deployable set of every snapshot line; a path this layout cannot read | `maven_artifact.blob_id`, sized from the row |
-| `daemon-binaries` | `own`, `P0D` | a `daemon_binary` row | the last 2 versions; both rungs qits-ci names; a pinned digest's bytes | `daemon_binary.blob_id`, sized from the row |
+| `daemon-binaries` | `own`, `P0D` | a `daemon_binary` row | the last 2 versions; both rungs qits-ci names; a binary a coordinate some repository's manifest references **carries**; a pinned digest's bytes | `daemon_binary.blob_id`, sized from the row |
 | `docs` | `own`, `P0D` | a published **version** of a site — never a file, because `docs_file` cascades | the last 2 versions of every site | `docs_file.blob_id` of surviving versions |
 | `sboms` | `own`, `P0D` | one stored document, `packageType/packageName@version` | the last 2 released documents of every package | `sbom_document.blob_id`, sized from the row |
 | `ci-screenshots`, `ci-videos` | `excluded` | **nothing** — no engine is configured, so nothing of them is ever deleted | everything | `artifact_record.blob_id`, reported live |
@@ -1164,7 +1164,7 @@ Six services hold references into this store that nothing here can derive, and a
 |---|---|---|
 | `GET /platform-deployments/api/pins` (qits-platform-deployments) | image coordinates: what is serving, and what a rollback would restore, unioned over every environment | `{"pins":[{"applicationName":…,"shas":[…]}]}` |
 | `GET /ci/api/daemon` (qits-ci) | the daemon ladder's top two rungs, which protect `daemon_binary` rows keyed `(name, version)` | `{daemonName, daemonVersion, previousDaemonVersion, source}` |
-| `GET /maintenance/api/pins` (qits-platform-maintenance) | the internal maven, npm and docker versions repositories' manifests still **reference** on `main` — what source still builds against, which no pull implies | `{"generatedAt":…,"repositories":[…],"pins":[{"ecosystem","name","version","repository","manifestPath"}]}` |
+| `GET /maintenance/api/pins` (qits-platform-maintenance) | the internal maven, npm and docker versions repositories' manifests still **reference** on `main` — what source still builds against, which no pull implies — plus the **daemon binaries** those versions carry | `{"generatedAt":…,"repositories":[…],"pins":[{"ecosystem","name","version","repository","manifestPath","via"}]}` |
 | `GET /configuration/api/pins` (qits-configuration) | the container images the platform is **configured** to launch — the version the NEXT deploy of a launching service will be handed | `{"generatedAt":…,"pins":[{"image","version","application","key"}]}` |
 | `GET /workspaces/api/pins` (qits-workspaces) | the workspace and editor images that service would pull **today**, out of the configuration it is actually running with | `{"generatedAt":…,"pins":[{"image","version","launches"}]}` |
 | `GET /projects/api/pins` (qits-projects) | the agent and refinement images, on the same terms | `{"generatedAt":…,"pins":[{"image","version","launches"}]}` |
@@ -1180,7 +1180,29 @@ enough to act on is maintenance's call, made as a `503` that arrives here as a f
 other. An ecosystem this store cannot file is **refused**, not skipped — a pin filed nowhere is a
 keep dropped in silence. `launches` on a launch pin is the same kind of provenance: parsed, carried
 onto the record for the receipt, and deciding nothing — two kinds of start pulling one image are one
-keep.
+keep, and `via` on a `daemon` pin is read past on the same terms.
+
+**The maintenance source's fourth ecosystem is `daemon`, and it is DERIVED rather than read.** No
+manifest on this platform spells a daemon binary: a daemon's version travels inside the maven or npm
+coordinate that ships it — qits-ci's pom pins `eu.wohlben.qits:qits-platform-access-cli-binary`, and
+that version *is* the coordinate the daemons store files the `qits` CLI under. So maintenance
+resolves a pinned internal coordinate to the repository that released it and to every daemon that
+repository released at the same version, answering those as `daemon` rows with `via` naming the
+carrier. It is the `CarriedImages` mechanism one artifact type over. Until it existed, a pinned
+daemon binary was named by **no pin source at all** — qits-ci's ladder speaks for `qits-ci-daemon`
+and for nothing else — so at `P0D` with a belt of two the pinned version rotted and release pipelines
+`404`ed fetching it. A `daemon` row joins on `name@version`, `DaemonBinariesGcAdapter`'s identity
+verbatim, and keeps under a sentence of its own: `a daemon binary carried by a coordinate a
+repository manifest on main references (qits-platform-maintenance dependency pins)`. Distinct from
+the manifest sentence although it comes from the same document, because "a pom names this jar" and
+"a pom names a jar whose release also shipped this executable" are different claims about different
+bytes — and distinct from qits-ci's, because a receipt states one reason per identity and which
+source saved a version is what a reviewer is reading for. **Accepting the name is this service's half
+of the change and it ships first**: the reader refuses a whole source on an ecosystem it does not
+hold, a refused source aborts every sweep on the platform, so meeting `daemon` untaught would stop
+GC entirely. The supplied-pins path needs nothing of its own — `GcSuppliedPins.dependencyPins()`
+runs the same `MaintenanceHttpDependencyPins.parse`, so the ecosystem is taught to both ways in at
+once.
 
 **The last two are the fourth source in a different TENSE, and they exist because it left a
 residual.** qits-configuration holds the version the *next* deploy of a launching service will be
@@ -1213,7 +1235,9 @@ type carrying a refusal instead of zeros nobody can interpret.
 
 The keep is reported under the pin's own name — `pinned by a qits-platform-deployments deployment`,
 `pinned by qits-ci daemon ladder`, `referenced by a repository manifest on main
-(qits-platform-maintenance dependency pins)`, `a configured container image (qits-configuration)`,
+(qits-platform-maintenance dependency pins)`, `a daemon binary carried by a coordinate a repository
+manifest on main references (qits-platform-maintenance dependency pins)`,
+`a configured container image (qits-configuration)`,
 `the image qits-workspaces would launch today (effective pin)`, `the image qits-projects would launch
 today (effective pin)` — and both engines check it **before** the access rule, because a pin is the one fact no timestamp
 implies.
@@ -1565,12 +1589,14 @@ qits-ci's answer and the blob class is the one a running service runs.
 the same transaction as a publish, publishes come from the release pipeline, and versions are
 immutable (`409` on republish). So the belt is the settlement's sentence with nothing to qualify —
 the last two versions of every daemon live whatever their age, both rungs of qits-ci's ladder live
-under qits-ci's own rule, and everything else dies on the run that finds it.
+under qits-ci's own rule, whatever a pinned coordinate carries lives under maintenance's, and
+everything else dies on the run that finds it.
 
 | Kept because | Spelled |
 |---|---|
 | it is one of the last two versions | per `(repository, name)`, ranked by version: an **adopted digest-hex version ranks below every calver one**, because the ops adoption carries the blob's own digest as the version and comparing 64 hex characters as a number would rank the oldest thing here as the newest |
 | qits-ci's ladder names it | `GET /ci/api/daemon`, both rungs — the version a run would launch and the fallback beneath it. A runner that has not started in months still fetches its rung the moment one does |
+| a coordinate a manifest references **carries** it | `GET /maintenance/api/pins`, `ecosystem: daemon`, joined on `name@version`. The ladder is about `qits-ci-daemon` and about nothing else, so every other daemon on the platform was held up by the belt of two and by nothing — while its real pin sat in a pom (`eu.wohlben.qits:qits-platform-access-cli-binary`, in qits-ci's and in qits-workspace-oci's). At `P0D` a cadence of two is not a keep-set: the pinned version rotted and release pipelines `404`ed on it. **The ladder wins where both apply** — not because either keep is stronger, but because a receipt states one reason per identity and "a runner would launch this" is the stronger claim to print |
 | a pin names its bytes | the digest half of the same aggregate: `QITS_CI_DAEMON_VERSION` has been a sha256 since the daemon shipped, so a pinned digest keeps whichever row names those bytes |
 | — | a download used to keep a rung alive for `P3D`. At `P0D` it does not: a fetch is a timestamp, and qits-ci answers with both rungs on every run, so what a runner will launch is named rather than inferred. (The digest-addressed `/v2` blob route never moved an access timestamp anyway and must not grow a twin — it carries no daemon identity.) |
 

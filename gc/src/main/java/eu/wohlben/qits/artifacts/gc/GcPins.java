@@ -11,9 +11,10 @@ import java.util.regex.Pattern;
  *
  * <p>Six services answer it, and they answer six different questions. qits-platform-deployments
  * names the image shas a restart or a rollback would pull; qits-ci names the daemon versions its
- * ladder would launch; qits-platform-maintenance names the internal maven, npm and docker versions
- * repositories' manifests still <b>reference</b> on main; qits-configuration names the container
- * images the platform is <b>configured</b> to launch; qits-workspaces and qits-projects each name
+ * ladder would launch; qits-platform-maintenance names the internal maven, npm, docker and
+ * <b>daemon</b> versions repositories' manifests still <b>reference</b> on main; qits-configuration
+ * names the container images the platform is <b>configured</b> to launch; qits-workspaces and
+ * qits-projects each name
  * the images they would launch <b>today</b>. All six are facts no timestamp in this store implies —
  * a container running untouched for months still pulls its sha the moment it restarts, and a library
  * nothing has resolved this month is still what every build of its consumer needs — which is why
@@ -33,6 +34,17 @@ import java.util.regex.Pattern;
  * window stopped trusting. So each launching service answers for itself, and the two answers are
  * kept as separate sets: a report that folded them into {@code configuredImages} could not say which
  * of the two saved a tag, which is precisely the distinction a reviewer is checking.
+ *
+ * <p><b>The maintenance source's fourth ecosystem is DERIVED, and that is why it exists.</b> No
+ * manifest on this platform spells a daemon binary: a daemon's version travels inside the maven or
+ * npm coordinate that <b>carries</b> it — qits-ci's pom pins {@code
+ * eu.wohlben.qits:qits-platform-access-cli-binary}, and that version IS the coordinate the daemons
+ * store files the {@code qits} CLI under. So a pinned carrier resolves to the repository that
+ * released it and to every daemon that repository released at the same version, and
+ * qits-platform-maintenance answers those as {@code daemon} rows. Without them a daemon binary two
+ * poms pin is named by no pin source at all: qits-ci's ladder speaks for its own daemon and for
+ * nothing else, the window is {@code P0D}, and the belt keeps two versions — so a pinned version
+ * three releases old rots and every pipeline resolving it 404s.
  *
  * <p><b>One aggregate per run, taken at the start.</b> Not per type and not per strategy: two
  * fetches inside one run can disagree, and the disagreement is a deployment that landed between them
@@ -57,6 +69,11 @@ import java.util.regex.Pattern;
  *     name@version} — which is {@code NpmPackagesGcAdapter}'s identity verbatim
  * @param manifestImages images some repository's Dockerfile references, spelled {@code image:tag}
  *     with the <b>full</b> image name ({@code qits/workspace-base:2026.902.143920})
+ * @param daemonDependencies daemon binaries a pinned maven or npm coordinate carries, spelled {@code
+ *     name@version} — which is {@code DaemonBinariesGcAdapter}'s identity verbatim, down to its
+ *     {@code AT} separator. Beside {@link #daemonVersions} rather than folded into it: that set is
+ *     qits-ci's ladder for one daemon, this one is any daemon any repository's manifest reaches
+ *     through a carrier, and a receipt has to be able to say which of the two saved a version
  * @param configuredImages images qits-configuration is configured to launch, spelled the same way
  * @param workspaceLaunchImages images qits-workspaces would launch today, spelled the same way —
  *     the EFFECTIVE coordinate, which lags {@code configuredImages} until that service is redeployed
@@ -75,6 +92,7 @@ public record GcPins(
     Set<String> mavenDependencies,
     Set<String> npmDependencies,
     Set<String> manifestImages,
+    Set<String> daemonDependencies,
     Set<String> configuredImages,
     Set<String> workspaceLaunchImages,
     Set<String> projectLaunchImages,
@@ -90,6 +108,20 @@ public record GcPins(
   /** The rule a version is kept under when some repository's manifest on main still names it. */
   public static final String BY_MANIFEST =
       "referenced by a repository manifest on main (qits-platform-maintenance dependency pins)";
+
+  /**
+   * The rule a daemon binary is kept under when a coordinate a manifest on main references carries
+   * it.
+   *
+   * <p>Distinct from {@link #BY_MANIFEST} although it comes from the same source and the same
+   * document: a receipt is read to decide whether a version may go, and "a pom names this jar" and
+   * "a pom names a jar whose release also shipped this executable" are different claims about
+   * different bytes. Distinct from {@link #BY_CI} for the same reason in the other direction — the
+   * ladder is what a runner would launch, this is what a build would download.
+   */
+  public static final String BY_CARRIED_DAEMON =
+      "a daemon binary carried by a coordinate a repository manifest on main references"
+          + " (qits-platform-maintenance dependency pins)";
 
   /** The rule an image is kept under when the platform is configured to launch it. */
   public static final String BY_CONFIGURATION = "a configured container image (qits-configuration)";
@@ -112,6 +144,7 @@ public record GcPins(
     mavenDependencies = Set.copyOf(mavenDependencies);
     npmDependencies = Set.copyOf(npmDependencies);
     manifestImages = Set.copyOf(manifestImages);
+    daemonDependencies = Set.copyOf(daemonDependencies);
     configuredImages = Set.copyOf(configuredImages);
     workspaceLaunchImages = Set.copyOf(workspaceLaunchImages);
     projectLaunchImages = Set.copyOf(projectLaunchImages);
@@ -121,11 +154,11 @@ public record GcPins(
 
   /**
    * The execution pins alone — the shape a case about deployments or the daemon ladder states, with
-   * the four consumption sets empty because it is not about them.
+   * the consumption sets empty because it is not about them.
    *
    * <p>A defaulted overload rather than a new spelling at every call site: the members are on the
-   * record and a reader of the report sees all six sets, but a case that is about one of them
-   * should not have to write out five empty sets to say so.
+   * record and a reader of the report sees every set, but a case that is about one of them should
+   * not have to write out the rest empty to say so.
    *
    * <p>{@link #sources()} is how a <b>run</b> read its pins, so a value constructed in a test has
    * none to report and must not invent one: an empty list reads as "this aggregate was not fetched",
@@ -153,6 +186,7 @@ public record GcPins(
         daemonName,
         daemonVersions,
         blobs,
+        Set.of(),
         Set.of(),
         Set.of(),
         Set.of(),
@@ -189,6 +223,7 @@ public record GcPins(
         mavenDependencies,
         npmDependencies,
         manifestImages,
+        Set.of(),
         configuredImages,
         Set.of(),
         Set.of(),
@@ -196,7 +231,13 @@ public record GcPins(
         List.of());
   }
 
-  /** Every keep-set and no provenance — what a case that hands pins in directly is stating. */
+  /**
+   * Every keep-set a stored fact could name before the daemon ecosystem existed, and no provenance.
+   *
+   * <p>Kept beside the whole one below on the terms the overload above states: the cases written
+   * when the maintenance source filed three ecosystems still say exactly what they meant, and what
+   * they meant is that no carried daemon is pinned.
+   */
   public GcPins(
       Map<String, Set<String>> deployments,
       String daemonName,
@@ -217,6 +258,37 @@ public record GcPins(
         mavenDependencies,
         npmDependencies,
         manifestImages,
+        Set.of(),
+        configuredImages,
+        workspaceLaunchImages,
+        projectLaunchImages,
+        failures,
+        List.of());
+  }
+
+  /** Every keep-set and no provenance — what a case that hands pins in directly is stating. */
+  public GcPins(
+      Map<String, Set<String>> deployments,
+      String daemonName,
+      Set<String> daemonVersions,
+      Set<String> blobs,
+      Set<String> mavenDependencies,
+      Set<String> npmDependencies,
+      Set<String> manifestImages,
+      Set<String> daemonDependencies,
+      Set<String> configuredImages,
+      Set<String> workspaceLaunchImages,
+      Set<String> projectLaunchImages,
+      List<String> failures) {
+    this(
+        deployments,
+        daemonName,
+        daemonVersions,
+        blobs,
+        mavenDependencies,
+        npmDependencies,
+        manifestImages,
+        daemonDependencies,
         configuredImages,
         workspaceLaunchImages,
         projectLaunchImages,
@@ -257,6 +329,22 @@ public record GcPins(
    */
   public String pinsDaemonVersion(String name, String version) {
     return daemonName.equals(name) && daemonVersions.contains(version) ? BY_CI : null;
+  }
+
+  /**
+   * {@link #BY_CARRIED_DAEMON} when a coordinate some repository's manifest references carries this
+   * daemon binary, else null.
+   *
+   * <p>The argument is the adapter's identity unchanged — {@code name@version}, {@code
+   * DaemonBinariesGcAdapter}'s own spelling down to the separator — so there is no translation here
+   * to get wrong, which is the rule every consumption keep-set joins on.
+   *
+   * <p>A sibling of {@link #pinsDaemonVersion} rather than a second answer from it: that method
+   * means "qits-ci's ladder holds this", and widening it to mean "somebody holds this" would take
+   * the one distinction a receipt is read for out of the report.
+   */
+  public String pinsCarriedDaemon(String coordinate) {
+    return daemonDependencies.contains(coordinate) ? BY_CARRIED_DAEMON : null;
   }
 
   /** {@link #BY_CI} when a pin names one of these blobs by digest, else null. */

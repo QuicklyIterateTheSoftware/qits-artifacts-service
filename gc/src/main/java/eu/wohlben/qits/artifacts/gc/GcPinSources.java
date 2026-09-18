@@ -97,6 +97,7 @@ public class GcPinSources {
     Set<String> mavenDependencies = new TreeSet<>();
     Set<String> npmDependencies = new TreeSet<>();
     Set<String> manifestImages = new TreeSet<>();
+    Set<String> daemonDependencies = new TreeSet<>();
     Set<String> configuredImages = new TreeSet<>();
     Set<String> workspaceLaunchImages = new TreeSet<>();
     Set<String> projectLaunchImages = new TreeSet<>();
@@ -182,6 +183,12 @@ public class GcPinSources {
           case "maven" -> mavenDependencies.add(pin.name() + ":" + pin.version());
           case "npm" -> npmDependencies.add(pin.name() + "@" + pin.version());
           case "docker" -> manifestImages.add(pin.name() + ":" + pin.version());
+          // The separator is read off the adapter rather than retyped: a daemon identity is
+          // `name@version` because that is how the download route spells it, and a copy of that
+          // decision here is a copy that can be corrected in one place and not the other.
+          case "daemon" ->
+              daemonDependencies.add(
+                  pin.name() + DaemonBinariesGcAdapter.AT + pin.version());
           default ->
               // Unreachable through the parser, which refuses an ecosystem it cannot file. Kept as
               // a refusal rather than a silent drop, because a pin filed nowhere is a keep lost.
@@ -193,6 +200,9 @@ public class GcPinSources {
       keeps.addAll(mavenDependencies);
       keeps.addAll(npmDependencies);
       keeps.addAll(manifestImages);
+      // The daemon keeps are in the same section as the other three: they come from the same read
+      // of the same document, and a reviewer checking why a binary survived reads one list.
+      keeps.addAll(daemonDependencies);
       sources.add(
           answered(
               maintenanceSource,
@@ -206,7 +216,9 @@ public class GcPinSources {
                   + npmDependencies.size()
                   + " npm, "
                   + manifestImages.size()
-                  + " docker) — what repositories on main still build against",
+                  + " docker, "
+                  + daemonDependencies.size()
+                  + " daemon) — what repositories on main still build against",
               pins.size(),
               keeps));
     } catch (RuntimeException unreachable) {
@@ -218,6 +230,7 @@ public class GcPinSources {
       mavenDependencies.clear();
       npmDependencies.clear();
       manifestImages.clear();
+      daemonDependencies.clear();
     }
 
     Instant startedConfiguration = Instant.now();
@@ -263,6 +276,7 @@ public class GcPinSources {
         mavenDependencies,
         npmDependencies,
         manifestImages,
+        daemonDependencies,
         configuredImages,
         workspaceLaunchImages,
         projectLaunchImages,

@@ -89,6 +89,7 @@ class GcPinsTest extends GcFixture {
     assertEquals(java.util.Set.of(), pins.mavenDependencies());
     assertEquals(java.util.Set.of(), pins.npmDependencies());
     assertEquals(java.util.Set.of(), pins.manifestImages());
+    assertEquals(java.util.Set.of(), pins.daemonDependencies());
     assertEquals(java.util.Set.of(), pins.configuredImages());
     assertEquals(java.util.Set.of(), pins.workspaceLaunchImages());
     assertEquals(java.util.Set.of(), pins.projectLaunchImages());
@@ -228,6 +229,60 @@ class GcPinsTest extends GcFixture {
     GcPinSource configuration = source(pins, "qits-configuration");
     assertEquals(2, configuration.pinCount(), "entries, which is what configuration answers with");
     assertEquals(List.of("qits/workspace:2026.904.160522"), configuration.keeps());
+  }
+
+  @Test
+  void aDaemonPinFoldsOnTheDaemonAdaptersOwnIdentitySpellingAndCarriesItsOwnReason() {
+    // The fourth ecosystem of the maintenance source, and the two things about it that matter here.
+    //
+    // It joins on `name@version` — DaemonBinariesGcAdapter's identity verbatim, separator and all —
+    // because a keep-set the other side has to translate is a keep-set that will one day translate
+    // wrong. And it carries a reason of its OWN: the row arrives beside maven and npm rows in one
+    // document, but "a pom names this jar" and "a pom names a jar whose release also shipped this
+    // executable" are different claims, and the receipt is what a reviewer reads to tell them apart.
+    GcPinSources sources = answering();
+    sources.maintenance =
+        () ->
+            List.of(
+                new MaintenanceDependencyPins.DependencyPin(
+                    "maven",
+                    "eu.wohlben.qits:qits-platform-access-cli-binary",
+                    "2026.917.65806",
+                    "qits-ci-service",
+                    "pom.xml"),
+                // The carrier above, resolved by maintenance to the binary it ships. Same version,
+                // because the daemons store files the CLI under the coordinate's own version.
+                new MaintenanceDependencyPins.DependencyPin(
+                    "daemon",
+                    "qits-platform-access-cli",
+                    "2026.917.65806",
+                    "qits-platform-access-cli",
+                    "pom.xml"));
+
+    GcPins pins = sources.fetch();
+
+    assertTrue(pins.complete());
+    assertEquals(
+        java.util.Set.of("qits-platform-access-cli@2026.917.65806"), pins.daemonDependencies());
+    assertEquals(
+        GcPins.BY_CARRIED_DAEMON,
+        pins.pinsCarriedDaemon("qits-platform-access-cli@2026.917.65806"));
+    assertNull(
+        pins.pinsCarriedDaemon("qits-ci-daemon@2026.917.65806"),
+        "a version of a DIFFERENT daemon is not what the carrier shipped");
+    assertNull(
+        pins.pinsDaemonVersion("qits-platform-access-cli", "2026.917.65806"),
+        "and it is not the ladder's keep either — two sources, two sets, two sentences");
+
+    GcPinSource maintenance = source(pins, "qits-platform-maintenance");
+    assertEquals(2, maintenance.pinCount());
+    assertEquals(
+        List.of(
+            "eu.wohlben.qits:qits-platform-access-cli-binary:2026.917.65806",
+            "qits-platform-access-cli@2026.917.65806"),
+        maintenance.keeps(),
+        "the carrier and what it carries, both in the one section a reviewer reads");
+    assertTrue(maintenance.outcome().contains("1 daemon"), maintenance.outcome());
   }
 
   @Test

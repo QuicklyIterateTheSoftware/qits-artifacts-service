@@ -5,7 +5,17 @@ import jakarta.inject.Singleton;
 
 /**
  * The platform's own daemon binaries, live on the settled rule: <b>the last two versions of every
- * daemon stay, both rungs of qits-ci's ladder stay, and the rest ages out after P90D unaccessed.</b>
+ * daemon stay, both rungs of qits-ci's ladder stay, every binary a pinned coordinate carries stays,
+ * and the rest ages out after P90D unaccessed.</b>
+ *
+ * <p><b>The third clause was owed from the day the window went to zero and was paid on
+ * 2026-09-18.</b> At {@code P0D} retention IS the keep-set, and this type's keep-set knew about one
+ * daemon: qits-ci's. Every other daemon binary on the platform was held up by a belt of two and by
+ * nothing else, while its actual pins sat in poms — {@code qits-platform-access-cli} in qits-ci's
+ * and in qits-workspace-oci's — where nothing here could see them. Two versions of cadence is not a
+ * keep-set, and the rot showed up as release pipelines 404ing on a version somebody had deliberately
+ * pinned. qits-platform-maintenance now derives those as {@code daemon} pins from the coordinate
+ * that carries them, and {@link DaemonBinariesGcAdapter} honours them beside the ladder.
  *
  * <p>This type reported "no strategy registered for daemon-binaries" until now, and that was the
  * honest report of a decision waiting on a fact: the keep-set is partly qits-ci's answer, and a

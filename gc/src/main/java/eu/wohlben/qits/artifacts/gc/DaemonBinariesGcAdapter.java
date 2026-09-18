@@ -35,13 +35,30 @@ import java.util.regex.Pattern;
  * by construction, and a 64-hex string compared as a number against a calver would rank the oldest
  * thing here as the newest.
  *
- * <h2>The pins are qits-ci's ladder, both rungs</h2>
+ * <h2>The pins are qits-ci's ladder, both rungs — and a carrier coordinate, for every other daemon</h2>
  *
  * <p>{@code GET /ci/api/daemon} answers with the version a run would launch and the fallback beneath
  * it, and both are kept under qits-ci's own sentence. The <b>digest</b> half of the same aggregate
  * is the binder's floor rather than this adapter's business: a pin has been a sha256 digest since
  * the daemon shipped, so a pinned digest keeps whatever row names those bytes even when the version
  * strings do not match.
+ *
+ * <p><b>The ladder speaks for one daemon, and that left every other one unspoken for.</b> This type
+ * runs at {@code P0D} with a belt of two, so a daemon binary somebody <b>pinned</b> three releases
+ * ago is deleted on the run that finds it — and the pin that named it is not in this store at all,
+ * it is a line in a pom. That is not hypothetical: {@code qits-platform-access-cli} is pinned by
+ * qits-ci's pom and by qits-workspace-oci, qits-ci's ladder is about {@code qits-ci-daemon} and says
+ * nothing about it, and the versions rotted until release pipelines 404'd fetching them.
+ *
+ * <p>So a second source answers here: qits-platform-maintenance's {@code daemon} pins, a daemon
+ * binary carried by a maven or npm coordinate a manifest on main references, joined on {@link #AT}
+ * exactly as this adapter spells its identities. <b>The ladder wins where both apply</b> — not
+ * because either keep is stronger (a kept identity is kept, and the two answers never disagree about
+ * whether) but because a receipt states one reason per identity, and the strongest claim available
+ * is the right one to state: "a runner would launch this" is a fact about a process that exists,
+ * where "a pom names a coordinate that shipped this" is a fact about source. Two keep-sets and two
+ * sentences, for the reason the launch pins are two: a report that could not say which source saved
+ * a version could not be reviewed.
  *
  * <h2>Effective access, and the read this type deliberately cannot see</h2>
  *
@@ -98,13 +115,22 @@ public class DaemonBinariesGcAdapter implements GcTypeAdapter {
     return List.copyOf(candidates);
   }
 
-  /** qits-ci's ladder, both rungs, under qits-ci's own sentence. */
+  /**
+   * qits-ci's ladder, both rungs, under qits-ci's own sentence — then a carrier coordinate under
+   * maintenance's.
+   *
+   * <p>The identity goes to the second source <b>verbatim</b>: {@code GcPinSources} folds a {@code
+   * daemon} pin with this class's own {@link #AT}, so the lookup is an equality test and never a
+   * translation. The ladder is asked first, for the reason the class javadoc argues.
+   */
   @Override
   public GcPinned pinnedBy(List<GcCandidate> candidates, GcPins pins) {
     return candidate -> {
       int at = candidate.identity().indexOf(AT);
-      return pins.pinsDaemonVersion(
-          candidate.identity().substring(0, at), candidate.identity().substring(at + 1));
+      String byLadder =
+          pins.pinsDaemonVersion(
+              candidate.identity().substring(0, at), candidate.identity().substring(at + 1));
+      return byLadder != null ? byLadder : pins.pinsCarriedDaemon(candidate.identity());
     };
   }
 
