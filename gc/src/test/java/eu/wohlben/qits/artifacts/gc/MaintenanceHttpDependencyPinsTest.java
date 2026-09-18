@@ -14,7 +14,8 @@ import org.junit.jupiter.api.Test;
  * The dependency pin adapter against a stub serving qits-platform-maintenance's real response shape.
  *
  * <p>{@code GET /maintenance/api/pins} answers {@code {"generatedAt":…,"repositories":[…],"pins":[…]}}
- * — one pin per manifest reference to an internally published version, in one of three ecosystems.
+ * — one pin per manifest reference to an internally published version, in one of the ecosystems this
+ * store hosts (and, since 2026-09-18, one per daemon binary such a reference carries).
  * This suite is about that shape and nothing else: which member holds the keep-set, which member is
  * provenance to be dropped, and which malformed bodies must refuse rather than read as "nothing is
  * referenced".
@@ -105,6 +106,34 @@ class MaintenanceHttpDependencyPinsTest {
           assertThrows(IllegalStateException.class, () -> adapter(maintenance.baseUrl()).pins())
               .getMessage()
               .contains("no ecosystem, name or version"));
+    }
+  }
+
+  @Test
+  void aDaemonPinParsesBecauseTheDaemonsStoreIsHostedHereToo() throws IOException {
+    // The fourth ecosystem, and the ONLY reason it is a parser change at all: this reader refuses a
+    // whole source on a name it does not hold, and a refused source aborts every sweep on the
+    // platform. So the name has to be accepted here before maintenance starts sending it — which is
+    // why this half ships first, and why the case is about parsing rather than about keeping.
+    //
+    // `via` is the carrier the row was derived from: read past, exactly as `repositories` is.
+    try (StubPinService maintenance =
+        StubPinService.serving(
+            "/pins",
+            """
+            {"pins":[
+              {"ecosystem":"daemon","name":"qits-platform-access-cli","version":"2026.917.65806",
+               "repository":"qits-platform-access-cli","manifestPath":"pom.xml",
+               "via":"eu.wohlben.qits:qits-platform-access-cli-binary"}
+            ]}
+            """)) {
+      List<MaintenanceDependencyPins.DependencyPin> pins = adapter(maintenance.baseUrl()).pins();
+
+      assertEquals(1, pins.size());
+      assertEquals("daemon", pins.get(0).ecosystem());
+      assertEquals("qits-platform-access-cli", pins.get(0).name());
+      assertEquals("2026.917.65806", pins.get(0).version());
+      assertEquals("qits-platform-access-cli", pins.get(0).repository());
     }
   }
 

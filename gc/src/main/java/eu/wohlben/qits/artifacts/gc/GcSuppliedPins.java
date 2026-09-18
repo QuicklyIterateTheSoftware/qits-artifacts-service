@@ -142,6 +142,10 @@ public record GcSuppliedPins(
   /**
    * The manifest dependency pins, read from the supplied document.
    *
+   * <p>No member of its own was needed when the {@code daemon} ecosystem was added: this delegates
+   * to the same {@link MaintenanceHttpDependencyPins#parse} the HTTP reader runs, so an ecosystem
+   * taught there is taught here in the same commit and cannot be taught to only one of the two.
+   *
    * @throws IllegalStateException no document was supplied, or its shape cannot be read
    */
   public List<MaintenanceDependencyPins.DependencyPin> dependencyPins() {

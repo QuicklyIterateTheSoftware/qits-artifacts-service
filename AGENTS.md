@@ -368,7 +368,10 @@ collection" section is the contract; these are the rules that get "helpfully" re
   folds them into one `GcPins`: qits-platform-deployments (`GET /platform-deployments/api/pins`,
   what is serving), qits-ci (`GET /ci/api/daemon`, what a runner would launch),
   qits-platform-maintenance (`GET /maintenance/api/pins`, which internal maven/npm/docker versions
-  repositories' manifests still reference on main), qits-configuration
+  repositories' manifests still reference on main, **plus the `daemon` binaries those versions
+  carry** — derived rows, because no manifest spells a daemon binary and the pin that names one
+  spells a maven or npm coordinate instead; they keep under `BY_CARRIED_DAEMON`, joined on the daemon
+  adapter's own `name@version`), qits-configuration
   (`GET /configuration/api/pins`, which container images the platform is configured to launch), and
   qits-workspaces / qits-projects (`GET /workspaces/api/pins`, `GET /projects/api/pins`, which
   images each of them would pull TODAY, out of the configuration it is actually running with).
@@ -544,6 +547,14 @@ collection" section is the contract; these are the rules that get "helpfully" re
   door. Adopted rows carry the **digest hex** as their version, so the adapter's version order ranks
   those below every calver one — comparing 64 hex characters as a number ranks the oldest thing
   there as the newest.
+  **Its keep-set has TWO pin sources since 2026-09-18, and the second one was owed from the day the
+  window went to zero.** qits-ci's ladder speaks for `qits-ci-daemon` and for nothing else, so every
+  other daemon binary was held up by the belt of two alone while its real pin sat in a pom
+  (`eu.wohlben.qits:qits-platform-access-cli-binary`, in qits-ci's and in qits-workspace-oci's) —
+  and the pinned versions rotted until release pipelines `404`ed on them. maintenance now derives
+  those as `daemon` pins from the coordinate that carries them; `DaemonBinariesGcAdapter.pinnedBy`
+  asks the ladder first and falls through to `GcPins.pinsCarriedDaemon`, because a receipt states
+  one reason per identity and "a runner would launch this" is the stronger claim to print.
 - **`sboms`' identity is `packageType/packageName@version` and nothing pins one.** The coordinate is
   the `SoftwareRelease` identity verbatim, so a report line needs no translation; the version comes
   last and is parsed with `lastIndexOf('@')`, because a package name carries `@`, `/` and `:` of its

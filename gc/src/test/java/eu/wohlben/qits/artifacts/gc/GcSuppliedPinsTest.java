@@ -59,7 +59,10 @@ class GcSuppliedPinsTest {
          {"ecosystem":"npm","name":"@qits/ui-components","version":"2026.902.204627",
           "repository":"qits-spa-home","manifestPath":"package.json"},
          {"ecosystem":"docker","name":"qits/workspace-base","version":"2026.902.143920",
-          "repository":"qits-workspace-daemon","manifestPath":"docker/Dockerfile"}
+          "repository":"qits-workspace-daemon","manifestPath":"docker/Dockerfile"},
+         {"ecosystem":"daemon","name":"qits-platform-access-cli","version":"2026.917.65806",
+          "repository":"qits-platform-access-cli","manifestPath":"pom.xml",
+          "via":"eu.wohlben.qits:qits-platform-access-cli-binary"}
        ]}
       """;
 
@@ -119,6 +122,7 @@ class GcSuppliedPinsTest {
       assertEquals(fetched.mavenDependencies(), supplied.mavenDependencies());
       assertEquals(fetched.npmDependencies(), supplied.npmDependencies());
       assertEquals(fetched.manifestImages(), supplied.manifestImages());
+      assertEquals(fetched.daemonDependencies(), supplied.daemonDependencies());
       assertEquals(fetched.configuredImages(), supplied.configuredImages());
       assertEquals(fetched.workspaceLaunchImages(), supplied.workspaceLaunchImages());
       assertEquals(fetched.projectLaunchImages(), supplied.projectLaunchImages());
@@ -127,6 +131,13 @@ class GcSuppliedPinsTest {
       assertEquals(
           GcPins.BY_MANIFEST,
           supplied.pinsMavenCoordinate("eu.wohlben.qits:qits-blobstore:2026.903.85122"));
+      // The ecosystem added on 2026-09-18 needed no member of its own: it rides the `dependencies`
+      // document an orchestrator already sends, through the parser that document already used. So
+      // this is the one addition to the envelope's meaning that is NOT a rollout step — an
+      // orchestrator sending six members keeps working, and the keeps simply widen.
+      assertEquals(
+          GcPins.BY_CARRIED_DAEMON,
+          supplied.pinsCarriedDaemon("qits-platform-access-cli@2026.917.65806"));
       assertEquals(
           GcPins.BY_CONFIGURATION,
           supplied.pinsConfiguredImage("qits/workspace", "2026.904.160522"));
@@ -399,7 +410,7 @@ class GcSuppliedPinsTest {
             .orElseThrow();
     assertEquals(2, all.deploymentPins().size());
     assertEquals("qits-ci-daemon", all.daemonPin().daemonName());
-    assertEquals(3, all.dependencyPins().size());
+    assertEquals(4, all.dependencyPins().size());
     assertEquals(1, all.configuredImagePins().size());
     assertEquals(2, all.workspaceLaunchPins().size());
     assertEquals(1, all.projectLaunchPins().size());
