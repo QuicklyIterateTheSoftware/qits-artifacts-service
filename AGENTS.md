@@ -58,6 +58,7 @@ one in is the library's, not this repository's.
 | `maven/MavenUpstream` | the `HttpClient` is an instance field, not static | same as above; the sixth outbound client, and the rule has still not changed. It reads and writes only `String`/`byte[]` and needs nothing else declared — the maven stack, like `registry` and `npm`, still adds zero native-image configuration |
 | `gc/CdHttpDeploymentPins`, `gc/CiHttpDaemonPins`, `gc/MaintenanceHttpDependencyPins`, `gc/ConfigurationHttpImagePins`, `gc/WorkspacesHttpLaunchPins`, `gc/ProjectsHttpLaunchPins` | the `HttpClient` is an instance field, not static | same as above; the third, fifth, seventh, eighth, ninth and tenth outbound clients, and the rule has not changed. It moved with the class when GC became its own module — the rule travels with the client, not with the package. The two pin readers added on 2026-09-04 and the two added on 2026-09-05 carry it for the same reason and add no other native-image configuration: they read `JsonNode`, never a bound type |
 | `registry/MirrorUpstream` | the `HttpClient` is an instance field, not static — and so is `MirrorBearerTokens`' `ObjectMapper`, which is reachable from one | same as above; the fourth outbound client, and the rule still has not changed |
+| `api/RegistryTokenEndpoint` | the `HttpClient` is an instance field, not static | same as above; the eleventh outbound client, and the rule has still not changed. It relays one form-encoded POST to the idp and reads a `JsonNode` back, so like the pin readers it needs nothing else declared |
 | artifacts' `microprofile-config.properties` | the `QITS_RESOURCE_DB_*` triple with **no defaults** | nothing — and that is the point: an unset variable dies at Flyway naming the missing one, rather than opening a fallback store. It replaced an H2 file url that resolved `${user.home}` through `getpwuid` and came out as `jdbc:h2:file:?/…` under UID 1001 |
 | `registry/MirrorUpstream`'s config | `endpoint-override` injected as `Optional<String>`, not `String` | the binary dies at boot on `Failed to load config value of type java.lang.String` — SmallRye reads a **configured-empty** value as absent, and that key ships blank. `defaultValue = ""` does not help. Invisible to `mvn verify`, where every test sets a real value |
 
@@ -89,7 +90,19 @@ edge. The **client** is the exception: this service has a host of its own,
 | `/artifacts/daemons/**` | raw Vert.x routes in `DaemonRoutes` (the platform's own daemon binaries) | **nothing** — a literal, and `DaemonPaths.BASE` is the only place it is spelled |
 | `/artifacts/docs/**` | raw Vert.x routes in `DocsRoutes` (published documentation bundles) | **nothing** — a literal, and `DocsPaths.BASE` is the only place it is spelled |
 | `/artifacts/sboms/**` | raw Vert.x routes in `SbomRoutes` (the published SBOM store) | **nothing** — a literal, and `SbomPaths.BASE` is the only place it is spelled |
+| `/artifacts/token` | one raw Vert.x route in `RegistryTokenEndpoint` (the docker-registry Bearer token endpoint) | **nothing** — a literal, and `RegistryChallenge.TOKEN_PATH` is the only place it is spelled |
 | `/v2/**` | raw Vert.x routes in `RegistryRoutes` (the OCI Distribution API) | **nothing** — a literal, and not under `/artifacts` at all |
+
+`/artifacts/token` is the one path here that is **deliberately uncredentialed**: it is the door that
+*buys* a credential, so a guard in front of it would be a loop. `PublishGuard.isPublish` claims
+`/v2/` and the five named `/artifacts/<wire>/` prefixes only, `AdminWriteGuard` is JAX-RS and sees
+only `/artifacts/api`, and this repository declares no `quarkus.http.auth.permission` rule at all —
+`RegistryTokenEndpointTest` asserts all three, with the machine-token gate on. It sits inside
+`/artifacts` so that the one path is reachable both on qits-net (where CI steps address
+`dev-qits-artifacts:8080` and the edge is never involved) and through the edge's projection of the
+`routes: /artifacts,/v2` that `deployments.yml` declares. **Nothing challenges anybody to use it
+yet**: `PublishGuard` still lets an anonymous publisher through, and `RegistryChallenge` exists so
+that the change which closes that gap is one call rather than a design.
 
 `/artifacts/npm` is *not* forced on us the way `/v2` is: npm accepts a registry URL of any depth, so
 it sits inside the segment the edge already routes here and needs no `routes:` entry of its own. The first path segment after it is the `artifact_repository` row, the same

@@ -53,6 +53,13 @@ import org.jboss.logging.Logger;
  *       exchange turns the run's pair into one).
  * </ul>
  *
+ * <p><b>The other half of closing that gap already ships.</b> docker and buildkit send a credential
+ * only after a {@code 401 WWW-Authenticate: Bearer realm="…"} names an endpoint they can reach, so
+ * the flip needs a realm before it needs a refusal. {@link RegistryTokenEndpoint} serves one at
+ * {@code /artifacts/token} and {@link RegistryChallenge#challenge} builds the header — both live,
+ * both tested, and deliberately called by nothing here yet. The change that closes the gap replaces
+ * the {@code rc.next()} in the anonymous branch of {@link #filter} with that one call.
+ *
  * <p>A bearer is judged only while the machine-token gate {@code qits.auth.machine.required} is
  * on, because with it off there is no OIDC tenant to validate one. The forwarded pair is judged
  * either way: it needs no validation, it is believed the way {@code ForwardAuthMechanism} believes

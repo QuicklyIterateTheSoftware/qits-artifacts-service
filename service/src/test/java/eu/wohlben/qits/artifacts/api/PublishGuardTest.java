@@ -240,6 +240,12 @@ class PublishGuardTest {
     assertEquals(false, PublishGuard.isPublish(io.vertx.core.http.HttpMethod.DELETE, "/v2/qits/x/manifests/1"));
     assertEquals(false, PublishGuard.isPublish(io.vertx.core.http.HttpMethod.POST, "/artifacts/npm/-/npm/v1/security/audits"));
     assertEquals(false, PublishGuard.isPublish(io.vertx.core.http.HttpMethod.PUT, "/artifacts/api/repositories/x"));
+    // And neither is the token endpoint, which is the door that BUYS the credential this guard
+    // will one day demand — a guard in front of it would be a loop. It is inside /artifacts but
+    // outside the five named wire prefixes, so it falls through; this pins that it stays so.
+    assertEquals(false, PublishGuard.isPublish(io.vertx.core.http.HttpMethod.GET, "/artifacts/token"));
+    assertEquals(false, PublishGuard.isPublish(io.vertx.core.http.HttpMethod.POST, "/artifacts/token"));
+    assertEquals(false, PublishGuard.isPublish(io.vertx.core.http.HttpMethod.PUT, "/artifacts/token"));
   }
 
   // --- plumbing ---------------------------------------------------------------------------------
