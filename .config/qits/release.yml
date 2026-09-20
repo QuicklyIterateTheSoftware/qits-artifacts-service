@@ -91,8 +91,27 @@ release-request:
         -Dquarkus.quinoa.package-manager-install.node-version=22.22.0 \
         -Dquarkus.quinoa.ci=true
       tar -czf /tmp/userstories.tgz -C service/target/userstories .
+      # Only a CI run may publish, so this PUT carries the run's own bearer. Minted HERE rather
+      # than read from QITS_PUBLISH_TOKEN, because the verify above can run for most of an hour
+      # and a token minted at container start would be expired by the time it is spent.
+      #
+      # Absent, unusable or failing, the header is simply left off and the PUT goes out bare —
+      # which is what it does today. That is deliberate: this recipe lands before qits-artifacts
+      # starts refusing an anonymous publish, and it must not break the release in between.
+      publish_token=""
+      if [ -n "${QITS_PUBLISH_TOKEN_COMMAND:-}" ] \
+        && command -v "$QITS_PUBLISH_TOKEN_COMMAND" >/dev/null 2>&1; then
+        publish_token=$("$QITS_PUBLISH_TOKEN_COMMAND" 2>/dev/null) || publish_token=""
+      fi
+      # THE ARGUMENT LIST, not an unquoted `${publish_token:+-H "Authorization: …"}`: that value
+      # contains spaces and would word-split into four arguments, of which curl would read the
+      # first as the whole header. An empty `"$@"` expands to nothing in both dash and bash.
+      set --
+      if [ -n "$publish_token" ]; then
+        set -- -H "Authorization: Bearer $publish_token"
+      fi
       status=$(curl -sS -o /tmp/docs-publish.out -w '%{http_code}' \
-        -X PUT --data-binary @/tmp/userstories.tgz \
+        -X PUT --data-binary @/tmp/userstories.tgz "$@" \
         -H "X-Artifacts-Meta-git.branch.name: $QITS_CI_BRANCH" \
         -H "X-Artifacts-Meta-git.commit.hash: $QITS_CI_SHA" \
         -H "X-Artifacts-Meta-git.repository.name: qits-artifacts" \
