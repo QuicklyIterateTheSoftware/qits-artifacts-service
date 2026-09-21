@@ -274,13 +274,31 @@ daemons, docs, SBOMs), and judges the identity the caller presents:
 | forwarded `X-Qits-User`/`X-Qits-Roles` without `qits:ci-run` — a browser session through the edge | 403 |
 | a JWT this service does not accept (other audience, expired, foreign key) | 401 |
 | HTTP Basic — the edge passes a client's `id:secret` through unchanged, and the store cannot check it | 401 |
-| no credential, or a bearer that is not a JWT (npm's `_authToken` ceremony) | accepted — **known gap** |
+| no credential, or a bearer that is not a JWT (npm's `_authToken` ceremony) | **depends on the surface** — see below |
 
-The last row stays open because every CI step on qits-net (`buildctl` push, `mvn deploy`, `npm
-publish`, the docs, daemon and SBOM `PUT`s) and every bootstrap seed publishes anonymously today.
-Closing it needs those publishers to present the run's credential first. A bearer is judged only
-while `qits.auth.machine.required` is on; the forwarded pair and Basic are judged always.
-`PublishGuardTest` proves the table; `RegistryOpenPushTest` pins the anonymous row.
+The last row is a rollout rather than a switch, and since 2026-09-20 it is **three-sixths closed**.
+A surface may only be flipped once every publisher that still writes to it presents the run's
+credential; refusing one before that stops every release on the estate. `PublishGuard.SURFACES`
+carries the state per surface (`ALLOW_ANONYMOUS`, `REFUSE`, `REFUSE_WITH_CHALLENGE`), so that list
+*is* the rollout and flipping the next surface is one word:
+
+| Surface | Anonymous publish | Why |
+|---|---|---|
+| `/v2/` (`POST`/`PATCH`/`PUT`) | **401 with `WWW-Authenticate: Bearer realm="…/artifacts/token"`** | `buildctl` and `docker push` carry the run's credential now — but only after a challenge, so the refusal must name a realm they can reach or the push never retries |
+| `/artifacts/daemons/` | **401**, plain | `qits-publish daemon submit` and the bootstrap's own publisher hold the bearer; nothing here speaks the docker token dance |
+| `/artifacts/sboms/` | **401**, plain | `qits-publish sbom submit`, from the composed postlude |
+| `/artifacts/npm/` | accepted | published to by the wrapper's `npm-library` archetype |
+| `/artifacts/maven/` | accepted | published to by the wrapper's `maven-library` archetype |
+| `/artifacts/docs/` | accepted | published to by the wrapper's `java-service` archetype |
+
+The last three flip when qits-qits is released at workspace resolution and their archetypes'
+credentialing change reaches CI — not before. **With `qits.auth.machine.required` off nothing is
+refused on any surface**: the OIDC tenant follows the same key, so there would be nothing to
+validate the credential a refusal demands. A bearer is judged only while that gate is on; the
+forwarded pair and Basic are judged always. `PublishGuardTest` proves the table and both anonymous
+halves, `PublishGuardGateOffTest` the gate-off posture, `RegistryOpenPushTest` the challenge,
+`DaemonOpenPublishTest` and `SbomOpenPublishTest` the two plain refusals, and `NpmOpenPublishTest`
+the surface that is deliberately still open.
 
 The registry once guarded writes with a static token as an HTTP Basic password. That
 bought a measured, awkward tradeoff — docker could push after a `docker login`, skopeo/podman
@@ -476,6 +494,12 @@ created.
 The OCI registry's rule verbatim (see "Who may publish" above): `PublishGuard` judges the identity a
 `PUT` presents, and only a CI run publishes. Reads are open at the store.
 
+This surface is one of the three where an **anonymous** publish is still accepted, and that is a
+deliberate hold rather than an oversight: its remaining publisher is the `npm-library` archetype in
+the qits-qits wrapper, which cannot present the run's credential until that wrapper is released.
+`/v2`, `/artifacts/daemons` and `/artifacts/sboms` already refuse one — see the rollout table under
+"Who may publish".
+
 The one wrinkle is client-side: the npm CLI refuses `npm publish` when no credential is configured
 for the target registry (`ENEEDAUTH` is a pre-flight check), so a pipeline's `.npmrc` carries one
 dummy `_authToken` line. It is npm-client ceremony, not an auth scheme: the guard treats a bearer
@@ -599,8 +623,9 @@ it answers with `Docker-Content-Digest` so a consumer can check it against its p
 request.
 
 **Only a CI run publishes** — `PublishGuard`, the rule every wire shares (see "Who may publish"
-under the OCI registry). An anonymous publish still passes today, the known gap
-`DaemonOpenPublishTest` pins. Integrity does not come from write auth alone: a version is
+under the OCI registry). An anonymous publish is **refused with a plain 401** here since
+2026-09-20 — one of the first three surfaces to close, pinned by `DaemonOpenPublishTest`.
+Integrity does not come from write auth alone: a version is
 immutable, so a publish can add a version and can never change one, and a consumer pins the digest
 this route echoes, so what a launcher runs is decided by content addressing.
 
@@ -696,7 +721,9 @@ belongs. The property that matters is immutability, which holds either way: the 
 change, and the route echoes their digest.
 
 **Only a CI run publishes**, the rule every wire shares (see "Who may publish" under the OCI
-registry); reads are open. The publish streams rather than buffers — no `BodyHandler`, capped by `qits.artifacts.sbom.max-size`
+registry); reads are open. An anonymous publish is **refused with a plain 401** here since
+2026-09-20 — one of the first three surfaces to close, pinned by `SbomOpenPublishTest`. The publish
+streams rather than buffers — no `BodyHandler`, capped by `qits.artifacts.sbom.max-size`
 (default 16M).
 
 GC keeps the last 2 **released** documents of every package and nothing else — the window is `P0D`,
