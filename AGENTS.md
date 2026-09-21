@@ -708,7 +708,7 @@ purpose, because tokenless-on-qits-net is their contract. `StoryBrowser` is the 
 `stories/support/` that touches auth, and it uses `Flow.page()` rather than a recorded step
 precisely because it is harness plumbing and not a step in anybody's story.
 
-- `mvn verify` runs 457 tests (50 in `artifacts/`, 158 in `gc/`, 249 in `service/`) in about a
+- `mvn verify` runs 460 tests (50 in `artifacts/`, 158 in `gc/`, 252 in `service/`) in about a
   minute — counted from the surefire reports — and then the failsafe ITs against the packaged
   fast-jar: **39 tests across 24 IT classes**, of which the three `qits`-category stories and
   `OciConformanceIT` skip without their gates. The `service` module opts back into ITs
