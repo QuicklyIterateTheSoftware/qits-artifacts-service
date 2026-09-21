@@ -100,9 +100,12 @@ only `/artifacts/api`, and this repository declares no `quarkus.http.auth.permis
 `RegistryTokenEndpointTest` asserts all three, with the machine-token gate on. It sits inside
 `/artifacts` so that the one path is reachable both on qits-net (where CI steps address
 `dev-qits-artifacts:8080` and the edge is never involved) and through the edge's projection of the
-`routes: /artifacts,/v2` that `deployments.yml` declares. **Nothing challenges anybody to use it
-yet**: `PublishGuard` still lets an anonymous publisher through, and `RegistryChallenge` exists so
-that the change which closes that gap is one call rather than a design.
+`routes: /artifacts,/v2` that `deployments.yml` declares. **`PublishGuard` challenges an anonymous
+`/v2` publish to use it**, since 2026-09-20: that surface's `Anonymous` state is
+`REFUSE_WITH_CHALLENGE`, and `RegistryChallenge.challenge` writes the `WWW-Authenticate` header
+that names this path. It is the only one of the six surfaces that challenges — the other two closed
+ones answer a plain 401, because nothing publishing a daemon binary or an SBOM does the token
+dance.
 
 `/artifacts/npm` is *not* forced on us the way `/v2` is: npm accepts a registry URL of any depth, so
 it sits inside the segment the edge already routes here and needs no `routes:` entry of its own. The first path segment after it is the `artifact_repository` row, the same
@@ -703,7 +706,7 @@ purpose, because tokenless-on-qits-net is their contract. `StoryBrowser` is the 
 `stories/support/` that touches auth, and it uses `Flow.page()` rather than a recorded step
 precisely because it is harness plumbing and not a step in anybody's story.
 
-- `mvn verify` runs 290 tests (49 in `artifacts/`, 115 in `gc/`, 126 in `service/`) in about a
+- `mvn verify` runs 457 tests (50 in `artifacts/`, 158 in `gc/`, 249 in `service/`) in about a
   minute — counted from the surefire reports — and then the failsafe ITs against the packaged
   fast-jar: **39 tests across 24 IT classes**, of which the three `qits`-category stories and
   `OciConformanceIT` skip without their gates. The `service` module opts back into ITs
@@ -1021,13 +1024,34 @@ the new store up either way, and the next release publishes clean.
   credential (401 — the edge passes a client's `id:secret` through unchanged). `qits:system` is
   refused too, an explicit exception to the open calling model. The CI media upload
   (`POST …/blobs`) takes `qits:ci-run` only, for the same reason.
-  **A caller with no identity still publishes, and that is a known gap, not a decision.** Every
-  CI step on qits-net and every bootstrap seed publishes anonymously today. Refusing anonymous
-  writes before they present the run's credential stops every release. A bearer that is not a JWT
-  (npm's `_authToken` ceremony) counts as no identity and never reaches quarkus-oidc. A bearer is
-  judged only while `qits.auth.machine.required` is on. `PublishGuardTest` proves the role table;
-  `RegistryOpenPushTest`, `NpmOpenPublishTest`, `DaemonOpenPublishTest` and `SbomOpenPublishTest`
-  pin the anonymous half.
+  **A caller with no identity is refused on THREE of the six surfaces, and that split is data, not
+  a chain of `if`s.** Each `Surface` in `PublishGuard.SURFACES` carries an `Anonymous` state —
+  `ALLOW_ANONYMOUS`, `REFUSE`, `REFUSE_WITH_CHALLENGE` — so the list *is* the rollout and flipping
+  the next surface is one word in it. Since 2026-09-20: `/v2` refuses **with** a Bearer challenge
+  (buildctl and `docker push` send a credential only after one names a realm they can reach; a bare
+  401 there breaks every image push instead of authenticating it), `/artifacts/daemons` and
+  `/artifacts/sboms` refuse with a plain 401 (`qits-publish daemon submit` and `qits-publish sbom
+  submit` hold the run's bearer already). `/artifacts/npm`, `/artifacts/maven` and
+  `/artifacts/docs` **still carry the anonymous publisher and must**: their remaining publishers
+  are the `npm-library`, `maven-library` and `java-service` archetypes in the qits-qits wrapper,
+  whose credentialing change reaches CI only when that wrapper is released — refusing them now
+  stops every release on the estate.
+  Two things not to get wrong when flipping the next one. **The refusal sits UNDER
+  `machineAuth.enforced()`, never beside it**: `quarkus.oidc.tenant-enabled` follows the same key
+  ("there is no third state"), so with the gate off a refusal demands a credential nothing could
+  validate and makes the store unusable rather than stricter — gate off means behaviour completely
+  unchanged, every surface. And **`jwtBearer` returning null is not only the anonymous caller**:
+  npm's ceremonial `Bearer qits-ci` is not three base64url segments either, so it lands in the same
+  branch and is judged by the same per-surface state — accepted on npm, refused on a flipped one.
+  The forwarded-pair branch is **terminal on success** for the same reason: a pair holding
+  `qits:ci-run` that fell through would be judged a second time as a caller with no bearer, which
+  was harmless while the fallthrough landed on `rc.next()` and is a 401 the moment a surface flips.
+  A bearer is judged only while `qits.auth.machine.required` is on. `PublishGuardTest` proves the
+  role table and both anonymous halves (the maven and docs rows explicitly, because nothing else
+  pins them); `PublishGuardGateOffTest` pins the gate-off posture with no `@TestProfile` of its
+  own; `RegistryOpenPushTest` pins the challenge header, `DaemonOpenPublishTest` and
+  `SbomOpenPublishTest` the two plain refusals, and `NpmOpenPublishTest` the surface that is
+  deliberately still open.
 - `service` ships `quarkus.http.limits.max-body-size=1088M`, which is a **global** ceiling — every
   route in the process, not just the upload. Tracked as an open tradeoff in
   `docs/issues/2026-07-19_artifacts-global-max-body-size-widens-public-ingest-dos.md`, which now

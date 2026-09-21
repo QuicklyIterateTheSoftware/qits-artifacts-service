@@ -19,12 +19,11 @@ import java.util.Optional;
  * reach this store by its qits-net alias {@code dev-qits-artifacts:8080}, which never passes
  * through the edge, so the store needs a token endpoint and a challenge of its own.
  *
- * <p><b>{@link #bearerChallenge} is currently called by NOTHING in the main tree, and that is
- * deliberate.</b> The anonymous branch of {@link PublishGuard#filter} still passes a caller with no
- * identity, because every publisher on qits-net writes anonymously today and refusing them would
- * stop every release. The later change that flips that branch replaces its {@code rc.next()} with
- * one call to {@link #challenge}; everything it needs is already here and pinned by
- * {@code RegistryChallengeTest}, so the flip is a one-line diff and not a design.
+ * <p><b>{@link #challenge} is what {@link PublishGuard} answers an anonymous {@code /v2} publish
+ * with</b>, since the flip of 2026-09-20 — the surface's {@link PublishGuard.Anonymous} state is
+ * {@code REFUSE_WITH_CHALLENGE}, and it is the only one of the six that carries a challenge rather
+ * than a plain 401, because it is the only one whose clients do the token dance. The three surfaces
+ * still open ({@code npm}, {@code maven}, {@code docs}) reach neither door.
  *
  * <h2>Where the realm points</h2>
  *
@@ -101,7 +100,8 @@ final class RegistryChallenge {
 
   /**
    * Ends a request with 401, the challenge above and the Distribution spec's error body — the whole
-   * of what the later {@link PublishGuard} flip has to do.
+   * of what {@link PublishGuard}'s {@code REFUSE_WITH_CHALLENGE} surface answers with. The caller
+   * puts {@code Connection: close} on the response first, because the client may still be pushing.
    */
   static void challenge(
       HttpServerRequest request, Optional<String> realmOverride, String message) {

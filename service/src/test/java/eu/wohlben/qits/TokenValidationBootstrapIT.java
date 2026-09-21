@@ -205,9 +205,10 @@ public class TokenValidationBootstrapIT {
       """
       The flip side of trusting the platform's keys: a token signed by a key the published JWKS
       never carried, or carrying an audience this platform never issues, is refused at the admin
-      door — however well-formed it looks. The refusal is scoped to that door: the byte wires (`docker`,
-      `npm`, `mvn`) keep answering on qits-net trust, gate on or off, until machine auth arrives
-      for all of them at once.
+      door — however well-formed it looks. The refusal is scoped to that door: READING from the byte
+      wires (`docker`, `npm`, `mvn`) stays anonymous, gate on or off, because the cold-start path is
+      a bootstrap with no credential to present. Publishing is the half that closes, surface by
+      surface, as each wire's publishers start carrying the run's credential.
       """)
   @Order(2)
   void aStrangersTokenIsRefused(Interactions story) {
@@ -250,9 +251,10 @@ public class TokenValidationBootstrapIT {
         .as("wrong-audience-refused");
 
     // The scope of the refusal, asserted from the other side: an anonymous docker ping still
-    // answers with the gate on. The wires are unguarded on purpose (qits-net trust; versions are
-    // immutable) — RegistryOpenPushTest pins it on the JVM, this pins it in the packaged process
-    // with a real tenant validating in front of it.
+    // answers with the gate on. READS stay open on purpose — a bootstrap has no credential to
+    // present — while an anonymous /v2 PUSH is now refused with a Bearer challenge, which
+    // RegistryOpenPushTest pins on the JVM. This pins the read half in the packaged process with a
+    // real tenant validating in front of it.
     //
     // A different caller, so a different actor — set before the request, because the tap reads it
     // when the request is made and knows nothing about who is behind a socket.
@@ -266,7 +268,7 @@ public class TokenValidationBootstrapIT {
     // observation — no tap can see a posture — so it belongs in the step log, where an observed 200
     // beside a note explaining why it is a 200 says more than a label claiming both.
     story
-        .note("the byte wires stay open on qits-net trust, gate on or off: this one is anonymous")
+        .note("reading from the byte wires stays open, gate on or off: this one is anonymous")
         .as("wire-stays-open");
   }
 

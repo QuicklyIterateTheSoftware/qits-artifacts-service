@@ -18,6 +18,7 @@ import jakarta.enterprise.event.Observes;
 import jakarta.inject.Inject;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.regex.Pattern;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
@@ -35,30 +36,42 @@ import org.jboss.logging.Logger;
  * {@code /artifacts/docs/…} and {@code /artifacts/sboms/…}. Reads, and the {@code DELETE}s the
  * wires answer with 405, are not publishing and pass untouched.
  *
- * <p><b>A caller that presents no identity still passes, and that is a known gap, not a
- * decision.</b> Every publisher on qits-net writes anonymously today: the bootstrap's seeds, and
- * the CI steps that reach this service by its qits-net alias (maven, npm, daemons, docs, SBOMs).
- * Closing that needs each of them to present the run's credential first; until then, refusing the
- * anonymous caller would stop every release. Two things follow from it:
+ * <p><b>The anonymous caller is refused on three of the six surfaces, and passes on the other
+ * three.</b> Closing the gap is a rollout rather than a switch: a surface may only be flipped once
+ * every publisher that still writes to it presents the run's credential, and refusing one before
+ * that stops every release on the estate. {@link Anonymous} is that state, carried per {@link
+ * Surface}, so the {@link #SURFACES} list below IS the rollout and flipping the next surface is one
+ * word. Refused today: {@code /v2/} (with a challenge — see below), {@code /artifacts/daemons/} and
+ * {@code /artifacts/sboms/}. Still open: {@code /artifacts/npm/}, {@code /artifacts/maven/} and
+ * {@code /artifacts/docs/}, whose remaining publishers are the {@code npm-library}, {@code
+ * maven-library} and {@code java-service} archetypes in the qits-qits wrapper — their credentialing
+ * change reaches CI only once that wrapper is released. Four things follow from it:
  *
  * <ul>
  *   <li>A bearer that is not a JWT (npm's mandatory {@code _authToken} ceremony, {@code
- *       qits-ci}, {@code qits-bootstrap}) is no identity and passes as anonymous. It is never
- *       handed to quarkus-oidc, so it cannot be refused as an invalid token.
+ *       qits-ci}, {@code qits-bootstrap}) is no identity and is judged as anonymous — passed on an
+ *       open surface, refused on a flipped one. It is never handed to quarkus-oidc, so it cannot be
+ *       refused as an invalid token.
  *   <li>A JWT is validated and judged by its roles. One that fails validation (wrong audience,
  *       expired, foreign signature) is refused with 401.
- *   <li>A Basic credential is refused with 401. The edge passes a client's {@code id:secret}
- *       through unchanged, and this service cannot check a secret, so it cannot tell a CI run's
- *       pair from an agent's or a service's. A CI run presents its bearer (the edge's docker token
- *       exchange turns the run's pair into one).
+ *   <li>A Basic credential is refused with 401 on every surface. The edge passes a client's {@code
+ *       id:secret} through unchanged, and this service cannot check a secret, so it cannot tell a
+ *       CI run's pair from an agent's or a service's. A CI run presents its bearer (the edge's
+ *       docker token exchange turns the run's pair into one).
+ *   <li>With the machine-token gate off nothing is refused, on any surface. {@code
+ *       quarkus.oidc.tenant-enabled} follows the same key, so with the gate off there is no tenant
+ *       to validate the credential a refusal would be demanding — a refusal there makes the store
+ *       unusable rather than stricter. The anonymous branch therefore sits <b>under</b> {@code
+ *       machineAuth.enforced()}, never beside it.
  * </ul>
  *
- * <p><b>The other half of closing that gap already ships.</b> docker and buildkit send a credential
- * only after a {@code 401 WWW-Authenticate: Bearer realm="…"} names an endpoint they can reach, so
- * the flip needs a realm before it needs a refusal. {@link RegistryTokenEndpoint} serves one at
- * {@code /artifacts/token} and {@link RegistryChallenge#challenge} builds the header — both live,
- * both tested, and deliberately called by nothing here yet. The change that closes the gap replaces
- * the {@code rc.next()} in the anonymous branch of {@link #filter} with that one call.
+ * <p><b>{@code /v2/} is refused WITH a challenge, and that is not decoration.</b> docker and
+ * buildkit send a credential only after a {@code 401 WWW-Authenticate: Bearer realm="…"} names an
+ * endpoint they can reach; a bare 401 there is a push that never retries with anything. {@link
+ * RegistryTokenEndpoint} serves that endpoint at {@code /artifacts/token} and {@link
+ * RegistryChallenge#challenge} writes the header. The other two flipped surfaces take a plain 401:
+ * {@code qits-publish daemon submit} and {@code qits-publish sbom submit} hold the run's bearer
+ * already and speak no token dance, so a challenge there would name a door nobody knocks on.
  *
  * <p>A bearer is judged only while the machine-token gate {@code qits.auth.machine.required} is
  * on, because with it off there is no OIDC tenant to validate one. The forwarded pair is judged
@@ -86,27 +99,79 @@ public class PublishGuard {
   /** Three base64url segments: the shape of a JWS. Anything else is not a token this idp mints. */
   private static final Pattern JWT = Pattern.compile("[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+");
 
-  /** A publish surface: a path prefix and the methods that write under it. */
-  record Surface(String prefix, Set<HttpMethod> methods) {}
+  /** What the message says on a surface where anonymous is refused. */
+  private static final String NO_CREDENTIAL =
+      "only a CI run publishes; this publish carried no credential";
+
+  /**
+   * What a surface does with a caller this service can put no name to — the rollout state of the
+   * CI-only publish rule, one value per surface. It is data rather than a chain of {@code if}s so
+   * that flipping the next surface is one word in {@link #SURFACES}, and so that the list itself
+   * says how far the rollout has come.
+   *
+   * <p>Read only while the machine-token gate is on; with it off every surface behaves as {@link
+   * #ALLOW_ANONYMOUS}.
+   */
+  enum Anonymous {
+    /**
+     * Passed through: a publisher on this surface still writes with no credential, and refusing it
+     * would stop every release. The state every surface was in before 2026-09-20.
+     */
+    ALLOW_ANONYMOUS,
+
+    /** Refused with a plain 401. Every publisher here holds the run's bearer already. */
+    REFUSE,
+
+    /**
+     * Refused with a 401 carrying {@link RegistryChallenge#bearerChallenge} — the only answer a
+     * docker or buildkit client can recover from, because it names the token endpoint to go and
+     * buy a credential at.
+     */
+    REFUSE_WITH_CHALLENGE
+  }
+
+  /**
+   * A publish surface: a path prefix, the methods that write under it, and what it does with a
+   * caller that presents no identity this service can judge.
+   */
+  record Surface(String prefix, Set<HttpMethod> methods, Anonymous anonymous) {}
 
   /**
    * Every surface that creates content. Extended by hand when a wire is added — a publish route
-   * outside this list is unguarded.
+   * outside this list is unguarded — and the third component is the rollout: three surfaces refuse
+   * the anonymous publisher, three still carry it. The three open ones are published to by the
+   * {@code npm-library}, {@code maven-library} and {@code java-service} archetypes in the qits-qits
+   * wrapper, and flip when a wrapper release carries their credentialing change into CI.
    */
   static final List<Surface> SURFACES =
       List.of(
-          new Surface("/v2/", Set.of(HttpMethod.POST, HttpMethod.PATCH, HttpMethod.PUT)),
-          new Surface("/artifacts/npm/", Set.of(HttpMethod.PUT)),
-          new Surface("/artifacts/maven/", Set.of(HttpMethod.PUT)),
-          new Surface("/artifacts/daemons/", Set.of(HttpMethod.PUT)),
-          new Surface("/artifacts/docs/", Set.of(HttpMethod.PUT)),
-          new Surface("/artifacts/sboms/", Set.of(HttpMethod.PUT)));
+          // buildctl and `docker push`: they send a credential only after being challenged.
+          new Surface(
+              "/v2/",
+              Set.of(HttpMethod.POST, HttpMethod.PATCH, HttpMethod.PUT),
+              Anonymous.REFUSE_WITH_CHALLENGE),
+          new Surface("/artifacts/npm/", Set.of(HttpMethod.PUT), Anonymous.ALLOW_ANONYMOUS),
+          new Surface("/artifacts/maven/", Set.of(HttpMethod.PUT), Anonymous.ALLOW_ANONYMOUS),
+          // `qits-publish daemon submit`, and the bootstrap's own credential.
+          new Surface("/artifacts/daemons/", Set.of(HttpMethod.PUT), Anonymous.REFUSE),
+          new Surface("/artifacts/docs/", Set.of(HttpMethod.PUT), Anonymous.ALLOW_ANONYMOUS),
+          // `qits-publish sbom submit`, from the composed postlude.
+          new Surface("/artifacts/sboms/", Set.of(HttpMethod.PUT), Anonymous.REFUSE));
 
   @ConfigProperty(name = "qits.auth.forward.user-header")
   String userHeader;
 
   @ConfigProperty(name = "qits.auth.forward.roles-header")
   String rolesHeader;
+
+  /**
+   * The advertised realm, empty unless a deployment overrides it — {@link RegistryChallenge} says
+   * why deriving it from the inbound request is the default, and {@link RegistryTokenEndpoint}
+   * carries the same injection point. {@code Optional<String>} rather than {@code String}, because
+   * SmallRye reads this configured-empty key as absent.
+   */
+  @ConfigProperty(name = "qits.artifacts.registry.token-realm")
+  Optional<String> tokenRealm;
 
   @Inject MachineAuth machineAuth;
 
@@ -116,26 +181,39 @@ public class PublishGuard {
 
   /** True for a method and normalized path that publish. */
   static boolean isPublish(HttpMethod method, String path) {
+    return surfaceOf(method, path) != null;
+  }
+
+  /**
+   * The surface a request publishes on, or null when it publishes on none. The first prefix that
+   * matches decides — a path under a wire's prefix is that wire's, and a method it does not write
+   * with is not publishing at all rather than falling through to a later entry.
+   */
+  static Surface surfaceOf(HttpMethod method, String path) {
     if (path == null) {
-      return false;
+      return null;
     }
     for (Surface surface : SURFACES) {
       if (path.startsWith(surface.prefix())) {
-        return surface.methods().contains(method);
+        return surface.methods().contains(method) ? surface : null;
       }
     }
-    return false;
+    return null;
   }
 
   void filter(RoutingContext rc) {
     String path = rc.normalizedPath();
-    if (!isPublish(rc.request().method(), path)) {
+    Surface surface = surfaceOf(rc.request().method(), path);
+    if (surface == null) {
       rc.next();
       return;
     }
 
     // The forwarded pair first: the edge asserts it for a signed-in person, and anything on
     // qits-net can send it. Either way it names an identity, and that identity must be a CI run.
+    // It is TERMINAL either way: a pair naming a CI run has been judged, and falling through to be
+    // judged a second time would turn a request the edge already authenticated into an anonymous
+    // one the moment a surface flips.
     String user = rc.request().getHeader(userHeader);
     if (user != null && !user.isBlank()) {
       Set<String> roles = roles(rc.request().getHeader(rolesHeader));
@@ -143,6 +221,8 @@ public class PublishGuard {
         refuse(rc, 403, "only a CI run publishes; " + user + " holds " + roles);
         return;
       }
+      rc.next();
+      return;
     }
 
     // A Basic pair is a client's id and secret — through the edge it reaches here verbatim. This
@@ -154,10 +234,24 @@ public class PublishGuard {
       return;
     }
 
-    String jwt = jwtBearer(authorization);
-    if (jwt == null || !machineAuth.enforced()) {
-      // No identity presented (or none this service can validate): qits-net trust, the known gap.
+    if (!machineAuth.enforced()) {
+      // The gate is off, so there is no OIDC tenant at all and nothing could present a credential
+      // this service would accept. Behaviour is exactly what it was before the idp existed, on
+      // every surface — the refusal below lives UNDER this check and never beside it.
       rc.next();
+      return;
+    }
+
+    String jwt = jwtBearer(authorization);
+    if (jwt == null) {
+      // No identity this service can put a name to. That is the anonymous publisher — and also
+      // npm's ceremonial `Bearer qits-ci`, which is not three base64url segments and so never
+      // reaches quarkus-oidc. The surface decides.
+      switch (surface.anonymous()) {
+        case ALLOW_ANONYMOUS -> rc.next();
+        case REFUSE -> refuse(rc, 401, NO_CREDENTIAL);
+        case REFUSE_WITH_CHALLENGE -> challenge(rc);
+      }
       return;
     }
 
@@ -203,6 +297,27 @@ public class PublishGuard {
     } else {
       context.runOnContext(ignored -> action.run());
     }
+  }
+
+  /**
+   * Refuses an anonymous {@code /v2} publish the one way a docker or buildkit client can recover
+   * from: 401 with {@code WWW-Authenticate: Bearer realm="…/artifacts/token"}, which is what sends
+   * it to {@link RegistryTokenEndpoint} and back with a credential.
+   *
+   * <p>{@code Connection: close} is put on ahead of {@link RegistryChallenge#challenge} for the
+   * same reason {@link #refuse} sets it — the client may still be pushing a layer at us — and
+   * before rather than inside, so the shipped challenge stays the string {@code
+   * RegistryChallengeTest} pins.
+   */
+  private void challenge(RoutingContext rc) {
+    LOG.warnf(
+        "Refused %s %s with 401 and a Bearer challenge: %s",
+        rc.request().method(), rc.normalizedPath(), NO_CREDENTIAL);
+    if (rc.response().ended()) {
+      return;
+    }
+    rc.response().putHeader(HttpHeaders.CONNECTION, "close");
+    RegistryChallenge.challenge(rc.request(), tokenRealm, NO_CREDENTIAL);
   }
 
   /**
