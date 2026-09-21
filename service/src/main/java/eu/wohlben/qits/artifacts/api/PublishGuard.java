@@ -316,6 +316,13 @@ public class PublishGuard {
     if (rc.response().ended()) {
       return;
     }
+    // Resumed for the same reason {@link #refuse} resumes: the caller may still be sending a
+    // payload. A challenge is usually answered on the small request that OPENS an upload —
+    // docker's `POST /v2/<name>/blobs/uploads/` carries no body — but a token that expires
+    // mid-push is challenged on a `PATCH` that is streaming a layer, and that one must not be
+    // left half-read. Reaching here the request was never paused (only the bearer path pauses),
+    // so this is a no-op on the common path and insurance on the rare one.
+    rc.request().resume();
     rc.response().putHeader(HttpHeaders.CONNECTION, "close");
     RegistryChallenge.challenge(rc.request(), tokenRealm, NO_CREDENTIAL);
   }
