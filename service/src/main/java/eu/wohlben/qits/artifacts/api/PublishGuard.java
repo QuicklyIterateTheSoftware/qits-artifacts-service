@@ -36,22 +36,25 @@ import org.jboss.logging.Logger;
  * {@code /artifacts/docs/…} and {@code /artifacts/sboms/…}. Reads, and the {@code DELETE}s the
  * wires answer with 405, are not publishing and pass untouched.
  *
- * <p><b>The anonymous caller is refused on four of the six surfaces, and passes on the other
- * two.</b> Closing the gap is a rollout rather than a switch: a surface may only be flipped once
- * every publisher that still writes to it presents the run's credential, and refusing one before
- * that stops every release on the estate. {@link Anonymous} is that state, carried per {@link
- * Surface}, so the {@link #SURFACES} list below IS the rollout and flipping the next surface is one
- * word. Refused today: {@code /v2/} (with a challenge — see below), {@code /artifacts/maven/},
- * {@code /artifacts/daemons/} and {@code /artifacts/sboms/}. Still open: {@code /artifacts/npm/}
- * and {@code /artifacts/docs/}, whose remaining publishers are the {@code npm-library} and {@code
- * java-service} archetypes in the qits-qits wrapper — their credentialing change reaches CI only
- * once that wrapper is released. Four things follow from it:
+ * <p><b>The anonymous caller is refused on all six surfaces, since 2026-09-21.</b> Closing the gap
+ * was a rollout rather than a switch: a surface could only be flipped once every publisher that
+ * still wrote to it presented the run's credential, and refusing one before that would have stopped
+ * every release on the estate. {@link Anonymous} is that state, carried per {@link Surface}, so the
+ * {@link #SURFACES} list below IS the rollout — and what it records now is a finished one. {@code
+ * /v2/} refuses with a challenge (see below); {@code /artifacts/npm/}, {@code /artifacts/maven/},
+ * {@code /artifacts/daemons/}, {@code /artifacts/docs/} and {@code /artifacts/sboms/} answer a
+ * plain 401. npm and docs were the last two, and they closed once the {@code npm-library} and
+ * {@code java-service} archetypes in the qits-qits wrapper began presenting the run's bearer on
+ * {@code main} — wrapper commit {@code 7f917fb}, 2026-09-20 — and a census of all 56 release recipes
+ * on the estate found no uncredentialed publisher left on either. Four things follow from it:
  *
  * <ul>
  *   <li>A bearer that is not a JWT (npm's mandatory {@code _authToken} ceremony, {@code
- *       qits-ci}, {@code qits-bootstrap}) is no identity and is judged as anonymous — passed on an
- *       open surface, refused on a flipped one. It is never handed to quarkus-oidc, so it cannot be
- *       refused as an invalid token.
+ *       qits-ci}, {@code qits-bootstrap}) is no identity and is judged as anonymous — which now
+ *       means refused, everywhere. It is never handed to quarkus-oidc, so it cannot be refused as
+ *       an invalid token: the 401 is this guard's own sentence rather than a validation failure,
+ *       and the body says so, which is what sends a debugger to the publisher rather than to the
+ *       idp.
  *   <li>A JWT is validated and judged by its roles. One that fails validation (wrong audience,
  *       expired, foreign signature) is refused with 401.
  *   <li>A Basic credential is refused with 401 on every surface. The edge passes a client's {@code
@@ -69,10 +72,13 @@ import org.jboss.logging.Logger;
  * buildkit send a credential only after a {@code 401 WWW-Authenticate: Bearer realm="…"} names an
  * endpoint they can reach; a bare 401 there is a push that never retries with anything. {@link
  * RegistryTokenEndpoint} serves that endpoint at {@code /artifacts/token} and {@link
- * RegistryChallenge#challenge} writes the header. The other three flipped surfaces take a plain
- * 401: {@code qits-publish daemon submit}, {@code qits-publish sbom submit} and maven itself hold
- * the run's bearer already and speak no token dance, so a challenge there would name a door nobody
- * knocks on.
+ * RegistryChallenge#challenge} writes the header. The other five surfaces take a plain 401: {@code
+ * qits-publish daemon submit}, {@code qits-publish sbom submit}, {@code qits-publish docs submit},
+ * npm and maven itself all hold the run's bearer already and speak no token dance, so a challenge
+ * there would name a door nobody knocks on. On the last two it would be worse than noise: npm reads
+ * a {@code WWW-Authenticate: Bearer} as a reason to re-send its {@code _authToken} ceremony, and a
+ * hand-written {@code curl} reads it as a reason to prompt — each making its own wrong thing of a
+ * header meant for one client family.
  *
  * <p><b>Why {@code /artifacts/maven/} could be flipped, and why it takes a plain 401.</b>
  * qits-ci-service {@code 2026.921.80307} injects the credential into every step: {@code BOOTSTRAP}
@@ -90,9 +96,11 @@ import org.jboss.logging.Logger;
  * 401-then-retry: a {@code WWW-Authenticate: Bearer} here would be noise it cannot act on, which is
  * why this surface is {@link Anonymous#REFUSE} and not {@link Anonymous#REFUSE_WITH_CHALLENGE}.
  *
- * <p><b>Every accepted publish is logged at INFO, and that is what makes the next flip
+ * <p><b>Every accepted publish is logged at INFO, and that is what made the last flip
  * reviewable</b> — see {@link #accept}. A refusal has said why since the guard shipped; an accept
- * said nothing at all, and on a surface about to be flipped the accepts are the interesting half.
+ * said nothing at all, and on a surface about to be flipped the accepts were the interesting half.
+ * With every surface closed the line has the other half of that value: it names who published, so a
+ * 401 beside it is attributable rather than a mystery.
  *
  * <p>A bearer is judged only while the machine-token gate {@code qits.auth.machine.required} is
  * on, because with it off there is no OIDC tenant to validate one. The forwarded pair is judged
@@ -136,7 +144,16 @@ public class PublishGuard {
   enum Anonymous {
     /**
      * Passed through: a publisher on this surface still writes with no credential, and refusing it
-     * would stop every release. The state every surface was in before 2026-09-20.
+     * would stop every release. The state every surface was in before 2026-09-20, and <b>no surface
+     * is in it today</b> — the rollout finished on 2026-09-21.
+     *
+     * <p>It stays a value anyway, and not out of sentiment. It is still the behaviour the code
+     * takes with the machine-token gate off: that early return in {@link #filter} is written as
+     * "every surface behaves as {@code ALLOW_ANONYMOUS}", and {@code PublishGuardGateOffTest} pins
+     * exactly that over all six. Deleting the constant would leave that sentence naming nothing,
+     * and would leave the switch below with no branch for the one state a newly added wire can
+     * honestly be in before its publishers are credentialed — which is the state all six surfaces
+     * below started from.
      */
     ALLOW_ANONYMOUS,
 
@@ -159,10 +176,15 @@ public class PublishGuard {
 
   /**
    * Every surface that creates content. Extended by hand when a wire is added — a publish route
-   * outside this list is unguarded — and the third component is the rollout: four surfaces refuse
-   * the anonymous publisher, two still carry it. The two open ones are published to by the {@code
-   * npm-library} and {@code java-service} archetypes in the qits-qits wrapper, and flip when a
-   * wrapper release carries their credentialing change into CI.
+   * outside this list is unguarded — and the third component was the rollout. <b>That rollout is
+   * complete: since 2026-09-21 all six surfaces refuse the anonymous publisher</b>, and the list
+   * pins that end state rather than tracking progress towards it.
+   *
+   * <p>So what it says now is the stronger claim, and the one worth breaking a build over: nothing
+   * writes to this store without naming itself. A value moving back to {@link
+   * Anonymous#ALLOW_ANONYMOUS} is a surface being re-opened to an uncredentialed publisher, which
+   * is a decision and never a tidy-up — {@code PublishGuardTest.theSurfaceListIsTheRollout} asserts
+   * the whole map so it cannot be one.
    */
   static final List<Surface> SURFACES =
       List.of(
@@ -171,13 +193,17 @@ public class PublishGuard {
               "/v2/",
               Set.of(HttpMethod.POST, HttpMethod.PATCH, HttpMethod.PUT),
               Anonymous.REFUSE_WITH_CHALLENGE),
-          new Surface("/artifacts/npm/", Set.of(HttpMethod.PUT), Anonymous.ALLOW_ANONYMOUS),
+          // The `npm-library` archetype's .npmrc, whose `_authToken` is the run's bearer now —
+          // written from $QITS_PUBLISH_TOKEN_COMMAND rather than the ceremonial `qits-ci`.
+          new Surface("/artifacts/npm/", Set.of(HttpMethod.PUT), Anonymous.REFUSE),
           // Every maven publisher presents the run's bearer: qits-ci's BOOTSTRAP writes the
           // settings file that carries it, and appends `-gs` to MAVEN_ARGS.
           new Surface("/artifacts/maven/", Set.of(HttpMethod.PUT), Anonymous.REFUSE),
           // `qits-publish daemon submit`, and the bootstrap's own credential.
           new Surface("/artifacts/daemons/", Set.of(HttpMethod.PUT), Anonymous.REFUSE),
-          new Surface("/artifacts/docs/", Set.of(HttpMethod.PUT), Anonymous.ALLOW_ANONYMOUS),
+          // The `java-service` archetype's `curl -H "Authorization: Bearer …"`, `qits-publish docs
+          // submit`, and five repositories' hand-written copies of the same block.
+          new Surface("/artifacts/docs/", Set.of(HttpMethod.PUT), Anonymous.REFUSE),
           // `qits-publish sbom submit`, from the composed postlude.
           new Surface("/artifacts/sboms/", Set.of(HttpMethod.PUT), Anonymous.REFUSE));
 
@@ -326,16 +352,17 @@ public class PublishGuard {
    * Passes a publish on, and says in the log who published it — the accept half of the pair {@link
    * #refuse} and {@link #challenge} make.
    *
-   * <p><b>Why an accept is worth a line at all.</b> {@code /artifacts/npm/} and {@code
-   * /artifacts/docs/} are the two surfaces still carrying the anonymous publisher, and flipping one
-   * is today a blind change: nothing on either end can tell a credentialed publish from an
-   * uncredentialed one. The wrapper's release recipes mint the run's token in a step that swallows
-   * the mint's exit code, so a failed mint degrades to an anonymous publish that still succeeds and
-   * says nothing; and on this side an accept was a bare {@code rc.next()} — no record, no access log
-   * in the shipped configuration, and no principal on the request span. So this line is what proves,
-   * <b>before</b> a refusal makes the answer expensive, that every real publisher on a surface is
-   * presenting the run's bearer. After the flip it is the other half of the same value: a 401 is
-   * attributable to a named publisher rather than being a mystery somebody has to reproduce.
+   * <p><b>Why an accept is worth a line at all.</b> This line is what MADE the last flip
+   * reviewable. Until it existed, flipping {@code /artifacts/npm/} or {@code /artifacts/docs/} was
+   * a blind change: nothing on either end could tell a credentialed publish from an uncredentialed
+   * one. The wrapper's release recipes mint the run's token in a step that swallows the mint's exit
+   * code, so a failed mint degrades to an anonymous publish that still succeeds and says nothing;
+   * and on this side an accept was a bare {@code rc.next()} — no record, no access log in the
+   * shipped configuration, and no principal on the request span. So this line is what proved,
+   * <b>before</b> a refusal made the answer expensive, that every real publisher on those two
+   * surfaces was presenting the run's bearer. With the rollout finished it carries the other half
+   * of the same value, and carries it permanently: every accept names a publisher, so a 401 beside
+   * them is attributable to a named one rather than being a mystery somebody has to reproduce.
    *
    * <p>It names the surface prefix as well as the path, because the surface is what carries the
    * rollout state and therefore what a reader is counting accepts per. The publisher is a
@@ -360,8 +387,11 @@ public class PublishGuard {
    * this function alone. Two callers pass no name at all and must not be confusable: the gate-off
    * accept says so outright, because with {@code qits.auth.machine.required} off there is no OIDC
    * tenant and nothing <i>could</i> have presented a credential, while an {@link
-   * Anonymous#ALLOW_ANONYMOUS} accept is a publisher that could have and did not — which is the one
-   * the rollout is waiting on.
+   * Anonymous#ALLOW_ANONYMOUS} accept is a publisher that could have and did not. No surface
+   * carries that second state since the rollout finished, so that accept is unreachable in the
+   * shipped configuration — but the two must still be told apart, because the code can still reach
+   * both and reading a gate-off accept as an uncredentialed publish sends somebody hunting a
+   * publisher that was never asked for a credential.
    */
   static String publisher(String name, String how) {
     String who = name == null || name.isBlank() ? "anonymous" : name;

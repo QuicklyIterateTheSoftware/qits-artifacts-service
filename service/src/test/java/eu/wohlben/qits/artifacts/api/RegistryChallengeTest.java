@@ -12,9 +12,11 @@ import org.junit.jupiter.api.Test;
  * challenge docker does not parse fails with no message anywhere, so the string itself is the
  * contract rather than the code that builds it.
  *
- * <p>Nothing in the main tree sends this header yet — {@link PublishGuard} still lets an anonymous
- * publisher through, and the change that makes it call {@link RegistryChallenge#challenge} is a
- * later one. This is what makes that flip a one-line diff rather than a design.
+ * <p>It shipped before anything sent the header, so that flipping {@code /v2} would be a one-line
+ * diff rather than a design. {@link PublishGuard} has called {@link RegistryChallenge#challenge}
+ * since 2026-09-20 and refuses the anonymous publisher on every surface since 2026-09-21, so this
+ * suite is no longer ahead of its caller — it is the bytes half of that refusal, with {@code
+ * registry/RegistryOpenPushTest} the wire half.
  */
 class RegistryChallengeTest {
 
@@ -107,7 +109,7 @@ class RegistryChallengeTest {
 
   /**
    * The endpoint the realm names is not a publish route, so {@link PublishGuard} never claims the
-   * door that BUYS the credential it will one day demand. The wire half of this is in {@code
+   * door that BUYS the credential it demands. The wire half of this is in {@code
    * RegistryTokenEndpointTest}; this is the path arithmetic on its own.
    */
   @Test

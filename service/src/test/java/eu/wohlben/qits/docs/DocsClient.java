@@ -5,6 +5,8 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 /**
  * A synthetic docs client: publish, fetch a file, read a version, list versions.
@@ -20,9 +22,19 @@ final class DocsClient implements AutoCloseable {
   private final URI base;
   private final HttpClient http =
       HttpClient.newBuilder().version(HttpClient.Version.HTTP_1_1).build();
+  private final Map<String, String> headers = new LinkedHashMap<>();
 
   DocsClient(URI base) {
     this.base = base;
+  }
+
+  /**
+   * Adds a header to every subsequent request — {@code npm/NpmClient.header}'s twin, applied at the
+   * one {@link #send} choke point so no call site can be the exception.
+   */
+  DocsClient header(String name, String value) {
+    headers.put(name, value);
+    return this;
   }
 
   @Override
@@ -120,6 +132,7 @@ final class DocsClient implements AutoCloseable {
 
   private <T> HttpResponse<T> send(
       HttpRequest.Builder builder, HttpResponse.BodyHandler<T> bodyHandler) {
+    headers.forEach(builder::header);
     try {
       return http.send(builder.build(), bodyHandler);
     } catch (Exception e) {

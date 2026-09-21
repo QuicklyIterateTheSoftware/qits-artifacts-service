@@ -103,11 +103,13 @@ only `/artifacts/api`, and this repository declares no `quarkus.http.auth.permis
 `routes: /artifacts,/v2` that `deployments.yml` declares. **`PublishGuard` challenges an anonymous
 `/v2` publish to use it**, since 2026-09-20: that surface's `Anonymous` state is
 `REFUSE_WITH_CHALLENGE`, and `RegistryChallenge.challenge` writes the `WWW-Authenticate` header
-that names this path. It is the only one of the six surfaces that challenges — the other three
-closed ones answer a plain 401, because nothing publishing a daemon binary, an SBOM or a maven
-artifact does the token dance. Four of the six are closed since 2026-09-21; `/artifacts/npm` and
-`/artifacts/docs` are the two still carrying the anonymous publisher, waiting on the `npm-library`
-and `java-service` archetypes in the qits-qits wrapper.
+that names this path. It is the only one of the six surfaces that challenges — the other five answer
+a plain 401, because nothing publishing a daemon binary, an SBOM, a maven artifact, an npm package
+or a docs bundle does the token dance, and on the last two a challenge would be worse than noise:
+npm reads `WWW-Authenticate: Bearer` as a reason to re-send its `_authToken` ceremony and a
+hand-written `curl` reads it as a reason to prompt. **All six are closed since 2026-09-21**, npm and
+docs last, once the `npm-library` and `java-service` archetypes in the qits-qits wrapper began
+presenting the run's bearer on `main`.
 
 `/artifacts/npm` is *not* forced on us the way `/v2` is: npm accepts a registry URL of any depth, so
 it sits inside the segment the edge already routes here and needs no `routes:` entry of its own. The first path segment after it is the `artifact_repository` row, the same
@@ -708,7 +710,7 @@ purpose, because tokenless-on-qits-net is their contract. `StoryBrowser` is the 
 `stories/support/` that touches auth, and it uses `Flow.page()` rather than a recorded step
 precisely because it is harness plumbing and not a step in anybody's story.
 
-- `mvn verify` runs 460 tests (50 in `artifacts/`, 158 in `gc/`, 252 in `service/`) in about a
+- `mvn verify` runs 478 tests (50 in `artifacts/`, 158 in `gc/`, 270 in `service/`) in about a
   minute — counted from the surefire reports — and then the failsafe ITs against the packaged
   fast-jar: **39 tests across 24 IT classes**, of which the three `qits`-category stories and
   `OciConformanceIT` skip without their gates. The `service` module opts back into ITs
@@ -1026,10 +1028,14 @@ the new store up either way, and the next release publishes clean.
   credential (401 — the edge passes a client's `id:secret` through unchanged). `qits:system` is
   refused too, an explicit exception to the open calling model. The CI media upload
   (`POST …/blobs`) takes `qits:ci-run` only, for the same reason.
-  **A caller with no identity is refused on FOUR of the six surfaces, and that split is data, not
-  a chain of `if`s.** Each `Surface` in `PublishGuard.SURFACES` carries an `Anonymous` state —
-  `ALLOW_ANONYMOUS`, `REFUSE`, `REFUSE_WITH_CHALLENGE` — so the list *is* the rollout and flipping
-  the next surface is one word in it. Since 2026-09-20: `/v2` refuses **with** a Bearer challenge
+  **A caller with no identity is refused on ALL SIX surfaces since 2026-09-21, and that state is
+  data, not a chain of `if`s.** Each `Surface` in `PublishGuard.SURFACES` carries an `Anonymous`
+  state — `ALLOW_ANONYMOUS`, `REFUSE`, `REFUSE_WITH_CHALLENGE` — so the list *was* the rollout, one
+  word per surface, and what it pins now is the finished end state: nothing writes to this store
+  without naming itself. A row going back to `ALLOW_ANONYMOUS` is a surface re-opened to an
+  uncredentialed publisher, which is a decision and never a tidy-up —
+  `PublishGuardTest.theSurfaceListIsTheRollout` asserts the whole map so it cannot be one. From
+  2026-09-20: `/v2` refuses **with** a Bearer challenge
   (buildctl and `docker push` send a credential only after one names a realm they can reach; a bare
   401 there breaks every image push instead of authenticating it), `/artifacts/daemons` and
   `/artifacts/sboms` refuse with a plain 401 (`qits-publish daemon submit` and `qits-publish sbom
@@ -1046,41 +1052,63 @@ the new store up either way, and the next release publishes clean.
   the live store before the flip, a deploy with that settings file to a nonexistent repository
   answered **403** (`only a CI run publishes; dyn-workspace-… holds [qits:agent, …]`) where an
   uncredentialed one would have reached the route and answered 404 — which is how we know the
-  header is sent unprompted and read as an identity. `/artifacts/npm` and
-  `/artifacts/docs` **still carry the anonymous publisher and must**: their remaining publishers
-  are the `npm-library` and `java-service` archetypes in the qits-qits wrapper,
-  whose credentialing change reaches CI only when that wrapper is released — refusing them now
-  stops every release on the estate.
-  Two things not to get wrong when flipping the next one. **The refusal sits UNDER
-  `machineAuth.enforced()`, never beside it**: `quarkus.oidc.tenant-enabled` follows the same key
-  ("there is no third state"), so with the gate off a refusal demands a credential nothing could
-  validate and makes the store unusable rather than stricter — gate off means behaviour completely
-  unchanged, every surface. And **`jwtBearer` returning null is not only the anonymous caller**:
+  header is sent unprompted and read as an identity. **`/artifacts/npm` and `/artifacts/docs` were
+  the last two, and they are the two that DID wait for a wrapper release**: their publishers are the
+  `npm-library` and `java-service` archetypes in qits-qits, so the credentialing change reached CI
+  only when that wrapper shipped it — wrapper commit `7f917fb`, on `main` since 2026-09-20 15:38
+  UTC, npm's `.npmrc` `_authToken` fed from `$QITS_PUBLISH_TOKEN_COMMAND` and docs' `curl -H
+  "Authorization: Bearer …"`, plus `qits-publish docs submit` and five repositories' hand-written
+  copies of the same block. A census of all 56 release recipes on the estate then found no
+  uncredentialed npm or docs publisher left, which is what made the flip a measurement rather than a
+  hope. Both take a **plain** 401 and not a challenge, for the reason maven does and one sharper:
+  `WWW-Authenticate: Bearer` is a header meant for one client family, and npm would read it as a
+  reason to re-send the very `_authToken` ceremony that is not a credential while a raw `curl` would
+  read it as a reason to prompt — each making its own wrong thing of it.
+  Three things the closed state rests on, all three still live wiring rather than history — they are
+  what a seventh wire gets added under, and what a careless refactor takes out. **The refusal sits
+  UNDER `machineAuth.enforced()`, never beside it**: `quarkus.oidc.tenant-enabled` follows the same
+  key ("there is no third state"), so with the gate off a refusal demands a credential nothing could
+  validate and makes the store unusable rather than stricter — gate off still means behaviour
+  completely unchanged, every surface, and that is the one state `ALLOW_ANONYMOUS` still names now
+  that no surface carries it. And **`jwtBearer` returning null is not only the anonymous caller**:
   npm's ceremonial `Bearer qits-ci` is not three base64url segments either, so it lands in the same
-  branch and is judged by the same per-surface state — accepted on npm, refused on a flipped one.
-  The forwarded-pair branch is **terminal on success** for the same reason: a pair holding
-  `qits:ci-run` that fell through would be judged a second time as a caller with no bearer, which
-  was harmless while the fallthrough landed on `rc.next()` and is a 401 the moment a surface flips.
+  branch and is judged by the same per-surface state — which is now a 401 everywhere, delivered as
+  this guard's own sentence rather than as a token-validation failure, because it never reaches
+  quarkus-oidc at all. The forwarded-pair branch is **terminal on success** for the same reason: a
+  pair holding `qits:ci-run` that fell through would be judged a second time as a caller with no
+  bearer, which was harmless while the fallthrough landed on `rc.next()` and is a 401 on every
+  surface today.
   A bearer is judged only while `qits.auth.machine.required` is on. `PublishGuardTest` proves the
-  role table and both anonymous halves (the maven and docs rows explicitly, because nothing else
-  pins them — maven has no `*OpenPublishTest` suite of its own, so its refusal AND the fact that the
-  refusal **stores nothing**, a following `HEAD`/`GET` answering 404, live there);
-  `PublishGuardGateOffTest` pins the gate-off posture with no `@TestProfile` of its
-  own; `RegistryOpenPushTest` pins the challenge header, `DaemonOpenPublishTest` and
-  `SbomOpenPublishTest` two of the three plain refusals, and `NpmOpenPublishTest` a surface that is
-  deliberately still open.
-  **An accept is logged too, at `INFO`, and that is the instrument the remaining flips are made
+  role table and the anonymous row over all six wires at once, asserts the whole surface map, and
+  carries the store-side half for the three wires where it matters most — a refused maven, npm or
+  docs publish **stores nothing**, a following `HEAD`/`GET` answering 404, which for npm and docs is
+  the difference between a refusal and a spent immutable coordinate or a website with pieces
+  missing. maven has no `*OpenPublishTest` suite of its own, so that file is the only thing pinning
+  its row at all. `PublishGuardGateOffTest` pins the gate-off posture with no `@TestProfile` of its
+  own, and is why `ALLOW_ANONYMOUS` is still a value. Each wire states its own answer in its own
+  package too: `RegistryOpenPushTest` pins the challenge header, `DaemonOpenPublishTest` and
+  `SbomOpenPublishTest` the first two plain refusals, `NpmOpenPublishTest` — inverted on the flip,
+  where it had asserted an open surface — and `DocsOpenPublishTest`, new with it, the last two. Docs
+  having had no suite of its own is the gap that closed: its posture lived entirely inside a
+  parameterised table of six, where widening an `@EnumSource` could have moved it with no file
+  saying so.
+  **An accept is logged too, at `INFO`, and that is the instrument the last flips were made
   with.** All four accepting paths go through one `accept(rc, surface, publisher)` beside `refuse`
   and `challenge` — the forwarded pair, the gate-off early return, `ALLOW_ANONYMOUS` and a validated
   `qits:ci-run` bearer — and each names the surface prefix, the method, the path and who published:
   a name where this service has one, the literal `anonymous` where it has none. Never a token and
-  never the `Authorization` header. It exists because a surface cannot otherwise be flipped with
+  never the `Authorization` header. It exists because a surface could not otherwise be flipped with
   evidence: an accept used to be a bare `rc.next()`, there is no access log in the shipped
   configuration, no principal on the request span, and the wrapper's release recipes swallow their
   token mint's exit code — so a degraded, uncredentialed publish succeeds silently on both ends.
-  The two nameless cases are told apart on purpose (`anonymous (gate off)` against plain
-  `anonymous`): with the gate off nothing *could* present a credential, so only the second is a
-  publisher the rollout is waiting on. The description is built by the static, pure
+  That is what proved the npm and docs publishers were credentialed *before* a refusal made the
+  question expensive, and with every surface closed the line carries the other half of the same
+  value permanently: every accept names a publisher, so a 401 beside it is attributable rather than
+  a mystery to reproduce. The two nameless cases are told apart on purpose (`anonymous (gate off)`
+  against plain `anonymous`): with the gate off nothing *could* present a credential, while the
+  second is a publisher that could have and did not. No surface carries that second state now, so
+  it is unreachable in the shipped configuration — but confusing the two still sends somebody
+  hunting a publisher that was never asked for a credential. The description is built by the static, pure
   `PublishGuard.publisher`, pinned by `PublishGuardPublisherTest` — plain JUnit, no `@QuarkusTest`
   and no `@TestProfile`, which is the whole reason the decision was extracted rather than asserted
   through a log handler.

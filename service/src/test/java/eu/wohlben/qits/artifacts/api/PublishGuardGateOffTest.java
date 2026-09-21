@@ -14,8 +14,10 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 
 /**
- * With the machine-token gate off, an anonymous publish still lands on <b>every</b> surface —
- * including the four {@link PublishGuard} now refuses it on. That is the other axis of the flip,
+ * With the machine-token gate off, an anonymous publish still lands on <b>every</b> surface — which
+ * since 2026-09-21 means all six {@link PublishGuard} refuses it on with the gate on, so this suite
+ * is the whole of what {@link PublishGuard.Anonymous#ALLOW_ANONYMOUS} still describes. That is the
+ * other axis of the flip,
  * and it is load-bearing rather than tidy: {@code quarkus.oidc.tenant-enabled} follows the same
  * {@code qits.auth.machine.required} key ("there is no third state", in
  * {@code application.properties}), so with the gate off there is no tenant that could validate the

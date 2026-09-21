@@ -274,49 +274,62 @@ daemons, docs, SBOMs), and judges the identity the caller presents:
 | forwarded `X-Qits-User`/`X-Qits-Roles` without `qits:ci-run` — a browser session through the edge | 403 |
 | a JWT this service does not accept (other audience, expired, foreign key) | 401 |
 | HTTP Basic — the edge passes a client's `id:secret` through unchanged, and the store cannot check it | 401 |
-| no credential, or a bearer that is not a JWT (npm's `_authToken` ceremony) | **depends on the surface** — see below |
+| no credential, or a bearer that is not a JWT (npm's `_authToken` ceremony) | **401 on every surface** — with a Bearer challenge on `/v2`, plain on the other five |
 
-The last row is a rollout rather than a switch, and since 2026-09-21 it is **four-sixths closed**.
-A surface may only be flipped once every publisher that still writes to it presents the run's
-credential; refusing one before that stops every release on the estate. `PublishGuard.SURFACES`
-carries the state per surface (`ALLOW_ANONYMOUS`, `REFUSE`, `REFUSE_WITH_CHALLENGE`), so that list
-*is* the rollout and flipping the next surface is one word:
+That last row was a rollout rather than a switch, and since 2026-09-21 it is **closed on all six**.
+A surface could only be flipped once every publisher that still wrote to it presented the run's
+credential — refusing one before that stops every release on the estate — so closing the gap was six
+decisions taken one at a time rather than one switch thrown. `PublishGuard.SURFACES` carries the
+state per surface (`ALLOW_ANONYMOUS`, `REFUSE`, `REFUSE_WITH_CHALLENGE`), so that list *was* the
+rollout; what it records now is the stronger claim, which is that nothing writes to this store
+without naming itself:
 
 | Surface | Anonymous publish | Why |
 |---|---|---|
 | `/v2/` (`POST`/`PATCH`/`PUT`) | **401 with `WWW-Authenticate: Bearer realm="…/artifacts/token"`** | `buildctl` and `docker push` carry the run's credential now — but only after a challenge, so the refusal must name a realm they can reach or the push never retries |
+| `/artifacts/npm/` | **401**, plain | the `npm-library` archetype's `.npmrc` carries the run's bearer as its `_authToken` now, fed from `$QITS_PUBLISH_TOKEN_COMMAND` rather than the ceremonial `qits-ci`. A challenge here would be worse than noise: npm reads `WWW-Authenticate: Bearer` as a reason to re-send the very ceremony that is not a credential |
 | `/artifacts/maven/` | **401**, plain | qits-ci-service `2026.921.80307` writes `/tmp/qits-deploy-settings.xml` in `BOOTSTRAP` and appends `-gs` to `MAVEN_ARGS`, so every publisher sends the run's bearer out of its `<server id="qits">` entry — **preemptively**, never after a 401, which is why a challenge here would be noise |
 | `/artifacts/daemons/` | **401**, plain | `qits-publish daemon submit` and the bootstrap's own publisher hold the bearer; nothing here speaks the docker token dance |
+| `/artifacts/docs/` | **401**, plain | the `java-service` archetype's `curl -H "Authorization: Bearer …"`, `qits-publish docs submit`, and five repositories' hand-written copies of the same block. A raw `curl` reads a challenge as a reason to prompt for a password nobody is standing there to type |
 | `/artifacts/sboms/` | **401**, plain | `qits-publish sbom submit`, from the composed postlude |
-| `/artifacts/npm/` | accepted | published to by the wrapper's `npm-library` archetype |
-| `/artifacts/docs/` | accepted | published to by the wrapper's `java-service` archetype |
 
-The last two flip when qits-qits is released at workspace resolution and their archetypes'
-credentialing change reaches CI — not before. Maven did **not** need that release: one settings file
-injected by the step launcher covers every maven publisher at once — the seven repositories that
-pass a `-gs` of their own and the five `maven-library` archetype repositories whose recipe could not
-be edited ahead of a wrapper release. Measured against the live store before the flip, a deploy with
-that settings file to a nonexistent repository answered **403** (`only a CI run publishes;
+**npm and docs were the last two, and they were the two that had to wait for a wrapper release.**
+Their publishers are archetypes in qits-qits, so the credentialing change reached CI only when that
+wrapper shipped it — wrapper commit `7f917fb`, on `main` since 2026-09-20 15:38 UTC — after which a
+census of all 56 release recipes on the estate found no uncredentialed npm or docs publisher left.
+Maven never needed that release, and the contrast is the useful half: one settings file injected by
+the step launcher covers every maven publisher at once — the seven repositories that pass a `-gs` of
+their own and the five `maven-library` archetype repositories whose recipe could not be edited ahead
+of a wrapper release. Measured against the live store before the flip, a deploy with that settings
+file to a nonexistent repository answered **403** (`only a CI run publishes;
 dyn-workspace-… holds [qits:agent, …]`) rather than the 404 an uncredentialed deploy would have
 reached — proof that maven sends the header preemptively and that the guard reads it as an identity.
 **With `qits.auth.machine.required` off nothing is
 refused on any surface**: the OIDC tenant follows the same key, so there would be nothing to
 validate the credential a refusal demands. A bearer is judged only while that gate is on; the
-forwarded pair and Basic are judged always. `PublishGuardTest` proves the table and both anonymous
-halves — including that a refused maven deploy **stores nothing**, not merely that it answered 401 —
-`PublishGuardGateOffTest` the gate-off posture, `RegistryOpenPushTest` the challenge,
-`DaemonOpenPublishTest` and `SbomOpenPublishTest` two of the three plain refusals, and
-`NpmOpenPublishTest` a surface that is deliberately still open.
+forwarded pair and Basic are judged always. `PublishGuardTest` proves the role table and the
+anonymous row over all six wires at once — including that a refused maven, npm or docs publish
+**stores nothing**, not merely that it answered 401 — and asserts the whole surface map, so a row
+going back to `ALLOW_ANONYMOUS` is an edit that breaks a test rather than a tidy-up.
+`PublishGuardGateOffTest` pins the other axis, and is the reason `ALLOW_ANONYMOUS` is still a value
+no surface holds: with the gate off every surface accepts anonymous, on every wire. Each wire also
+states its own answer in its own protocol's terms — `RegistryOpenPushTest` the challenge,
+`DaemonOpenPublishTest` and `SbomOpenPublishTest` the first two plain refusals, `NpmOpenPublishTest`
+(which asserted the opposite until the flip inverted it) and `DocsOpenPublishTest` (new with the
+flip) the last two. Docs had no suite of its own before, which was the gap worth closing with it:
+its posture lived entirely inside a parameterised table of six, where a careless `@EnumSource`
+widening could have moved it with no file saying so.
 
 **Every publish is logged, accepted or refused.** A refusal has always said why, at `WARN`; an
 accept says at `INFO` which surface it landed on and who published it — the forwarded user name
 (marked `forwarded`), the principal of a validated bearer, or the literal `anonymous` where this
 service has no name for the caller (marked `gate off` when the machine-token gate is what made it
-nameless). No token and no `Authorization` header is ever written. That line is how the still-open
-surfaces are counted down before they are flipped, since the publishers that would break are
-otherwise invisible from both ends: nothing here recorded an accept, there is no access log in the
-shipped configuration, and a release recipe whose token mint failed degrades to an anonymous publish
-that still succeeds. After a flip it is what makes a 401 attributable to a publisher.
+nameless). No token and no `Authorization` header is ever written. That line is how the last
+surfaces were counted down before they were flipped, since the publishers that would have broken
+were otherwise invisible from both ends: nothing here recorded an accept, there is no access log in
+the shipped configuration, and a release recipe whose token mint failed degrades to an anonymous
+publish that still succeeds. With every surface flipped it carries the other half of the same
+value — it is what makes a 401 beside it attributable to a named publisher.
 `PublishGuardPublisherTest` pins the description, `anonymous` most of all.
 
 The registry once guarded writes with a static token as an HTTP Basic password. That
@@ -513,17 +526,28 @@ created.
 The OCI registry's rule verbatim (see "Who may publish" above): `PublishGuard` judges the identity a
 `PUT` presents, and only a CI run publishes. Reads are open at the store.
 
-This surface is one of the **two** where an **anonymous** publish is still accepted, and that is a
-deliberate hold rather than an oversight: its remaining publisher is the `npm-library` archetype in
-the qits-qits wrapper, which cannot present the run's credential until that wrapper is released.
-`/v2`, `/artifacts/maven`, `/artifacts/daemons` and `/artifacts/sboms` already refuse one — see the
-rollout table under "Who may publish". `/artifacts/docs` is the other hold, for the same reason
-under a different archetype.
+Since 2026-09-21 an **anonymous** publish is refused here with a plain 401, and this was one of the
+last two surfaces to close. It was held open on purpose until then: its publisher is the
+`npm-library` archetype's `.npmrc` in the qits-qits wrapper, which could not present the run's
+credential until that wrapper was released, and refusing it before that stopped every release on the
+estate. It does present one now — the `_authToken` is fed from `$QITS_PUBLISH_TOKEN_COMMAND` and is
+the run's bearer — and `NpmOpenPublishTest`, which asserted the opposite until the day of the flip,
+pins the refusal. The refusal is **plain**, with no `WWW-Authenticate: Bearer`: npm would read one as
+a reason to re-send the very `_authToken` ceremony that is not a credential, turning a single
+refusal into a retry loop that still fails. See the rollout table under "Who may publish".
 
-The one wrinkle is client-side: the npm CLI refuses `npm publish` when no credential is configured
-for the target registry (`ENEEDAUTH` is a pre-flight check), so a pipeline's `.npmrc` carries one
-dummy `_authToken` line. It is npm-client ceremony, not an auth scheme: the guard treats a bearer
-that is not a JWT as no identity. A real CI run token in that line would be judged as one.
+The client-side wrinkle survives the flip and now bites harder. The npm CLI refuses `npm publish`
+when no credential is configured for the target registry (`ENEEDAUTH` is a pre-flight check that
+never reaches this service), so a pipeline's `.npmrc` must carry an `_authToken` line whatever the
+store does with it. What changed is what belongs in that line. A dummy value used to get past the
+pre-flight and then publish; it now gets past the pre-flight and is refused, because the guard
+treats a bearer that is not a JWT as no identity at all — it is npm-client ceremony, not an auth
+scheme. What a real `npm publish` sees in that case is `401` carrying npm's own `{"error": …}`
+shape and no challenge, which npm reports as `E401` and does not retry, and the message is the
+guard's own sentence (`only a CI run publishes; this publish carried no credential`) rather than a
+token-validation failure — deliberately, because the token was never handed to OIDC, and because
+that is what sends a debugger to the `.npmrc` instead of to the idp. A real CI run token in that
+line is judged as one, which is the only thing that publishes here now.
 
 ### Deliberately not implemented
 
@@ -713,8 +737,15 @@ to send — so the cap (`qits.artifacts.docs.max-bundle-size`, default 256M) is 
 wrong number entirely.
 
 **Only a CI run publishes**, the rule every wire shares (see "Who may publish" under the OCI
-registry); reads are open. A version is immutable, so a publish can add one and can never change
-one.
+registry); reads are open, and here that openness is the whole product — every reader of a docs
+bundle is a browser holding nothing. An anonymous publish is **refused with a plain 401** since
+2026-09-21: docs and npm were the last two surfaces to close, once the `java-service` archetype's
+`curl -H "Authorization: Bearer …"` reached CI. The refusal carries no `WWW-Authenticate`, because
+the publisher is a shell `curl` that would read a challenge as a reason to prompt for a password
+nobody is standing there to type. `DocsOpenPublishTest` is what says this in the wire's own terms,
+and it is new with the flip: until then this surface's posture lived only inside `PublishGuardTest`'s
+table of six, the one wire with no suite of its own. A version is immutable, so a publish can add
+one and can never change one.
 
 `media_type` is resolved from the file **extension** at publish and stored, never sniffed —
 `MediaTypeSniffer` has no `woff2` entry and would reject exactly the files a static site is made of.
@@ -1845,7 +1876,7 @@ app's `application.properties` overrides them.
 | `qits.artifacts.gc.pins.projects-timeout` | `PT10S` | per-request timeout on that fetch |
 | `qits.artifacts.gc.type.<wire-name>.strategy` | per type, see "The settlement" | which engine collects a repository type: `own` or `excluded` here — the `cache` engine is qits-platform-mirror's. Every registered type must have one, and a missing entry is refused, not defaulted |
 | `qits.artifacts.gc.type.<wire-name>.window` | `P0D` for all six own types | how long an identity may sit unaccessed before it is eligible, ISO-8601. At the shipped zero the keep-classes are the whole retention policy. Absent for an `excluded` type |
-| `qits.auth.machine.required` | `false` | the machine-token rollout gate. Off, the JSON admin write surface is open — network trust. On, its writes need a bearer with `aud=qits-platform`, and `PublishGuard` validates a bearer presented on a publish route |
+| `qits.auth.machine.required` | `false` | the machine-token rollout gate. Off, the JSON admin write surface is open — network trust — and every wire accepts an anonymous publish, because the OIDC tenant follows this same key and a refusal would be demanding a credential nothing could validate. On, its writes need a bearer with `aud=qits-platform`, `PublishGuard` validates a bearer presented on a publish route, and a publish carrying none is refused on all six wires |
 | `qits.auth.machine.audience` | `qits-platform` | the one platform audience, and the `aud` every machine token carries. `quarkus.oidc.token.audience` is the same value one layer down |
 | `qits.artifacts.startup-seed.enabled` | `true` | self-seed the hosted roots: `ci-screenshots`, `ci-videos`, `qits`, `npm`, `maven`, `daemons`, `docs`, `sboms`. No cache root — those are qits-platform-mirror's |
 | `quarkus.oidc.auth-server-url` | `http://qits-platform-idp:8080/idp` | the idp, reached direct on qits-net, for validating an inbound machine token |
