@@ -103,9 +103,11 @@ only `/artifacts/api`, and this repository declares no `quarkus.http.auth.permis
 `routes: /artifacts,/v2` that `deployments.yml` declares. **`PublishGuard` challenges an anonymous
 `/v2` publish to use it**, since 2026-09-20: that surface's `Anonymous` state is
 `REFUSE_WITH_CHALLENGE`, and `RegistryChallenge.challenge` writes the `WWW-Authenticate` header
-that names this path. It is the only one of the six surfaces that challenges — the other two closed
-ones answer a plain 401, because nothing publishing a daemon binary or an SBOM does the token
-dance.
+that names this path. It is the only one of the six surfaces that challenges — the other three
+closed ones answer a plain 401, because nothing publishing a daemon binary, an SBOM or a maven
+artifact does the token dance. Four of the six are closed since 2026-09-21; `/artifacts/npm` and
+`/artifacts/docs` are the two still carrying the anonymous publisher, waiting on the `npm-library`
+and `java-service` archetypes in the qits-qits wrapper.
 
 `/artifacts/npm` is *not* forced on us the way `/v2` is: npm accepts a registry URL of any depth, so
 it sits inside the segment the edge already routes here and needs no `routes:` entry of its own. The first path segment after it is the `artifact_repository` row, the same
@@ -1024,16 +1026,29 @@ the new store up either way, and the next release publishes clean.
   credential (401 — the edge passes a client's `id:secret` through unchanged). `qits:system` is
   refused too, an explicit exception to the open calling model. The CI media upload
   (`POST …/blobs`) takes `qits:ci-run` only, for the same reason.
-  **A caller with no identity is refused on THREE of the six surfaces, and that split is data, not
+  **A caller with no identity is refused on FOUR of the six surfaces, and that split is data, not
   a chain of `if`s.** Each `Surface` in `PublishGuard.SURFACES` carries an `Anonymous` state —
   `ALLOW_ANONYMOUS`, `REFUSE`, `REFUSE_WITH_CHALLENGE` — so the list *is* the rollout and flipping
   the next surface is one word in it. Since 2026-09-20: `/v2` refuses **with** a Bearer challenge
   (buildctl and `docker push` send a credential only after one names a realm they can reach; a bare
   401 there breaks every image push instead of authenticating it), `/artifacts/daemons` and
   `/artifacts/sboms` refuse with a plain 401 (`qits-publish daemon submit` and `qits-publish sbom
-  submit` hold the run's bearer already). `/artifacts/npm`, `/artifacts/maven` and
+  submit` hold the run's bearer already). **`/artifacts/maven` joined them on 2026-09-21, and it is
+  the one that did NOT wait for a wrapper release** — qits-ci-service `2026.921.80307` injects the
+  credential into every step instead of into a recipe: `BOOTSTRAP` writes
+  `/tmp/qits-deploy-settings.xml` carrying a `<server id="qits">` whose configuration is an
+  `Authorization: Bearer` header, and appends `-gs` to `MAVEN_ARGS`. `qits` is the repository id
+  every `-DaltDeploymentRepository="qits::default::…"` names, so one file covers all maven
+  publishers at once — the seven repositories passing their own `-gs` and the five `maven-library`
+  archetype repositories whose recipe could not be edited from a workspace. It takes a **plain**
+  401, not a challenge: maven authenticates *preemptively* out of the `<server>` entry and does no
+  401-then-retry, so a `WWW-Authenticate: Bearer` would be noise it cannot act on. Measured against
+  the live store before the flip, a deploy with that settings file to a nonexistent repository
+  answered **403** (`only a CI run publishes; dyn-workspace-… holds [qits:agent, …]`) where an
+  uncredentialed one would have reached the route and answered 404 — which is how we know the
+  header is sent unprompted and read as an identity. `/artifacts/npm` and
   `/artifacts/docs` **still carry the anonymous publisher and must**: their remaining publishers
-  are the `npm-library`, `maven-library` and `java-service` archetypes in the qits-qits wrapper,
+  are the `npm-library` and `java-service` archetypes in the qits-qits wrapper,
   whose credentialing change reaches CI only when that wrapper is released — refusing them now
   stops every release on the estate.
   Two things not to get wrong when flipping the next one. **The refusal sits UNDER
@@ -1048,9 +1063,11 @@ the new store up either way, and the next release publishes clean.
   was harmless while the fallthrough landed on `rc.next()` and is a 401 the moment a surface flips.
   A bearer is judged only while `qits.auth.machine.required` is on. `PublishGuardTest` proves the
   role table and both anonymous halves (the maven and docs rows explicitly, because nothing else
-  pins them); `PublishGuardGateOffTest` pins the gate-off posture with no `@TestProfile` of its
+  pins them — maven has no `*OpenPublishTest` suite of its own, so its refusal AND the fact that the
+  refusal **stores nothing**, a following `HEAD`/`GET` answering 404, live there);
+  `PublishGuardGateOffTest` pins the gate-off posture with no `@TestProfile` of its
   own; `RegistryOpenPushTest` pins the challenge header, `DaemonOpenPublishTest` and
-  `SbomOpenPublishTest` the two plain refusals, and `NpmOpenPublishTest` the surface that is
+  `SbomOpenPublishTest` two of the three plain refusals, and `NpmOpenPublishTest` a surface that is
   deliberately still open.
 - `service` ships `quarkus.http.limits.max-body-size=1088M`, which is a **global** ceiling — every
   route in the process, not just the upload. Tracked as an open tradeoff in

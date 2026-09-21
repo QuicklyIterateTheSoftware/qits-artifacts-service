@@ -12,6 +12,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import eu.wohlben.qits.MachineTokens;
 import eu.wohlben.qits.artifacts.api.PublishWires.Wire;
+import eu.wohlben.qits.maven.TinyArtifact;
 import eu.wohlben.qits.registry.OciClient;
 import eu.wohlben.qits.registry.TinyImage;
 import io.quarkus.test.common.http.TestHTTPResource;
@@ -41,10 +42,10 @@ import org.junit.jupiter.params.provider.EnumSource;
  * wrong reason.
  *
  * <p><b>The anonymous rows are per surface now</b>, because closing that gap is a rollout: {@code
- * /v2}, {@code daemons} and {@code sboms} refuse a caller with no credential, while {@code npm},
- * {@code maven} and {@code docs} still carry one. Both halves are pinned below, the still-open half
- * explicitly, so that a later edit flipping one of those three by accident fails here rather than
- * on the estate. {@code PublishGuardGateOffTest} pins the other axis: with the gate off nothing is
+ * /v2}, {@code maven}, {@code daemons} and {@code sboms} refuse a caller with no credential, while
+ * {@code npm} and {@code docs} still carry one. Both halves are pinned below, the still-open half
+ * explicitly, so that a later edit flipping one of those two by accident fails here rather than on
+ * the estate. {@code PublishGuardGateOffTest} pins the other axis: with the gate off nothing is
  * refused anywhere.
  */
 @QuarkusTest
@@ -54,11 +55,14 @@ class PublishGuardTest {
   /** Fixture content must be unique per run: versions are immutable and blobs dedupe. */
   private static final String RUN = PublishWires.RUN;
 
-  /** The three surfaces where an anonymous publish is refused today. */
-  private static final String FLIPPED = "OCI|DAEMON|SBOM";
+  /** The four surfaces where an anonymous publish is refused today. */
+  private static final String FLIPPED = "OCI|MAVEN|DAEMON|SBOM";
 
-  /** The three whose publishers are still the wrapper's archetypes, writing with no credential. */
-  private static final String STILL_OPEN = "NPM|MAVEN|DOCS";
+  /** The two whose publishers are still the wrapper's archetypes, writing with no credential. */
+  private static final String STILL_OPEN = "NPM|DOCS";
+
+  /** The flipped surfaces that answer a plain 401 — every one but {@code /v2}. */
+  private static final String PLAIN_REFUSALS = "MAVEN|DAEMON|SBOM";
 
   @TestHTTPResource("/")
   URL root;
@@ -161,23 +165,46 @@ class PublishGuardTest {
     assertStatus(401, wires.publish(wire, bearer(MachineTokens.forAnotherAudience())));
   }
 
-  // --- the anonymous caller, per surface: three closed, three still open -----------------------
+  // --- the anonymous caller, per surface: four closed, two still open --------------------------
 
   @ParameterizedTest
   @EnumSource(value = Wire.class, names = FLIPPED, mode = EnumSource.Mode.MATCH_ANY)
   void aPublisherWithNoIdentityIsRefusedOnAFlippedSurface(Wire wire) {
-    // Every publisher on these three holds the run's credential now: buildctl and `docker push`
-    // after the challenge below, `qits-publish daemon submit` and `qits-publish sbom submit`.
+    // Every publisher on these four holds the run's credential now: buildctl and `docker push`
+    // after the challenge below, `qits-publish daemon submit`, `qits-publish sbom submit`, and —
+    // since qits-ci-service 2026.921.80307 — every `mvn deploy`, out of the settings file the
+    // BOOTSTRAP step writes and appends to MAVEN_ARGS as `-gs`.
     assertStatus(401, wires.publish(wire));
+  }
+
+  @Test
+  void theRefusedMavenPublishStoresNothing() {
+    // 401 is the answer; the property is that the jar never reached the store. A refusal that
+    // still wrote would be the worst of both — a guard that reads as closed over an open surface.
+    String path =
+        "artifacts/maven/maven/eu/wohlben/guard/refused-"
+            + RUN
+            + "/1.0.0/refused-"
+            + RUN
+            + "-1.0.0.jar";
+    assertStatus(401, wires.send("PUT", path, TinyArtifact.jar("refused-" + RUN)));
+    assertStatus(404, wires.send("HEAD", path, null));
+    assertStatus(404, wires.send("GET", path, null));
+
+    // And the same coordinate lands for a CI run, so the 404s above are the refusal's doing and
+    // not a path this wire would never have served.
+    assertAccepted(
+        wires.send("PUT", path, TinyArtifact.jar("refused-" + RUN), bearer(MachineTokens.forCiRun())));
+    assertStatus(200, wires.send("HEAD", path, null));
   }
 
   @ParameterizedTest
   @EnumSource(value = Wire.class, names = STILL_OPEN, mode = EnumSource.Mode.MATCH_ANY)
   void aPublisherWithNoIdentityStillPublishesOnASurfaceNotYetFlipped(Wire wire) {
-    // npm, maven and docs are published to by the npm-library, maven-library and java-service
-    // archetypes in the qits-qits wrapper. Their credentialing change reaches CI only once that
-    // wrapper is released, and refusing them before then would stop every release on the estate.
-    // Nothing else pins maven and docs, and they are exactly what a careless edit would flip.
+    // npm and docs are published to by the npm-library and java-service archetypes in the qits-qits
+    // wrapper. Their credentialing change reaches CI only once that wrapper is released, and
+    // refusing them before then would stop every release on the estate. Nothing else pins docs, and
+    // it is exactly what a careless edit would flip.
     assertAccepted(wires.publish(wire));
   }
 
@@ -201,10 +228,12 @@ class PublishGuardTest {
   }
 
   @ParameterizedTest
-  @EnumSource(value = Wire.class, names = "DAEMON|SBOM", mode = EnumSource.Mode.MATCH_ANY)
-  void theOtherTwoRefusalsArePlain(Wire wire) {
-    // Nothing that publishes a daemon binary or an SBOM speaks the docker token dance, so a Bearer
-    // challenge there would name a door nobody knocks on.
+  @EnumSource(value = Wire.class, names = PLAIN_REFUSALS, mode = EnumSource.Mode.MATCH_ANY)
+  void theOtherThreeRefusalsArePlain(Wire wire) {
+    // Nothing that publishes a daemon binary, an SBOM or a maven artifact speaks the docker token
+    // dance, so a Bearer challenge there would name a door nobody knocks on. maven specifically
+    // authenticates PREEMPTIVELY out of its <server> entry and never does a 401-then-retry, so a
+    // challenge is a header it could not act on even if it read it.
     HttpResponse<String> refused = wires.publish(wire);
     assertStatus(401, refused);
     assertFalse(
@@ -216,7 +245,8 @@ class PublishGuardTest {
   @EnumSource(value = Wire.class, names = STILL_OPEN, mode = EnumSource.Mode.MATCH_ANY)
   void npmsCeremonialTokenIsNoIdentity(Wire wire) {
     // CI's .npmrc carries _authToken=qits-ci. Not three base64url segments, so never handed to
-    // OIDC — it is judged as the anonymous caller, and npm is a surface still carrying one.
+    // OIDC — it is judged as the anonymous caller, and npm is one of the two surfaces still
+    // carrying one.
     assertAccepted(wires.publish(wire, "Authorization", "Bearer qits-ci"));
   }
 
@@ -306,14 +336,14 @@ class PublishGuardTest {
 
   @Test
   void theSurfaceListIsTheRollout() {
-    // The list is the document of how far the rollout has come, so it is asserted as one: three
-    // surfaces refuse, of which exactly one challenges, and three still carry the anonymous
+    // The list is the document of how far the rollout has come, so it is asserted as one: four
+    // surfaces refuse, of which exactly one challenges, and two still carry the anonymous
     // publisher. Flipping the next one is a deliberate edit here as well as there.
     assertEquals(
         Map.of(
             "/v2/", PublishGuard.Anonymous.REFUSE_WITH_CHALLENGE,
             "/artifacts/npm/", PublishGuard.Anonymous.ALLOW_ANONYMOUS,
-            "/artifacts/maven/", PublishGuard.Anonymous.ALLOW_ANONYMOUS,
+            "/artifacts/maven/", PublishGuard.Anonymous.REFUSE,
             "/artifacts/daemons/", PublishGuard.Anonymous.REFUSE,
             "/artifacts/docs/", PublishGuard.Anonymous.ALLOW_ANONYMOUS,
             "/artifacts/sboms/", PublishGuard.Anonymous.REFUSE),

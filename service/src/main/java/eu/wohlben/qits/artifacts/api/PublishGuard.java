@@ -36,16 +36,16 @@ import org.jboss.logging.Logger;
  * {@code /artifacts/docs/…} and {@code /artifacts/sboms/…}. Reads, and the {@code DELETE}s the
  * wires answer with 405, are not publishing and pass untouched.
  *
- * <p><b>The anonymous caller is refused on three of the six surfaces, and passes on the other
- * three.</b> Closing the gap is a rollout rather than a switch: a surface may only be flipped once
+ * <p><b>The anonymous caller is refused on four of the six surfaces, and passes on the other
+ * two.</b> Closing the gap is a rollout rather than a switch: a surface may only be flipped once
  * every publisher that still writes to it presents the run's credential, and refusing one before
  * that stops every release on the estate. {@link Anonymous} is that state, carried per {@link
  * Surface}, so the {@link #SURFACES} list below IS the rollout and flipping the next surface is one
- * word. Refused today: {@code /v2/} (with a challenge — see below), {@code /artifacts/daemons/} and
- * {@code /artifacts/sboms/}. Still open: {@code /artifacts/npm/}, {@code /artifacts/maven/} and
- * {@code /artifacts/docs/}, whose remaining publishers are the {@code npm-library}, {@code
- * maven-library} and {@code java-service} archetypes in the qits-qits wrapper — their credentialing
- * change reaches CI only once that wrapper is released. Four things follow from it:
+ * word. Refused today: {@code /v2/} (with a challenge — see below), {@code /artifacts/maven/},
+ * {@code /artifacts/daemons/} and {@code /artifacts/sboms/}. Still open: {@code /artifacts/npm/}
+ * and {@code /artifacts/docs/}, whose remaining publishers are the {@code npm-library} and {@code
+ * java-service} archetypes in the qits-qits wrapper — their credentialing change reaches CI only
+ * once that wrapper is released. Four things follow from it:
  *
  * <ul>
  *   <li>A bearer that is not a JWT (npm's mandatory {@code _authToken} ceremony, {@code
@@ -69,9 +69,26 @@ import org.jboss.logging.Logger;
  * buildkit send a credential only after a {@code 401 WWW-Authenticate: Bearer realm="…"} names an
  * endpoint they can reach; a bare 401 there is a push that never retries with anything. {@link
  * RegistryTokenEndpoint} serves that endpoint at {@code /artifacts/token} and {@link
- * RegistryChallenge#challenge} writes the header. The other two flipped surfaces take a plain 401:
- * {@code qits-publish daemon submit} and {@code qits-publish sbom submit} hold the run's bearer
- * already and speak no token dance, so a challenge there would name a door nobody knocks on.
+ * RegistryChallenge#challenge} writes the header. The other three flipped surfaces take a plain
+ * 401: {@code qits-publish daemon submit}, {@code qits-publish sbom submit} and maven itself hold
+ * the run's bearer already and speak no token dance, so a challenge there would name a door nobody
+ * knocks on.
+ *
+ * <p><b>Why {@code /artifacts/maven/} could be flipped, and why it takes a plain 401.</b>
+ * qits-ci-service {@code 2026.921.80307} injects the credential into every step: {@code BOOTSTRAP}
+ * writes {@code /tmp/qits-deploy-settings.xml} carrying a {@code <server id="qits">} whose
+ * configuration is an {@code Authorization: Bearer} HTTP header, and appends {@code -gs} to {@code
+ * MAVEN_ARGS}. {@code qits} is the repository id every {@code
+ * -DaltDeploymentRepository="qits::default::…"} names, so that one file covers <b>all</b> maven
+ * publishers at once — the seven repositories that also pass a {@code -gs} of their own, and the
+ * five {@code maven-library} archetype repositories whose recipe could not be edited ahead of a
+ * wrapper release. Measured against the live store before the flip: deploying with that exact
+ * settings file to a nonexistent repository answered <b>403</b> ({@code "only a CI run publishes;
+ * dyn-workspace-… holds [qits:agent, …]"}), which is the guard reading the header as an identity —
+ * an uncredentialed deploy would instead have reached the route and answered 404. So maven sends
+ * the header <b>preemptively</b>, out of the {@code <server>} entry, and never does a
+ * 401-then-retry: a {@code WWW-Authenticate: Bearer} here would be noise it cannot act on, which is
+ * why this surface is {@link Anonymous#REFUSE} and not {@link Anonymous#REFUSE_WITH_CHALLENGE}.
  *
  * <p>A bearer is judged only while the machine-token gate {@code qits.auth.machine.required} is
  * on, because with it off there is no OIDC tenant to validate one. The forwarded pair is judged
@@ -138,10 +155,10 @@ public class PublishGuard {
 
   /**
    * Every surface that creates content. Extended by hand when a wire is added — a publish route
-   * outside this list is unguarded — and the third component is the rollout: three surfaces refuse
-   * the anonymous publisher, three still carry it. The three open ones are published to by the
-   * {@code npm-library}, {@code maven-library} and {@code java-service} archetypes in the qits-qits
-   * wrapper, and flip when a wrapper release carries their credentialing change into CI.
+   * outside this list is unguarded — and the third component is the rollout: four surfaces refuse
+   * the anonymous publisher, two still carry it. The two open ones are published to by the {@code
+   * npm-library} and {@code java-service} archetypes in the qits-qits wrapper, and flip when a
+   * wrapper release carries their credentialing change into CI.
    */
   static final List<Surface> SURFACES =
       List.of(
@@ -151,7 +168,9 @@ public class PublishGuard {
               Set.of(HttpMethod.POST, HttpMethod.PATCH, HttpMethod.PUT),
               Anonymous.REFUSE_WITH_CHALLENGE),
           new Surface("/artifacts/npm/", Set.of(HttpMethod.PUT), Anonymous.ALLOW_ANONYMOUS),
-          new Surface("/artifacts/maven/", Set.of(HttpMethod.PUT), Anonymous.ALLOW_ANONYMOUS),
+          // Every maven publisher presents the run's bearer: qits-ci's BOOTSTRAP writes the
+          // settings file that carries it, and appends `-gs` to MAVEN_ARGS.
+          new Surface("/artifacts/maven/", Set.of(HttpMethod.PUT), Anonymous.REFUSE),
           // `qits-publish daemon submit`, and the bootstrap's own credential.
           new Surface("/artifacts/daemons/", Set.of(HttpMethod.PUT), Anonymous.REFUSE),
           new Surface("/artifacts/docs/", Set.of(HttpMethod.PUT), Anonymous.ALLOW_ANONYMOUS),

@@ -276,7 +276,7 @@ daemons, docs, SBOMs), and judges the identity the caller presents:
 | HTTP Basic — the edge passes a client's `id:secret` through unchanged, and the store cannot check it | 401 |
 | no credential, or a bearer that is not a JWT (npm's `_authToken` ceremony) | **depends on the surface** — see below |
 
-The last row is a rollout rather than a switch, and since 2026-09-20 it is **three-sixths closed**.
+The last row is a rollout rather than a switch, and since 2026-09-21 it is **four-sixths closed**.
 A surface may only be flipped once every publisher that still writes to it presents the run's
 credential; refusing one before that stops every release on the estate. `PublishGuard.SURFACES`
 carries the state per surface (`ALLOW_ANONYMOUS`, `REFUSE`, `REFUSE_WITH_CHALLENGE`), so that list
@@ -285,20 +285,28 @@ carries the state per surface (`ALLOW_ANONYMOUS`, `REFUSE`, `REFUSE_WITH_CHALLEN
 | Surface | Anonymous publish | Why |
 |---|---|---|
 | `/v2/` (`POST`/`PATCH`/`PUT`) | **401 with `WWW-Authenticate: Bearer realm="…/artifacts/token"`** | `buildctl` and `docker push` carry the run's credential now — but only after a challenge, so the refusal must name a realm they can reach or the push never retries |
+| `/artifacts/maven/` | **401**, plain | qits-ci-service `2026.921.80307` writes `/tmp/qits-deploy-settings.xml` in `BOOTSTRAP` and appends `-gs` to `MAVEN_ARGS`, so every publisher sends the run's bearer out of its `<server id="qits">` entry — **preemptively**, never after a 401, which is why a challenge here would be noise |
 | `/artifacts/daemons/` | **401**, plain | `qits-publish daemon submit` and the bootstrap's own publisher hold the bearer; nothing here speaks the docker token dance |
 | `/artifacts/sboms/` | **401**, plain | `qits-publish sbom submit`, from the composed postlude |
 | `/artifacts/npm/` | accepted | published to by the wrapper's `npm-library` archetype |
-| `/artifacts/maven/` | accepted | published to by the wrapper's `maven-library` archetype |
 | `/artifacts/docs/` | accepted | published to by the wrapper's `java-service` archetype |
 
-The last three flip when qits-qits is released at workspace resolution and their archetypes'
-credentialing change reaches CI — not before. **With `qits.auth.machine.required` off nothing is
+The last two flip when qits-qits is released at workspace resolution and their archetypes'
+credentialing change reaches CI — not before. Maven did **not** need that release: one settings file
+injected by the step launcher covers every maven publisher at once — the seven repositories that
+pass a `-gs` of their own and the five `maven-library` archetype repositories whose recipe could not
+be edited ahead of a wrapper release. Measured against the live store before the flip, a deploy with
+that settings file to a nonexistent repository answered **403** (`only a CI run publishes;
+dyn-workspace-… holds [qits:agent, …]`) rather than the 404 an uncredentialed deploy would have
+reached — proof that maven sends the header preemptively and that the guard reads it as an identity.
+**With `qits.auth.machine.required` off nothing is
 refused on any surface**: the OIDC tenant follows the same key, so there would be nothing to
 validate the credential a refusal demands. A bearer is judged only while that gate is on; the
 forwarded pair and Basic are judged always. `PublishGuardTest` proves the table and both anonymous
-halves, `PublishGuardGateOffTest` the gate-off posture, `RegistryOpenPushTest` the challenge,
-`DaemonOpenPublishTest` and `SbomOpenPublishTest` the two plain refusals, and `NpmOpenPublishTest`
-the surface that is deliberately still open.
+halves — including that a refused maven deploy **stores nothing**, not merely that it answered 401 —
+`PublishGuardGateOffTest` the gate-off posture, `RegistryOpenPushTest` the challenge,
+`DaemonOpenPublishTest` and `SbomOpenPublishTest` two of the three plain refusals, and
+`NpmOpenPublishTest` a surface that is deliberately still open.
 
 The registry once guarded writes with a static token as an HTTP Basic password. That
 bought a measured, awkward tradeoff — docker could push after a `docker login`, skopeo/podman
@@ -494,11 +502,12 @@ created.
 The OCI registry's rule verbatim (see "Who may publish" above): `PublishGuard` judges the identity a
 `PUT` presents, and only a CI run publishes. Reads are open at the store.
 
-This surface is one of the three where an **anonymous** publish is still accepted, and that is a
+This surface is one of the **two** where an **anonymous** publish is still accepted, and that is a
 deliberate hold rather than an oversight: its remaining publisher is the `npm-library` archetype in
 the qits-qits wrapper, which cannot present the run's credential until that wrapper is released.
-`/v2`, `/artifacts/daemons` and `/artifacts/sboms` already refuse one — see the rollout table under
-"Who may publish".
+`/v2`, `/artifacts/maven`, `/artifacts/daemons` and `/artifacts/sboms` already refuse one — see the
+rollout table under "Who may publish". `/artifacts/docs` is the other hold, for the same reason
+under a different archetype.
 
 The one wrinkle is client-side: the npm CLI refuses `npm publish` when no credential is configured
 for the target registry (`ENEEDAUTH` is a pre-flight check), so a pipeline's `.npmrc` carries one
@@ -561,10 +570,17 @@ derivation, never rewriting:
   normal. A **literal `-SNAPSHOT` filename** is the one mutable path — the coordinate is a moving
   target by definition — and serves with `no-cache` rather than `immutable`.
 
-**No login here either** — the OCI/npm threat model word for word, with one less wrinkle than npm:
-maven sends no credential unless challenged, this server never challenges, so a pipeline's
-`distributionManagement` needs no matching `<server>` entry. From outside, `/artifacts/maven/**`
-falls under qits-gateway's ordinary session auth like any other non-allowlisted artifacts path.
+**Only a CI run publishes**, the rule every wire shares (see "Who may publish" under the OCI
+registry); reads are open. Since 2026-09-21 an **anonymous** deploy is refused with a plain 401 —
+and maven needs a `<server>` entry for that, which is the one thing that changed here. This server
+never challenges, and maven would not act on a challenge anyway: it authenticates **preemptively**
+out of a `<server>` entry or not at all. qits-ci-service `2026.921.80307` supplies that entry for
+every step — `BOOTSTRAP` writes `/tmp/qits-deploy-settings.xml` with a `<server id="qits">` whose
+configuration is an `Authorization: Bearer` HTTP header, and appends `-gs` to `MAVEN_ARGS`; `qits`
+is the repository id every `-DaltDeploymentRepository="qits::default::…"` names. A pipeline outside
+CI needs its own `<server id="qits">` carrying the run's bearer, or its deploy answers 401. From
+outside, `/artifacts/maven/**` falls under qits-gateway's ordinary session auth like any other
+non-allowlisted artifacts path.
 
 The deploy `PUT` streams rather than buffers, capped by `qits.artifacts.maven.max-artifact-size`
 (default 128M) — the one size answer for both directions a jar can travel, the npm
