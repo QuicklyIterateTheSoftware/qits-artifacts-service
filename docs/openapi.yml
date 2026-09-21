@@ -10,5 +10,5 @@ components:
       description: Authentication
 info:
   title: qits-artifacts API
-  version: 2026.905.15051
+  version: 2026.921.83639
 paths: {}

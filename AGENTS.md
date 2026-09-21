@@ -1069,6 +1069,21 @@ the new store up either way, and the next release publishes clean.
   own; `RegistryOpenPushTest` pins the challenge header, `DaemonOpenPublishTest` and
   `SbomOpenPublishTest` two of the three plain refusals, and `NpmOpenPublishTest` a surface that is
   deliberately still open.
+  **An accept is logged too, at `INFO`, and that is the instrument the remaining flips are made
+  with.** All four accepting paths go through one `accept(rc, surface, publisher)` beside `refuse`
+  and `challenge` — the forwarded pair, the gate-off early return, `ALLOW_ANONYMOUS` and a validated
+  `qits:ci-run` bearer — and each names the surface prefix, the method, the path and who published:
+  a name where this service has one, the literal `anonymous` where it has none. Never a token and
+  never the `Authorization` header. It exists because a surface cannot otherwise be flipped with
+  evidence: an accept used to be a bare `rc.next()`, there is no access log in the shipped
+  configuration, no principal on the request span, and the wrapper's release recipes swallow their
+  token mint's exit code — so a degraded, uncredentialed publish succeeds silently on both ends.
+  The two nameless cases are told apart on purpose (`anonymous (gate off)` against plain
+  `anonymous`): with the gate off nothing *could* present a credential, so only the second is a
+  publisher the rollout is waiting on. The description is built by the static, pure
+  `PublishGuard.publisher`, pinned by `PublishGuardPublisherTest` — plain JUnit, no `@QuarkusTest`
+  and no `@TestProfile`, which is the whole reason the decision was extracted rather than asserted
+  through a log handler.
 - `service` ships `quarkus.http.limits.max-body-size=1088M`, which is a **global** ceiling — every
   route in the process, not just the upload. Tracked as an open tradeoff in
   `docs/issues/2026-07-19_artifacts-global-max-body-size-widens-public-ingest-dos.md`, which now

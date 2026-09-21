@@ -90,6 +90,10 @@ import org.jboss.logging.Logger;
  * 401-then-retry: a {@code WWW-Authenticate: Bearer} here would be noise it cannot act on, which is
  * why this surface is {@link Anonymous#REFUSE} and not {@link Anonymous#REFUSE_WITH_CHALLENGE}.
  *
+ * <p><b>Every accepted publish is logged at INFO, and that is what makes the next flip
+ * reviewable</b> — see {@link #accept}. A refusal has said why since the guard shipped; an accept
+ * said nothing at all, and on a surface about to be flipped the accepts are the interesting half.
+ *
  * <p>A bearer is judged only while the machine-token gate {@code qits.auth.machine.required} is
  * on, because with it off there is no OIDC tenant to validate one. The forwarded pair is judged
  * either way: it needs no validation, it is believed the way {@code ForwardAuthMechanism} believes
@@ -240,7 +244,7 @@ public class PublishGuard {
         refuse(rc, 403, "only a CI run publishes; " + user + " holds " + roles);
         return;
       }
-      rc.next();
+      accept(rc, surface, publisher(user, "forwarded"));
       return;
     }
 
@@ -257,7 +261,7 @@ public class PublishGuard {
       // The gate is off, so there is no OIDC tenant at all and nothing could present a credential
       // this service would accept. Behaviour is exactly what it was before the idp existed, on
       // every surface — the refusal below lives UNDER this check and never beside it.
-      rc.next();
+      accept(rc, surface, publisher(null, "gate off"));
       return;
     }
 
@@ -267,7 +271,7 @@ public class PublishGuard {
       // npm's ceremonial `Bearer qits-ci`, which is not three base64url segments and so never
       // reaches quarkus-oidc. The surface decides.
       switch (surface.anonymous()) {
-        case ALLOW_ANONYMOUS -> rc.next();
+        case ALLOW_ANONYMOUS -> accept(rc, surface, publisher(null, null));
         case REFUSE -> refuse(rc, 401, NO_CREDENTIAL);
         case REFUSE_WITH_CHALLENGE -> challenge(rc);
       }
@@ -287,12 +291,12 @@ public class PublishGuard {
     deferred
         .subscribe()
         .with(
-            identity -> onContext(context, () -> judge(rc, identity)),
+            identity -> onContext(context, () -> judge(rc, surface, identity)),
             failure ->
                 onContext(context, () -> refuse(rc, 401, "the bearer token is not valid here")));
   }
 
-  private void judge(RoutingContext rc, SecurityIdentity identity) {
+  private void judge(RoutingContext rc, Surface surface, SecurityIdentity identity) {
     if (!MachineIdentity.isMachine(identity)) {
       refuse(rc, 401, "the bearer token is not valid here");
       return;
@@ -307,7 +311,7 @@ public class PublishGuard {
               + identity.getRoles());
       return;
     }
-    rc.next();
+    accept(rc, surface, publisher(identity.getPrincipal().getName(), null));
   }
 
   private static void onContext(Context context, Runnable action) {
@@ -316,6 +320,52 @@ public class PublishGuard {
     } else {
       context.runOnContext(ignored -> action.run());
     }
+  }
+
+  /**
+   * Passes a publish on, and says in the log who published it — the accept half of the pair {@link
+   * #refuse} and {@link #challenge} make.
+   *
+   * <p><b>Why an accept is worth a line at all.</b> {@code /artifacts/npm/} and {@code
+   * /artifacts/docs/} are the two surfaces still carrying the anonymous publisher, and flipping one
+   * is today a blind change: nothing on either end can tell a credentialed publish from an
+   * uncredentialed one. The wrapper's release recipes mint the run's token in a step that swallows
+   * the mint's exit code, so a failed mint degrades to an anonymous publish that still succeeds and
+   * says nothing; and on this side an accept was a bare {@code rc.next()} — no record, no access log
+   * in the shipped configuration, and no principal on the request span. So this line is what proves,
+   * <b>before</b> a refusal makes the answer expensive, that every real publisher on a surface is
+   * presenting the run's bearer. After the flip it is the other half of the same value: a 401 is
+   * attributable to a named publisher rather than being a mystery somebody has to reproduce.
+   *
+   * <p>It names the surface prefix as well as the path, because the surface is what carries the
+   * rollout state and therefore what a reader is counting accepts per. The publisher is a
+   * description, never a credential: {@link #publisher} is the only thing that builds one, and the
+   * token and the raw {@code Authorization} header never reach it.
+   */
+  private static void accept(RoutingContext rc, Surface surface, String publisher) {
+    LOG.infof(
+        "Accepted %s %s on %s published by %s",
+        rc.request().method(), rc.normalizedPath(), surface.prefix(), publisher);
+    rc.next();
+  }
+
+  /**
+   * How an accepted publisher is described in the log: the name this service has for the caller, or
+   * the literal {@code anonymous} where it has none, with {@code how} naming the way the credential
+   * arrived when that is not obvious from the name.
+   *
+   * <p>Static and pure so the decision can be pinned by a plain JUnit test — a log assertion would
+   * need a handler on the root logger, and the property worth guarding (that an anonymous publish
+   * says {@code anonymous} and nothing else, so no token can ride out in a name) is a property of
+   * this function alone. Two callers pass no name at all and must not be confusable: the gate-off
+   * accept says so outright, because with {@code qits.auth.machine.required} off there is no OIDC
+   * tenant and nothing <i>could</i> have presented a credential, while an {@link
+   * Anonymous#ALLOW_ANONYMOUS} accept is a publisher that could have and did not — which is the one
+   * the rollout is waiting on.
+   */
+  static String publisher(String name, String how) {
+    String who = name == null || name.isBlank() ? "anonymous" : name;
+    return how == null ? who : who + " (" + how + ")";
   }
 
   /**

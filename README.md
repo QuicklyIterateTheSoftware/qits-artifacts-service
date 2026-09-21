@@ -308,6 +308,17 @@ halves — including that a refused maven deploy **stores nothing**, not merely 
 `DaemonOpenPublishTest` and `SbomOpenPublishTest` two of the three plain refusals, and
 `NpmOpenPublishTest` a surface that is deliberately still open.
 
+**Every publish is logged, accepted or refused.** A refusal has always said why, at `WARN`; an
+accept says at `INFO` which surface it landed on and who published it — the forwarded user name
+(marked `forwarded`), the principal of a validated bearer, or the literal `anonymous` where this
+service has no name for the caller (marked `gate off` when the machine-token gate is what made it
+nameless). No token and no `Authorization` header is ever written. That line is how the still-open
+surfaces are counted down before they are flipped, since the publishers that would break are
+otherwise invisible from both ends: nothing here recorded an accept, there is no access log in the
+shipped configuration, and a release recipe whose token mint failed degrades to an anonymous publish
+that still succeeds. After a flip it is what makes a 401 attributable to a publisher.
+`PublishGuardPublisherTest` pins the description, `anonymous` most of all.
+
 The registry once guarded writes with a static token as an HTTP Basic password. That
 bought a measured, awkward tradeoff — docker could push after a `docker login`, skopeo/podman
 could not (their shared `containers/image` reads the non-challenging `/v2/` ping as "no
