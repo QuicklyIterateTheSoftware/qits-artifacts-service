@@ -95,7 +95,7 @@
              assertEdgeCount) that let a story pin what did NOT happen. It also validates a
              declared edge's fields against Labels.scrub — nothing here declares one. See
              AGENTS.md, "The network diagram is observed, never narrated". -->
-        <qits.userflows.version>2026.920.210236</qits.userflows.version>
+        <qits.userflows.version>2026.922.190204</qits.userflows.version>
         <!-- The recording service mocks the same IT boots against (the generic MockService plus
              idp.MockIdp), released out of libs/qits-integrations-quarkus like qits-db-core above
              (the same-string policy applies the day this repo consumes a newer reactor).
