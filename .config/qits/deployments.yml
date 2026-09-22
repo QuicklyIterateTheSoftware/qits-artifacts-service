@@ -50,7 +50,7 @@ host: registry
 # empty, because a position is per slot and an absent entry has none. The order is stated in
 # integers rather than left to the edge's position-then-label tie-break so that renaming a row
 # cannot silently reorder the group.
-navigation-entries: services.details.Artifacts:6, daemons.details.Artifacts:6, libs.details.Artifacts:6, images.details.Artifacts:6
+navigation-entries: services.details.Artifacts:6, daemons.details.Artifacts:6, libs.details.Artifacts:6, apps.details.Artifacts:6, images.details.Artifacts:6
 
 # A postgres role and database of this application's own (qits_artifacts by derivation), created
 # on the tier's postgres BEFORE the successor starts and injected as QITS_RESOURCE_DB_URL /
