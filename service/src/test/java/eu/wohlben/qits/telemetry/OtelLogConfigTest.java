@@ -64,9 +64,16 @@ class OtelLogConfigTest {
     // http/protobuf, not the gRPC default — qits-observability's ingest is an HTTP resource.
     assertEquals("http/protobuf", value("quarkus.otel.exporter.otlp.protocol"));
 
-    // Resolved, not the raw expression: this is the base the SDK appends /v1/logs to.
+    // Resolved, not the raw expression: this is the base the SDK appends /v1/logs to. Both
+    // expressions have to expand for this to read — qits.observability.url is itself
+    // `http://${QITS_ENVIRONMENT:dev}-qits-observability:8080`, because qits-observability is
+    // environment-tier and its qits-net alias carries the environment. A build sets no
+    // QITS_ENVIRONMENT, so the `dev` fallback is what shows here; a deployment gets its own
+    // environment's receiver from the same line. The env-qualified spelling IS the assertion: a bare
+    // `qits-observability` resolves to nothing on qits-net, and the exporter would retry forever
+    // against a host that does not exist.
     assertEquals(
-        "http://qits-observability:8080/observability/api/otel",
+        "http://dev-qits-observability:8080/observability/api/otel",
         value("quarkus.otel.exporter.otlp.endpoint"));
   }
 
