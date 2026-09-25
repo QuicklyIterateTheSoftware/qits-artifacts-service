@@ -1,22 +1,3 @@
-# How qits-platform-deployments deploys this repo. It reads this file from the git host at
-# the built sha, so the answer travels with the commit.
-#
-# CARRYING THE FILE AT ALL is the other thing it says. The release flow reads it to decide whether
-# this repository deploys — a repo without one is finalized on `main` the moment it releases, and a
-# library or an SPA carries none. What a deploy pulls is the VERSION COORDINATE the release
-# published. There is no promotion and no branch to promote onto: the entry branch
-# (`qits.workspaces.release.entry-branch`) and the `deploy_branches` that used to name it here, in
-# thirteen copies of one platform-wide answer, went with the release door.
-#
-# ENVIRONMENT service since the byte-plane split: one hosted store per tier, and the wire alias
-# carries the tier (dev-qits-artifacts). The platform-wide pieces this repo used to bundle live
-# in services of their own now — the third-party cache is qits-platform-mirror, git is
-# qits-githost. The old `deployment_target: platform` outlived the split here and cost a
-# measured deployment: the deployer ran the platform plane, its predecessor search could not
-# match the tier-named seed container, and the successor died binding the port the seed still
-# held.
-deployment_target: environment
-
 # WHAT THIS REPOSITORY DEPLOYS AS, held still across the repository rename. The repository is
 # qits-artifacts-service now; the application is still qits-artifacts, so nothing that is running
 # moves: the swarm service and its wire alias, the container, the image qits/qits-artifacts the
