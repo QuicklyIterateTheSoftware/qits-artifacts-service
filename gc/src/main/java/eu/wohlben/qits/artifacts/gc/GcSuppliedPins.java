@@ -14,7 +14,7 @@ import java.util.Optional;
  * an authenticated platform.
  *
  * <p>Each member is the peer's response body <b>verbatim</b>: {@code deployments} is what {@code
- * GET /platform-deployments/api/pins} answered, {@code ciDaemon} is what {@code GET /ci/api/daemon}
+ * GET /deployments/api/pins} answered, {@code ciDaemon} is what {@code GET /ci/api/daemon}
  * answered, {@code dependencies} is what {@code GET /maintenance/api/pins} answered, {@code
  * configuredImages} is what {@code GET /configuration/api/pins} answered, and {@code
  * workspaceLaunches} / {@code projectLaunches} are what {@code GET /workspaces/api/pins} and {@code
@@ -75,7 +75,7 @@ public record GcSuppliedPins(
    * The optional request body of {@code POST /gc/plan} and the two sweeps, read into this.
    *
    * <pre>
-   * {"pins": {"deployments":       &lt;verbatim body of GET /platform-deployments/api/pins&gt;,
+   * {"pins": {"deployments":       &lt;verbatim body of GET /deployments/api/pins&gt;,
    *           "ciDaemon":          &lt;verbatim body of GET /ci/api/daemon&gt;,
    *           "dependencies":      &lt;verbatim body of GET /maintenance/api/pins&gt;,
    *           "configuredImages":  &lt;verbatim body of GET /configuration/api/pins&gt;,

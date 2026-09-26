@@ -15,7 +15,7 @@ import java.util.List;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 /**
- * One GET on qits-net, at plan time, every time: {@code GET /platform-deployments/api/pins}.
+ * One GET on qits-net, at plan time, every time: {@code GET /deployments/api/pins}.
  *
  * <p><b>One call, not two, and the deployer's rule rather than ours.</b> This used to list environments and
  * then each environment's deployments, and derive the keep-set here. cd answers the question

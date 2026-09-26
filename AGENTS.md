@@ -213,7 +213,7 @@ Don't. Declare a port in the package that needs it, inject it as `Instance<T>`, 
 supported configuration with a documented behaviour — see the table in the README.
 
 **The six GC pin ports are the only ones left, and they break the rule in both halves on purpose.**
-`CdDeploymentPins` (`GET /platform-deployments/api/pins`), `CiDaemonPins` (`GET /ci/api/daemon`),
+`CdDeploymentPins` (`GET /deployments/api/pins`), `CiDaemonPins` (`GET /ci/api/daemon`),
 `MaintenanceDependencyPins` (`GET /maintenance/api/pins`), `ConfigurationImagePins` (`GET
 /configuration/api/pins`), `WorkspacesLaunchPins` (`GET /workspaces/api/pins`) and
 `ProjectsLaunchPins` (`GET /projects/api/pins`) are ports this repo
@@ -385,7 +385,7 @@ collection" section is the contract; these are the rules that get "helpfully" re
 
 - **Live pins are read once per run, and a source that cannot answer aborts the whole run.**
   `GcPinSources` reads six sources at the start of every plan and every sweep, never cached, and
-  folds them into one `GcPins`: qits-platform-deployments (`GET /platform-deployments/api/pins`,
+  folds them into one `GcPins`: qits-platform-deployments (`GET /deployments/api/pins`,
   what is serving), qits-ci (`GET /ci/api/daemon`, what a runner would launch),
   qits-platform-maintenance (`GET /maintenance/api/pins`, which internal maven/npm/docker versions
   repositories' manifests still reference on main, **plus the `daemon` binaries those versions

@@ -74,7 +74,7 @@ class GcPinsTest extends GcFixture {
     assertEquals(6, pins.sources().size());
     GcPinSource cd = source(pins, "qits-platform-deployments");
     assertFalse(cd.answered());
-    assertTrue(cd.url().endsWith("/platform-deployments/api/pins"), cd.url());
+    assertTrue(cd.url().endsWith("/deployments/api/pins"), cd.url());
     assertTrue(cd.outcome().contains("qits-platform-deployments"), cd.outcome());
     assertEquals(0, cd.pinCount());
     assertEquals(List.of(), cd.keeps());
