@@ -17,7 +17,7 @@ import java.util.List;
  * deploys, which is two definitions of one rule waiting to disagree. They did: the local derivation
  * stopped at the first older row of any status, so a history of {@code ACTIVE(A) / FAILED(C) /
  * DECOMMISSIONED(B)} pinned C, an attempt that never served, and dropped B, the sha a rollback
- * actually restores. {@code GET /platform-deployments/api/pins} answers with the deployer's own rule
+ * actually restores. {@code GET /deployments/api/pins} answers with the deployer's own rule
  * ({@code RollbackPins}, which lives beside the code that performs the rollback), and this port
  * carries transport and nothing else.
  *

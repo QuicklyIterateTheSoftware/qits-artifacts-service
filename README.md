@@ -1247,7 +1247,7 @@ Six services hold references into this store that nothing here can derive, and a
 
 | source | what it pins | shape |
 |---|---|---|
-| `GET /platform-deployments/api/pins` (qits-platform-deployments) | image coordinates: what is serving, and what a rollback would restore, unioned over every environment | `{"pins":[{"applicationName":…,"shas":[…]}]}` |
+| `GET /deployments/api/pins` (qits-platform-deployments) | image coordinates: what is serving, and what a rollback would restore, unioned over every environment | `{"pins":[{"applicationName":…,"shas":[…]}]}` |
 | `GET /ci/api/daemon` (qits-ci) | the daemon ladder's top two rungs, which protect `daemon_binary` rows keyed `(name, version)` | `{daemonName, daemonVersion, previousDaemonVersion, source}` |
 | `GET /maintenance/api/pins` (qits-platform-maintenance) | the internal maven, npm and docker versions repositories' manifests still **reference** on `main` — what source still builds against, which no pull implies — plus the **daemon binaries** those versions carry | `{"generatedAt":…,"repositories":[…],"pins":[{"ecosystem","name","version","repository","manifestPath","via"}]}` |
 | `GET /configuration/api/pins` (qits-configuration) | the container images the platform is **configured** to launch — the version the NEXT deploy of a launching service will be handed | `{"generatedAt":…,"pins":[{"image","version","application","key"}]}` |
@@ -1330,7 +1330,7 @@ implies.
 #### Pins may arrive in the request
 
 `POST /artifacts/api/gc/plan` and both sweeps take an optional body — `{"pins": {"deployments": <the
-verbatim body of GET /platform-deployments/api/pins>, "ciDaemon": <the verbatim body of GET
+verbatim body of GET /deployments/api/pins>, "ciDaemon": <the verbatim body of GET
 /ci/api/daemon>, "dependencies": <GET /maintenance/api/pins>, "configuredImages": <GET
 /configuration/api/pins>, "workspaceLaunches": <GET /workspaces/api/pins>, "projectLaunches": <GET
 /projects/api/pins>}}` — and use those documents instead of the readers above. They are parsed by the
@@ -1467,7 +1467,7 @@ always stays, and everything else dies on the run that finds it.**
 | Kept because | Spelled |
 |---|---|
 | it is one of the last two releases | a tag shaped like a calver version (`2026.801.85448`), ranked by the version's own order — not by a row timestamp, so a release pulled last week is not thereby the newer release. There is no `-main.g<sha>` suffix in docker: the sha tag *is* the prerelease coordinate and a release adds a version tag beside it |
-| qits-platform-deployments pins it | any coordinate `GET /platform-deployments/api/pins` names for that image — what is serving, and what a rollback would restore. **One rule, the deployer's**: this used to be two rules derived here from raw deployment rows, and the derivation was wrong (it read a `FAILED` attempt as the rollback target and dropped the sha that actually served) |
+| qits-platform-deployments pins it | any coordinate `GET /deployments/api/pins` names for that image — what is serving, and what a rollback would restore. **One rule, the deployer's**: this used to be two rules derived here from raw deployment rows, and the derivation was wrong (it read a `FAILED` attempt as the rollback target and dropped the sha that actually served) |
 | a repository's Dockerfile references it | any `image:tag` `GET /maintenance/api/pins` names in the `docker` ecosystem, joined on the **full** image name. A base image is pulled by the *builder*, so nothing here has an access row to show for it and no deployment names it |
 | the platform is configured to launch it | any `image:version` `GET /configuration/api/pins` names, joined the same way. A workspace or agent image is started on demand from a configuration entry, so the image a user's next click pulls can easily be one nobody has started for a week |
 | it is the moving pointer | a tag literally named `latest`. CI step recipes pull `qits/build-images/*:latest` by name; `latest` is not a calver, so no release rule covers it, and the host-side keep-prefix suppresses exactly the pulls that would keep it access-warm. Deleting it `404`s a fresh host's first pull of a step image, and it costs nothing — `latest` shares the newest push's blobs |
@@ -1724,7 +1724,7 @@ answer to them is an ops action, once, by hand.
   "executable": true,
   "pinFailures": [],
   "pins": [                             // how this run read its pins; the sweep receipt carries the same
-    { "source": "qits-platform-deployments", "url": "http://qits-platform-deployments:8080/platform-deployments/api/pins",
+    { "source": "qits-platform-deployments", "url": "http://qits-platform-deployments:8080/deployments/api/pins",
       "answered": true, "readAt": "2026-08-01T12:00:00Z", "tookMillis": 34,
       "outcome": "9 application pins over 14 image shas — what is serving, and what a rollback would restore",
       "pinCount": 9,

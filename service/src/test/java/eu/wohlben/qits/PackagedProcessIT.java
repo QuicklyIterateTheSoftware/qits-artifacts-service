@@ -117,7 +117,7 @@ public class PackagedProcessIT {
       // aliases — which on a build machine resolve to whatever the resolver feels like, or hang.
       // Closed ports make the refusal deterministic while still driving a real HttpClient inside
       // the binary.
-      overrides.put("qits.artifacts.gc.pins.cd-base-url", "http://localhost:1/platform-deployments/api");
+      overrides.put("qits.artifacts.gc.pins.cd-base-url", "http://localhost:1/deployments/api");
       overrides.put("qits.artifacts.gc.pins.ci-base-url", "http://localhost:1/ci/api");
       overrides.put("qits.artifacts.gc.pins.maintenance-base-url", "http://localhost:1/maintenance/api");
       overrides.put("qits.artifacts.gc.pins.configuration-base-url", "http://localhost:1/configuration/api");

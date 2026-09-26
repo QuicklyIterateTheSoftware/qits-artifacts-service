@@ -201,7 +201,7 @@ class GcPlanControllerTest {
                 "qits-configuration",
                 "qits-workspaces",
                 "qits-projects"))
-        .body("pins.find { it.source == 'qits-platform-deployments' }.url", is("http://localhost:1/platform-deployments/api/pins"))
+        .body("pins.find { it.source == 'qits-platform-deployments' }.url", is("http://localhost:1/deployments/api/pins"))
         .body("pins.find { it.source == 'qits-platform-deployments' }.answered", is(false))
         .body("pins.find { it.source == 'qits-ci' }.url", is("http://localhost:1/ci/api/daemon"))
         .body("pins.find { it.source == 'qits-ci' }.keeps", hasSize(0))
@@ -381,7 +381,7 @@ class GcPlanControllerTest {
         .statusCode(404);
   }
 
-  /** The deployer's answer, verbatim as {@code GET /platform-deployments/api/pins} spells it. */
+  /** The deployer's answer, verbatim as {@code GET /deployments/api/pins} spells it. */
   private static final String DEPLOYMENTS =
       """
       {"pins":[{"applicationName":"qits-artifacts","shas":["aaaa","bbbb"]}]}
@@ -656,7 +656,7 @@ class GcPlanControllerTest {
         .body("pinFailures", hasSize(6))
         .body(
             "pins.find { it.source == 'qits-platform-deployments' }.url",
-            is("http://localhost:1/platform-deployments/api/pins"))
+            is("http://localhost:1/deployments/api/pins"))
         .body(
             "pins.find { it.source == 'qits-configuration' }.url",
             is("http://localhost:1/configuration/api/pins"))

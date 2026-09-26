@@ -95,8 +95,7 @@ public class TokenValidationBootstrapIT {
       overrides.put("quarkus.oidc.auth-server-url", idp.baseUrl());
       // No qits-platform-deployments, qits-ci or public registry on a build machine — closed ports
       // refuse deterministically, the same three lines PackagedProcessIT passes.
-      overrides.put(
-          "qits.artifacts.gc.pins.cd-base-url", "http://localhost:1/platform-deployments/api");
+      overrides.put("qits.artifacts.gc.pins.cd-base-url", "http://localhost:1/deployments/api");
       overrides.put("qits.artifacts.gc.pins.ci-base-url", "http://localhost:1/ci/api");
       overrides.put("qits.artifacts.oci.mirror.endpoint-override", "http://localhost:1");
       // Dark outside a deployment, like %dev/%test — a runtime key.
