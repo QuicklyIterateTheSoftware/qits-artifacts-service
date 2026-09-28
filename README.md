@@ -449,7 +449,7 @@ about types and is now a fact about deployments: the cache is another service. C
 no merged "group" view, because npm does the routing client-side — one `.npmrc`, two addresses:
 
 ```ini
-registry=http://qits-platform-mirror:8080/artifacts/npm/npmjs/         # everything, through the cache
+registry=http://qits-platform-mirror:8080/npm/npmjs/                   # everything, through the cache
 @qits:registry=http://qits-platform-artifacts:8080/artifacts/npm/npm/  # ours, from the hosted repo
 ```
 
