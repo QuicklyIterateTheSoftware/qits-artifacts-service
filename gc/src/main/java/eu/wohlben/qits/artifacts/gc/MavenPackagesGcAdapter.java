@@ -8,6 +8,7 @@ import eu.wohlben.qits.artifacts.entity.MavenArtifact;
 import eu.wohlben.qits.artifacts.control.MavenPackagesProfile;
 import eu.wohlben.qits.artifacts.gc.dto.GcIdentity;
 import eu.wohlben.qits.blobstore.persistence.ArtifactRepositoryRepository;
+import eu.wohlben.qits.artifacts.persistence.ContentHashRepository;
 import eu.wohlben.qits.artifacts.persistence.MavenArtifactRepository;
 import io.quarkus.narayana.jta.QuarkusTransaction;
 import jakarta.inject.Inject;
@@ -152,6 +153,7 @@ public class MavenPackagesGcAdapter implements GcTypeAdapter {
   @Inject ArtifactRepositoryRepository repositories;
   @Inject MavenArtifactRepository artifacts;
   @Inject MavenRegistryCollection maven;
+  @Inject ContentHashRepository contentHashes;
 
   @Override
   public String type() {
@@ -285,6 +287,9 @@ public class MavenPackagesGcAdapter implements GcTypeAdapter {
                   for (String path : unit.paths()) {
                     maven.collect(dead.repository(), path);
                   }
+                  // The coordinate's content hash goes with its files, in the same transaction:
+                  // a row left behind would describe a version this store no longer serves.
+                  forgetContentHash(dead);
                 });
         deleted.add(dead);
       } catch (RuntimeException failed) {
@@ -299,6 +304,23 @@ public class MavenPackagesGcAdapter implements GcTypeAdapter {
   }
 
   /** One repository's rows, folded into coordinates. Keyed by identity, in path order. */
+  /**
+   * Deletes the {@code content_hash} row of one collected coordinate, keyed the way the ledger
+   * records it: {@code groupId:artifactId} and the version. An identity with no version colon is an
+   * unreadable path, which is never condemned, and has no row to delete.
+   */
+  private void forgetContentHash(GcIdentity dead) {
+    int colon = dead.identity().lastIndexOf(':');
+    if (colon < 0) {
+      return;
+    }
+    contentHashes.deleteOne(
+        dead.repository(),
+        "maven",
+        dead.identity().substring(0, colon),
+        dead.identity().substring(colon + 1));
+  }
+
   private Map<String, Unit> units(String repository) {
     Map<String, Unit> units = new LinkedHashMap<>();
     for (MavenArtifact row : artifacts.<MavenArtifact>list("repository = ?1", repository)) {

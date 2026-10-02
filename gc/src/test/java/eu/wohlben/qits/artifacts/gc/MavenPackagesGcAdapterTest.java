@@ -62,6 +62,7 @@ class MavenPackagesGcAdapterTest extends GcFixture {
   @Inject MavenPackagesGcAdapter adapter;
   @Inject MavenRegistryCollection collection;
   @Inject GcPlanner planner;
+  @Inject eu.wohlben.qits.artifacts.control.JpaContentHashLedger ledger;
 
   @Test
   void noPublishedReleaseIsEverAgeCollectedHoweverColdAndHoweverDeepInTheVersionOrder()
@@ -470,6 +471,31 @@ class MavenPackagesGcAdapterTest extends GcFixture {
     assertEquals(taken.live(MavenPackagesProfile.KEY).keySet(), plan.blobsRetained());
     assertEquals(2, plan.blobsRetained().size(), "the jar and the pom");
     assertEquals(List.of(), planner.plan(taken, List.of(strategy), GcPins.none()).sweep().blobIds());
+  }
+
+  @Test
+  void aCollectedCoordinateTakesItsContentHashRowWithItAndAKeptOneKeepsIts() throws Exception {
+    // epic qits-620: the content_hash row is metadata about a version this store serves, so it goes
+    // in the same transaction as the coordinate's files. The ledger only ever records a release pom,
+    // and releases are never collected — so the row is written here by hand for a superseded
+    // snapshot set, which is the one coordinate this adapter does condemn. What is under test is the
+    // hop from the condemned identity to the ledger's key, not when the ledger writes.
+    maven();
+    snapshot("1.0.1", "20260601.101010", 1, "pom", 141, daysAgo(400));
+    snapshot("1.0.1", "20260802.123456", 3, "pom", 142, daysAgo(400));
+    release("1.0.0", "pom", 143, daysAgo(400));
+    String name = GROUP_ID + ":" + ARTIFACT_ID;
+    ledger.record("maven", MAVEN_REPO, name, "1.0.1-20260601.101010-1", "v1:sha256:" + "a".repeat(64));
+    ledger.record("maven", MAVEN_REPO, name, "1.0.1-20260802.123456-3", "v1:sha256:" + "b".repeat(64));
+    ledger.record("maven", MAVEN_REPO, name, "1.0.0", "v1:sha256:" + "c".repeat(64));
+
+    GcStrategy.Plan plan = strategy.plan(census.take(), GcPins.none());
+    GcStrategy.Applied applied = strategy.apply(plan, blobId -> false);
+
+    assertEquals(List.of(COORDINATE + "1.0.1-20260601.101010-1"), identities(applied.deleted()));
+    assertTrue(ledger.find("maven", MAVEN_REPO, name, "1.0.1-20260601.101010-1").isEmpty());
+    assertTrue(ledger.find("maven", MAVEN_REPO, name, "1.0.1-20260802.123456-3").isPresent());
+    assertTrue(ledger.find("maven", MAVEN_REPO, name, "1.0.0").isPresent());
   }
 
   // --- fixture ---------------------------------------------------------------------------------

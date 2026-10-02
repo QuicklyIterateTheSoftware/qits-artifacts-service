@@ -51,6 +51,7 @@ class NpmPackagesGcAdapterTest extends GcFixture {
 
   @Inject NpmPackagesGcStrategy strategy;
   @Inject GcPlanner planner;
+  @Inject eu.wohlben.qits.artifacts.control.JpaContentHashLedger ledger;
 
   @Test
   void noPublishedReleaseIsEverAgeCollectedHoweverColdAndHoweverDeepInTheVersionOrder()
@@ -285,6 +286,25 @@ class NpmPackagesGcAdapterTest extends GcFixture {
     assertTrue(
         npmVersionTombstones.findOne("npm", UI, "1.0.0-main.gab854a1").isPresent(),
         "and the name can never be silently republished");
+  }
+
+  @Test
+  void aCollectedVersionTakesItsContentHashRowWithItAndAKeptOneKeepsIts() throws Exception {
+    // epic qits-620: the row is metadata about a version this store serves, so it is deleted in the
+    // same transaction as the version row and its tombstone.
+    hosted();
+    version(UI, "1.0.0-main.gab854a1", 181, daysAgo(400));
+    version(UI, "1.1.0", 182, daysAgo(390));
+    ledger.record("npm", "npm", UI, "1.0.0-main.gab854a1", "v1:sha256:" + "a".repeat(64));
+    ledger.record("npm", "npm", UI, "1.1.0", "v1:sha256:" + "b".repeat(64));
+
+    GcStrategy.Plan plan = strategy.plan(census.take(), GcPins.none());
+    GcStrategy.Applied applied = strategy.apply(plan, blobId -> false);
+
+    assertEquals(List.of(UI + "@1.0.0-main.gab854a1"), identities(applied.deleted()));
+    assertEquals(List.of(), applied.errors());
+    assertTrue(ledger.find("npm", "npm", UI, "1.0.0-main.gab854a1").isEmpty(), "the row went too");
+    assertTrue(ledger.find("npm", "npm", UI, "1.1.0").isPresent(), "the kept release keeps its");
   }
 
   @Test

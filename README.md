@@ -790,6 +790,27 @@ is still the right shape: qits-platform-maintenance re-reads a live artifact's d
 cadence, and a pin source restating what the belt already keeps would be one keep-set decided twice.
 See "Garbage collection".
 
+
+## Content hashes
+
+The maven and npm upload routes (in qits-registries-javalib) accept an optional
+`X-Artifacts-Content-Hash: v<n>:<alg>:<hex>` header — on the release pom for maven, on the publish
+document for npm — and record it through the library's `ContentHashLedger` port. This service
+supplies `JpaContentHashLedger` over the `content_hash` table (V4); qits-mirror runs the library's
+no-op default. First write wins: an equal value is a no-op, a different one a 409. The value is
+opaque here — the qits CLI computes it, this service never recomputes it.
+
+```
+GET /artifacts/content-hashes/<maven|npm>/<name>/-/newest      the highest stored version
+GET /artifacts/content-hashes/<maven|npm>/<name>/-/<version>   that version
+→ 200 {"ecosystem","name","version","contentHash"}             contentHash null when none recorded
+→ 404 no such version / no version at all / unknown ecosystem; anything else is a 5xx
+```
+
+`<name>` is `groupId:artifactId` or the npm name (`@qits/foo`), `SbomPaths`' grammar. Both read
+the hosted repository (`maven`, `npm`). A maven version exists when its pom is stored; snapshots
+are skipped. "Newest" is `MavenVersionOrder` / `NpmSemver` precedence, never `dist-tags.latest`.
+Reads are anonymous, like every read here. The GC adapters delete a version's row with the version.
 ## The explorer API
 
 The `GET`s under `/artifacts/api` answer the one question this service could not: **what is in

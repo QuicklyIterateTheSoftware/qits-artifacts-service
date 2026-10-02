@@ -58,6 +58,7 @@ abstract class ArtifactsTestSupport {
   @Inject DocsFileRepository docsFiles;
 
   @Inject SbomDocumentRepository sbomDocuments;
+  @Inject eu.wohlben.qits.artifacts.persistence.ContentHashRepository contentHashes;
 
   @Inject OciMirrorUpstreamRepository mirrorUpstreams;
 
@@ -95,6 +96,8 @@ abstract class ArtifactsTestSupport {
               // The SBOM rows have no cascade to ride, unlike docs': fk_sbom_document_repository
               // points straight at artifact_repository, so they go before the repositories do.
               sbomDocuments.deleteAll();
+              // content_hash too: fk_content_hash_repository points at artifact_repository.
+              contentHashes.deleteAll();
               records.deleteAll();
               // The mirror upstreams too: their slug is a foreign key into artifact_repository, so
               // the pairing that makes a namespace resolvable is also what makes the wipe ordered.

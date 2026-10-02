@@ -88,6 +88,7 @@ abstract class GcFixture {
   @Inject eu.wohlben.qits.artifacts.persistence.DocsSiteRepository docsSites;
   @Inject eu.wohlben.qits.artifacts.persistence.DocsFileRepository docsFiles;
   @Inject eu.wohlben.qits.artifacts.persistence.SbomDocumentRepository sbomDocuments;
+  @Inject eu.wohlben.qits.artifacts.persistence.ContentHashRepository contentHashes;
   @Inject OciMirrorUpstreamRepository mirrorUpstreams;
   @Inject OciMirrorTagCheckRepository mirrorTagChecks;
   @Inject BlobDiskIndex diskIndex;
@@ -126,6 +127,8 @@ abstract class GcFixture {
               // The SBOM rows have no cascade to ride: fk_sbom_document_repository points straight
               // at artifact_repository, so they go before the repositories do.
               sbomDocuments.deleteAll();
+              // content_hash too: fk_content_hash_repository points at artifact_repository.
+              contentHashes.deleteAll();
               records.deleteAll();
               // The mirror upstreams too: their slug is a foreign key into artifact_repository, so
               // the pairing that makes a namespace resolvable is also what makes the wipe ordered.

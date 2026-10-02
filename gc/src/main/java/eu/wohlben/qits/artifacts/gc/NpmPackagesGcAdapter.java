@@ -8,8 +8,10 @@ import eu.wohlben.qits.artifacts.entity.NpmVersion;
 import eu.wohlben.qits.artifacts.control.NpmPackagesProfile;
 import eu.wohlben.qits.artifacts.gc.dto.GcIdentity;
 import eu.wohlben.qits.blobstore.persistence.ArtifactRepositoryRepository;
+import eu.wohlben.qits.artifacts.persistence.ContentHashRepository;
 import eu.wohlben.qits.artifacts.persistence.NpmDistTagRepository;
 import eu.wohlben.qits.artifacts.persistence.NpmVersionRepository;
+import io.quarkus.narayana.jta.QuarkusTransaction;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 import java.time.Instant;
@@ -128,6 +130,7 @@ public class NpmPackagesGcAdapter implements GcTypeAdapter {
   @Inject NpmVersionRepository versions;
   @Inject NpmDistTagRepository distTags;
   @Inject NpmRegistryCollection npm;
+  @Inject ContentHashRepository contentHashes;
 
   @Override
   public String type() {
@@ -244,7 +247,14 @@ public class NpmPackagesGcAdapter implements GcTypeAdapter {
           withheld.add(dead);
           continue;
         }
-        npm.collect(dead.repository(), packageName, version);
+        // One transaction for the version, its tombstone and its content hash: collect() joins it,
+        // and a content_hash row left behind would describe a version this store no longer serves.
+        QuarkusTransaction.requiringNew()
+            .run(
+                () -> {
+                  npm.collect(dead.repository(), packageName, version);
+                  contentHashes.deleteOne(dead.repository(), "npm", packageName, version);
+                });
         deleted.add(dead);
       } catch (RuntimeException failed) {
         errors.add(dead.identity() + ": " + failed.getMessage());

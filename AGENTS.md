@@ -90,6 +90,7 @@ edge. The **client** is the exception: this service has a host of its own,
 | `/artifacts/daemons/**` | raw Vert.x routes in `DaemonRoutes` (the platform's own daemon binaries) | **nothing** — a literal, and `DaemonPaths.BASE` is the only place it is spelled |
 | `/artifacts/docs/**` | raw Vert.x routes in `DocsRoutes` (published documentation bundles) | **nothing** — a literal, and `DocsPaths.BASE` is the only place it is spelled |
 | `/artifacts/sboms/**` | raw Vert.x routes in `SbomRoutes` (the published SBOM store) | **nothing** — a literal, and `SbomPaths.BASE` is the only place it is spelled |
+| `/artifacts/content-hashes/**` | raw Vert.x routes in `ContentHashRoutes` (the content-hash read, GET/HEAD only) | **nothing** — a literal, and `ContentHashPaths.BASE` is the only place it is spelled |
 | `/artifacts/token` | one raw Vert.x route in `RegistryTokenEndpoint` (the docker-registry Bearer token endpoint) | **nothing** — a literal, and `RegistryChallenge.TOKEN_PATH` is the only place it is spelled |
 | `/v2/**` | raw Vert.x routes in `RegistryRoutes` (the OCI Distribution API) | **nothing** — a literal, and not under `/artifacts` at all |
 

@@ -333,6 +333,55 @@ class MigrationLineageTest {
   }
 
   @Test
+  void theContentHashTableIsThereKeyedByTheVersionAndOwnedByARepository() throws SQLException {
+    // V4's table (epic qits-620). The primary key is the version, so a second value for the same
+    // version is refused at the database as well as by the ledger's first-write-wins rule; the
+    // ecosystem is one of the two the ledger records; and the row belongs to a repository.
+    insertRepository("maven", "MAVEN_PACKAGES");
+    execute(
+        "insert into content_hash (repository, ecosystem, package_name, version, value, created_at)"
+            + " values ('maven', 'maven', 'eu.wohlben.qits:qits-foo', '2026.1001.1', 'v1:sha256:"
+            + "a".repeat(64) + "', current_timestamp)");
+    assertEquals(1, count("select count(*) from content_hash where repository = 'maven'"));
+
+    SQLException duplicate =
+        assertThrows(
+            SQLException.class,
+            () ->
+                execute(
+                    "insert into content_hash (repository, ecosystem, package_name, version, value,"
+                        + " created_at) values ('maven', 'maven', 'eu.wohlben.qits:qits-foo',"
+                        + " '2026.1001.1', 'v1:sha256:" + "b".repeat(64) + "', current_timestamp)"));
+    assertTrue(
+        duplicate.getMessage().toUpperCase(Locale.ROOT).contains("CONTENT_HASH_PKEY"),
+        duplicate.getMessage());
+
+    SQLException wrongEcosystem =
+        assertThrows(
+            SQLException.class,
+            () ->
+                execute(
+                    "insert into content_hash (repository, ecosystem, package_name, version, value,"
+                        + " created_at) values ('maven', 'docker', 'qits/qits-foo', '1',"
+                        + " 'v1:sha256:aa', current_timestamp)"));
+    assertTrue(
+        wrongEcosystem.getMessage().toUpperCase(Locale.ROOT).contains("CK_CONTENT_HASH_ECOSYSTEM"),
+        wrongEcosystem.getMessage());
+
+    SQLException orphan =
+        assertThrows(
+            SQLException.class,
+            () ->
+                execute(
+                    "insert into content_hash (repository, ecosystem, package_name, version, value,"
+                        + " created_at) values ('no-such-repo', 'npm', '@qits/foo', '1.0.0',"
+                        + " 'v1:sha256:aa', current_timestamp)"));
+    assertTrue(
+        orphan.getMessage().toUpperCase(Locale.ROOT).contains("FK_CONTENT_HASH_REPOSITORY"),
+        orphan.getMessage());
+  }
+
+  @Test
   void aDocsVersionIsTheUnitOfEvictionBecauseItsFilesCascade() throws SQLException {
     // The one foreign key in this schema that is load-bearing rather than hygienic: deleting a
     // docs_site row must take its files with it, or a sweep could leave a version that lists itself
