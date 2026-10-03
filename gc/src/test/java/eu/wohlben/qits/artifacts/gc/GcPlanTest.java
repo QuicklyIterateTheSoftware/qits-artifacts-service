@@ -131,7 +131,7 @@ class GcPlanTest extends GcFixture {
         }
         case "sboms" -> {
           assertEquals("SbomGcStrategy", type.strategy());
-          // Nothing pins an SBOM by coordinate, and the type is refused here all the same: every
+          // No pin source names an SBOM, and the type is refused here all the same: every
           // own type takes the digest floor, and a pinned blob may be the bytes of a document.
           assertNotNull(type.error(), "the own engine reads pins, and there are none here");
           assertEquals(0, type.dead().size(), "a refused type plans nothing");

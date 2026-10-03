@@ -17,9 +17,9 @@ import jakarta.enterprise.context.ApplicationScoped;
  * publishes</b> — the release pipeline of every repository, in its last step after the publish
  * command and before the run goes green, so the document exists before the {@code SoftwareRelease}
  * event names the version; <b>what GC keeps</b> — the last released documents of every {@code
- * (packageType, packageName)} plus whatever the access window holds, because qits-platform-maintenance
- * re-reads a live artifact's SBOM and that read is the access; <b>what pins an entry</b> — nothing:
- * an SBOM describes an artifact and pins nothing, and nothing pins one.
+ * (packageType, packageName)}, plus every released document whose artifact is still in this store
+ * ({@code SbomGcAdapter.pinnedBy}); <b>what pins an entry</b> — nothing: an SBOM describes an
+ * artifact and pins nothing.
  *
  * <p><b>The identity is the {@code SoftwareRelease} identity</b> — {@code (packageType, packageName,
  * version)} verbatim — which is what lets a consumer of that event fetch the document with no

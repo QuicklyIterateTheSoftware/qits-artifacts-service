@@ -91,8 +91,9 @@ public class SbomRegistryService {
   }
 
   /**
-   * Records that a GET served this document — the access basis the GC window reads, which is what
-   * keeps the SBOM of a live-tracked artifact stored for as long as anything re-reads it.
+   * Records that a GET served this document — the access basis the GC window reads. What keeps a
+   * release's document is its artifact still being stored ({@code SbomGcAdapter.pinnedBy}), not
+   * this: maintenance reads a document once, at ingest.
    *
    * <p>Coalesced to one write per row per hour inside {@link SbomAccessTracker}.
    */

@@ -1,9 +1,20 @@
 package eu.wohlben.qits.artifacts.gc;
 
+import eu.wohlben.qits.artifacts.control.DaemonBinariesProfile;
+import eu.wohlben.qits.artifacts.control.MavenLayout;
+import eu.wohlben.qits.artifacts.control.MavenPackagesProfile;
+import eu.wohlben.qits.artifacts.control.NpmPackagesProfile;
+import eu.wohlben.qits.artifacts.control.OciImagesProfile;
 import eu.wohlben.qits.artifacts.control.SbomProfile;
 import eu.wohlben.qits.artifacts.control.SbomRegistryCollection;
+import eu.wohlben.qits.artifacts.entity.DaemonBinary;
+import eu.wohlben.qits.artifacts.entity.OciTag;
 import eu.wohlben.qits.artifacts.entity.SbomDocument;
 import eu.wohlben.qits.artifacts.gc.dto.GcIdentity;
+import eu.wohlben.qits.artifacts.persistence.DaemonBinaryRepository;
+import eu.wohlben.qits.artifacts.persistence.MavenArtifactRepository;
+import eu.wohlben.qits.artifacts.persistence.NpmVersionRepository;
+import eu.wohlben.qits.artifacts.persistence.OciTagRepository;
 import eu.wohlben.qits.artifacts.persistence.SbomDocumentRepository;
 import eu.wohlben.qits.blobstore.entity.ArtifactRepository;
 import eu.wohlben.qits.blobstore.persistence.ArtifactRepositoryRepository;
@@ -12,8 +23,11 @@ import jakarta.inject.Singleton;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.regex.Pattern;
 
 /**
@@ -47,13 +61,28 @@ import java.util.regex.Pattern;
  * occupies a belt slot and lives exactly as long as the access window keeps it, from {@code
  * max(created_at, accessed_at)}, so a freshly published document is always young.
  *
- * <h2>Nothing pins an SBOM, and that is a decision</h2>
+ * <h2>A release's document lives as long as the release does</h2>
  *
- * <p>{@link #pinnedBy} is not overridden. What keeps a live artifact's document is that
- * qits-platform-maintenance <b>re-reads it</b> on its scan cadence, and every such read moves {@code
- * accessed_at} — so the fact "this artifact is still tracked" already reaches this engine as
- * access. A pin source answering "what maintenance tracks" would restate that same basis in a second
- * place and let the two disagree; the one that lost would be the one deleting rows.
+ * <p>{@link #pinnedBy} keeps a calver document while the artifact it describes is still present in
+ * this store — the maven coordinate, the npm version, the image tag, the daemon version — under
+ * {@link #KEPT_ARTIFACT_PRESENT}. The maven and npm adapters keep every hosted release forever, so
+ * without this rule the belt and a {@code P0D} window left jars whose bill of materials answered
+ * {@code 404}: {@code eu.wohlben.qits:qits-service-mock:2026.917.65806} was published with one on
+ * 2026-09-17 and had lost it a few releases later. An SBOM is a statement about an artifact; one
+ * that outlives its subject and one that dies before it are both wrong, and the second was
+ * happening.
+ *
+ * <p><b>This replaced "nothing pins an SBOM", whose premise was false twice.</b> It held that
+ * qits-maintenance re-reads every live artifact's document on its scan cadence, so "still tracked"
+ * would reach this engine as access. Maintenance reads a document exactly <b>once</b>, at ingest;
+ * and the window is {@code P0D}, so no amount of access would have kept anything anyway. The fact
+ * the old paragraph wanted to arrive as a timestamp is answered here directly, from the rows of the
+ * stores themselves.
+ *
+ * <p>Presence is read once per run, one query per distinct described package rather than one per
+ * document, so a plan is judged against a single reading of each sibling store. A document whose
+ * artifact is gone — collected by its own type, or never stored here — keeps today's belt and
+ * window behaviour unchanged, and a non-calver document is never asked about.
  *
  * <p>The <b>digest</b> floor still applies, as it does to every own type: {@code OwnGcStrategy}
  * checks pinned blob digests under whatever this adapter answers, and a document's bytes are an
@@ -75,9 +104,22 @@ public class SbomGcAdapter implements GcTypeAdapter {
   /** A calver release version: {@code <year>.<month><day>.<time>}. */
   static final Pattern CALVER = Pattern.compile("\\d{4}\\.\\d{1,4}\\.\\d+");
 
+  /**
+   * The keep a release's document gets while the artifact it describes is still here, said in full
+   * so a report line explains itself without the class javadoc.
+   */
+  static final String KEPT_ARTIFACT_PRESENT =
+      "the artifact this bill of materials describes is still in this store — a document lives as"
+          + " long as its release does, so a consumer of a kept jar, tarball, image or binary can"
+          + " always read what is in it";
+
   @Inject ArtifactRepositoryRepository repositories;
   @Inject SbomDocumentRepository documents;
   @Inject SbomRegistryCollection sboms;
+  @Inject MavenArtifactRepository mavenArtifacts;
+  @Inject NpmVersionRepository npmVersions;
+  @Inject OciTagRepository ociTags;
+  @Inject DaemonBinaryRepository daemonBinaries;
 
   @Override
   public String type() {
@@ -108,6 +150,122 @@ public class SbomGcAdapter implements GcTypeAdapter {
       }
     }
     return List.copyOf(candidates);
+  }
+
+  /**
+   * Every calver document whose artifact is still present in its own store.
+   *
+   * <p>The released candidates are grouped by {@code packageType/packageName} first, so each
+   * sibling store is asked once per described package — every version of it in one read — rather
+   * than once per document. A package type this store does not hold answers nothing and keeps
+   * nothing.
+   */
+  @Override
+  public GcPinned pinnedBy(List<GcCandidate> candidates, GcPins pins) {
+    Map<String, Set<String>> wanted = new TreeMap<>();
+    for (GcCandidate candidate : candidates) {
+      if (!candidate.released()) {
+        continue;
+      }
+      String identity = candidate.identity();
+      String described = packageTypeOf(identity) + "/" + packageNameOf(identity);
+      wanted.computeIfAbsent(described, key -> new HashSet<>()).add(versionOf(identity));
+    }
+    Set<String> present = new HashSet<>();
+    List<ArtifactRepository> stores = repositories.listAll();
+    for (String described : wanted.keySet()) {
+      int slash = described.indexOf('/');
+      String packageType = described.substring(0, slash);
+      String packageName = described.substring(slash + 1);
+      for (String version : presentVersions(stores, packageType, packageName)) {
+        present.add(described + AT + version);
+      }
+    }
+    return candidate ->
+        candidate.released() && present.contains(candidate.identity())
+            ? KEPT_ARTIFACT_PRESENT
+            : null;
+  }
+
+  /**
+   * The versions of one described package its own store holds, across every repository of that
+   * store's hosted type.
+   *
+   * <ul>
+   *   <li>{@code maven} — {@code group:artifact}; any {@code maven_artifact} row under {@code
+   *       <group path>/<artifact>/<version>/}, read with one prefix query and parsed by {@code
+   *       MavenLayout} so a {@code LIKE} wildcard or a longer artifactId sharing the prefix cannot
+   *       answer for it.
+   *   <li>{@code npm} — any {@code npm_version} row of that name.
+   *   <li>{@code docker} — {@code <repository>/<image>}, the full image name every image pin
+   *       spells; any {@code oci_tag} row of that image whose tag is the version.
+   *   <li>{@code daemon} — any {@code daemon_binary} row of that name.
+   * </ul>
+   */
+  private Set<String> presentVersions(
+      List<ArtifactRepository> stores, String packageType, String packageName) {
+    Set<String> versions = new HashSet<>();
+    switch (packageType) {
+      case "maven" -> {
+        int colon = packageName.indexOf(':');
+        if (colon < 0) {
+          return versions;
+        }
+        String groupId = packageName.substring(0, colon);
+        String artifactId = packageName.substring(colon + 1);
+        // The repository method appends the closing `/%` itself.
+        String prefix = groupId.replace('.', '/') + "/" + artifactId;
+        for (String repository : named(stores, MavenPackagesProfile.KEY)) {
+          for (Object[] row :
+              mavenArtifacts.listPathsAndCreatedAtStartingWith(repository, prefix)) {
+            MavenLayout.ArtifactPath parsed = MavenLayout.parse((String) row[0]);
+            if (parsed != null
+                && parsed.groupId().equals(groupId)
+                && parsed.artifactId().equals(artifactId)) {
+              versions.add(parsed.version());
+            }
+          }
+        }
+      }
+      case "npm" -> {
+        for (String repository : named(stores, NpmPackagesProfile.KEY)) {
+          for (Object[] row : npmVersions.listVersionRows(repository, packageName)) {
+            versions.add((String) row[0]);
+          }
+        }
+      }
+      case "docker" -> {
+        int slash = packageName.indexOf('/');
+        if (slash < 0) {
+          return versions;
+        }
+        String repository = packageName.substring(0, slash);
+        if (named(stores, OciImagesProfile.KEY).contains(repository)) {
+          for (OciTag tag : ociTags.listByImage(repository, packageName.substring(slash + 1))) {
+            versions.add(tag.tag);
+          }
+        }
+      }
+      case "daemon" -> {
+        for (String repository : named(stores, DaemonBinariesProfile.KEY)) {
+          for (DaemonBinary row : daemonBinaries.listVersions(repository, packageName)) {
+            versions.add(row.version);
+          }
+        }
+      }
+      default -> {
+        // A type SbomPaths admits and no store here holds: nothing to be present in.
+      }
+    }
+    return versions;
+  }
+
+  /** The names of the repositories of one stored type. */
+  private static List<String> named(List<ArtifactRepository> stores, String type) {
+    return stores.stream()
+        .filter(store -> type.equals(store.type))
+        .map(store -> store.name)
+        .toList();
   }
 
   /**
