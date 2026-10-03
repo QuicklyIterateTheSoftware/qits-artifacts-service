@@ -576,14 +576,15 @@ collection" section is the contract; these are the rules that get "helpfully" re
   those as `daemon` pins from the coordinate that carries them; `DaemonBinariesGcAdapter.pinnedBy`
   asks the ladder first and falls through to `GcPins.pinsCarriedDaemon`, because a receipt states
   one reason per identity and "a runner would launch this" is the stronger claim to print.
-- **`sboms`' identity is `packageType/packageName@version` and nothing pins one.** The coordinate is
+- **`sboms`' identity is `packageType/packageName@version`, and a release's document lives as long as its artifact.** The coordinate is
   the `SoftwareRelease` identity verbatim, so a report line needs no translation; the version comes
   last and is parsed with `lastIndexOf('@')`, because a package name carries `@`, `/` and `:` of its
   own while `SbomPaths`' `VERSION` charset admits no `@`. The belt counts per **package**, not per
-  repository — every artifact on the platform publishes into the one `sboms` root. `pinnedBy` is
-  deliberately not overridden: qits-platform-maintenance re-reads a live artifact's document and
-  that read moves `accessed_at`, so "what maintenance tracks" already reaches the engine as access,
-  and a pin source restating it would be the same keep-set decided twice. Its funnel is
+  repository — every artifact on the platform publishes into the one `sboms` root. `pinnedBy`
+  keeps a calver document while the artifact it describes is still stored — maven coordinate, npm
+  version, image tag, daemon version (qits-739). It used to be left un-overridden on the premise that
+  maintenance re-reads documents and moves `accessed_at`; it reads each one once, at ingest, and the
+  window is `P0D`, so released jars kept forever lost their SBOMs. Its funnel is
   `SbomRegistryCollection` → package-private `SbomRegistryService.collect`, the sixth narrow door,
   and it writes **no** tombstone: a collected identity re-opens for a republish, as the daemon's
   does.

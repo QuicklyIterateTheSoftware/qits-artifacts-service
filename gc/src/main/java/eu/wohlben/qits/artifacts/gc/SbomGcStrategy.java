@@ -14,7 +14,7 @@ import jakarta.inject.Singleton;
  * answers for the versions anyone is running.
  *
  * <p>The rule is {@link OwnArtifactsStrategy}'s, the wiring {@link OwnGcStrategy}'s, and the facts —
- * one <b>document</b> is one identity, what a release is here, nothing pins one, how a row goes —
+ * one <b>document</b> is one identity, what a release is here, what keeps one, how a row goes —
  * are {@link SbomGcAdapter}'s.
  *
  * <p>{@code @Singleton} rather than {@code @ApplicationScoped}, for the report's sake: a

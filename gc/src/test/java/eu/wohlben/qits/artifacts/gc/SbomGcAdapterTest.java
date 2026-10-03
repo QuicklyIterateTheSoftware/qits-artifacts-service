@@ -4,15 +4,27 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import eu.wohlben.qits.artifacts.control.DaemonBinariesProfile;
 import eu.wohlben.qits.artifacts.control.LiveBlobCensus;
+import eu.wohlben.qits.artifacts.control.MavenPackagesProfile;
+import eu.wohlben.qits.artifacts.control.NpmPackagesProfile;
+import eu.wohlben.qits.artifacts.control.OciImagesProfile;
+import eu.wohlben.qits.artifacts.control.OciMediaTypes;
 import eu.wohlben.qits.artifacts.control.SbomProfile;
+import eu.wohlben.qits.artifacts.entity.MavenArtifact;
+import eu.wohlben.qits.artifacts.entity.NpmVersion;
+import eu.wohlben.qits.artifacts.entity.OciManifest;
+import eu.wohlben.qits.artifacts.entity.OciTag;
 import eu.wohlben.qits.artifacts.gc.dto.GcIdentity;
+import io.quarkus.narayana.jta.QuarkusTransaction;
 import io.quarkus.test.junit.QuarkusTest;
 import jakarta.inject.Inject;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.junit.jupiter.api.Test;
@@ -115,6 +127,116 @@ class SbomGcAdapterTest extends GcFixture {
   }
 
   @Test
+  void aReleasedDocumentIsKeptWhileItsMavenCoordinateIsStillStored() throws Exception {
+    // qits-739: maven keeps every hosted release forever, so a belt-displaced document whose jar
+    // is still here is a bill of materials torn off a release the store still serves. The
+    // third-oldest is kept because its coordinate is present; the fourth-oldest, whose coordinate
+    // is not stored, keeps today's belt-and-window answer and dies.
+    repository();
+    repositoryService.ensure(MAVEN_REPO, MavenPackagesProfile.KEY);
+    mavenRow("eu/wohlben/qits/qits-eventstream/2026.601.10/qits-eventstream-2026.601.10.jar");
+    // A sibling artifact holding the very version the doomed document names: presence is per
+    // coordinate, so it must not answer for `qits-eventstream`.
+    mavenRow(
+        "eu/wohlben/qits/qits-eventstream-x/2026.501.5/qits-eventstream-x-2026.501.5.jar");
+    String doomed = blob(71);
+    backdate(doomed, Duration.ofDays(30));
+    sbomRow(SBOM_REPO, "maven", MAVEN_NAME, "2026.501.5", doomed, daysAgo(500), null);
+    sbomRow(SBOM_REPO, "maven", MAVEN_NAME, "2026.601.10", blob(72), daysAgo(400), null);
+    sbomRow(SBOM_REPO, "maven", MAVEN_NAME, "2026.701.20", blob(73), daysAgo(300), null);
+    sbomRow(SBOM_REPO, "maven", MAVEN_NAME, "2026.801.30", blob(74), daysAgo(200), null);
+
+    GcStrategy.Plan plan = strategy.plan(census.take(), GcPins.none());
+
+    assertEquals(List.of("maven/" + MAVEN_NAME + "@2026.501.5"), identities(plan.dead()));
+    assertEquals(
+        SbomGcAdapter.KEPT_ARTIFACT_PRESENT,
+        ruleFor(plan.kept(), "maven/" + MAVEN_NAME + "@2026.601.10"),
+        "the jar is still served, so its bill of materials must be too");
+    assertEquals(
+        OwnArtifactsStrategy.KEPT_RELEASE,
+        ruleFor(plan.kept(), "maven/" + MAVEN_NAME + "@2026.801.30"));
+  }
+
+  @Test
+  void aReleasedDocumentIsKeptWhileItsNpmVersionIsStillStored() throws Exception {
+    // The same pair for npm, which keeps every hosted release for the same reason maven does.
+    repository();
+    repositoryService.ensure("npm", NpmPackagesProfile.KEY);
+    npmRow(NPM_NAME, "2026.601.10");
+    npmRow("@qits/other", "2026.501.5"); // the version, under a different name: no answer for ours
+    String doomed = blob(81);
+    backdate(doomed, Duration.ofDays(30));
+    sbomRow(SBOM_REPO, "npm", NPM_NAME, "2026.501.5", doomed, daysAgo(500), null);
+    sbomRow(SBOM_REPO, "npm", NPM_NAME, "2026.601.10", blob(82), daysAgo(400), null);
+    sbomRow(SBOM_REPO, "npm", NPM_NAME, "2026.701.20", blob(83), daysAgo(300), null);
+    sbomRow(SBOM_REPO, "npm", NPM_NAME, "2026.801.30", blob(84), daysAgo(200), null);
+
+    GcStrategy.Plan plan = strategy.plan(census.take(), GcPins.none());
+
+    assertEquals(List.of("npm/" + NPM_NAME + "@2026.501.5"), identities(plan.dead()));
+    assertEquals(
+        SbomGcAdapter.KEPT_ARTIFACT_PRESENT,
+        ruleFor(plan.kept(), "npm/" + NPM_NAME + "@2026.601.10"));
+  }
+
+  @Test
+  void aReleasedDocumentIsKeptWhileItsImageTagOrDaemonVersionIsStillStored() throws Exception {
+    // docker names `<repository>/<image>` and the tag is the version; daemon names the daemon.
+    // Each has a third-oldest document whose artifact is here and a fourth whose artifact is not.
+    repository();
+    repositoryService.ensure("qits", OciImagesProfile.KEY);
+    String config = store(filled(91, (byte) 91));
+    byte[] manifest = imageManifest(config, Map.of());
+    String digest = store(manifest);
+    imageTag("qits-artifacts", "2026.601.10", digest, manifest.length);
+    repositoryService.ensure(DAEMON_REPO, DaemonBinariesProfile.KEY);
+    daemonRow("qits-ci-daemon", "2026.601.10", blob(92), daysAgo(400), null);
+    int seed = 0;
+    for (String[] described :
+        List.of(
+            new String[] {"docker", "qits/qits-artifacts"},
+            new String[] {"daemon", "qits-ci-daemon"})) {
+      String doomed = store(filled(100 + ++seed, (byte) seed));
+      backdate(doomed, Duration.ofDays(30));
+      sbomRow(SBOM_REPO, described[0], described[1], "2026.501.5", doomed, daysAgo(500), null);
+      for (String version : List.of("2026.601.10", "2026.701.20", "2026.801.30")) {
+        String bytes = store((described[0] + version).getBytes(StandardCharsets.UTF_8));
+        sbomRow(SBOM_REPO, described[0], described[1], version, bytes, daysAgo(300), null);
+      }
+    }
+
+    GcStrategy.Plan plan = strategy.plan(census.take(), GcPins.none());
+
+    assertEquals(
+        Set.of("docker/qits/qits-artifacts@2026.501.5", "daemon/qits-ci-daemon@2026.501.5"),
+        Set.copyOf(identities(plan.dead())));
+    assertEquals(
+        SbomGcAdapter.KEPT_ARTIFACT_PRESENT,
+        ruleFor(plan.kept(), "docker/qits/qits-artifacts@2026.601.10"));
+    assertEquals(
+        SbomGcAdapter.KEPT_ARTIFACT_PRESENT,
+        ruleFor(plan.kept(), "daemon/qits-ci-daemon@2026.601.10"));
+  }
+
+  @Test
+  void aShaDocumentIsNotKeptByItsArtifact() throws Exception {
+    // Only a calver document is a release's bill of materials; a sha document whose version
+    // happens to exist as an artifact still lives on the window alone, which at P0D is nothing.
+    repository();
+    repositoryService.ensure("npm", NpmPackagesProfile.KEY);
+    String sha = "c".repeat(40);
+    npmRow(NPM_NAME, sha);
+    String doomed = blob(95);
+    backdate(doomed, Duration.ofDays(30));
+    sbomRow(SBOM_REPO, "npm", NPM_NAME, sha, doomed, daysAgo(300), null);
+
+    GcStrategy.Plan plan = strategy.plan(census.take(), GcPins.none());
+
+    assertEquals(List.of("npm/" + NPM_NAME + "@" + sha), identities(plan.dead()));
+  }
+
+  @Test
   void aCollectedDocumentGoesThroughTheCollectionDoorAndNoOtherWay() throws Exception {
     // The delete half, driven end to end: the condemned row is gone from the store afterwards, the
     // surviving ones are untouched, and nothing here reaches past SbomRegistryCollection.
@@ -203,6 +325,59 @@ class SbomGcAdapterTest extends GcFixture {
   }
 
   // --- fixture ---------------------------------------------------------------------------------
+
+  private void mavenRow(String path) throws IOException {
+    String blobId = store(path.getBytes(StandardCharsets.UTF_8));
+    QuarkusTransaction.requiringNew()
+        .run(
+            () -> {
+              MavenArtifact row = new MavenArtifact();
+              row.repository = MAVEN_REPO;
+              row.path = path;
+              row.blobId = blobId;
+              row.sizeBytes = path.length();
+              row.createdAt = Instant.now();
+              mavenArtifacts.persist(row);
+            });
+  }
+
+  private void npmRow(String packageName, String version) throws IOException {
+    String blobId = store((packageName + version).getBytes(StandardCharsets.UTF_8));
+    QuarkusTransaction.requiringNew()
+        .run(
+            () -> {
+              NpmVersion row = new NpmVersion();
+              row.repository = "npm";
+              row.packageName = packageName;
+              row.version = version;
+              row.tarballBlobId = blobId;
+              row.manifestJson = "{}";
+              row.createdAt = Instant.now();
+              npmVersions.persist(row);
+            });
+  }
+
+  private void imageTag(String image, String tag, String digest, long size) {
+    QuarkusTransaction.requiringNew()
+        .run(
+            () -> {
+              OciManifest manifest = new OciManifest();
+              manifest.repository = "qits";
+              manifest.imageName = image;
+              manifest.digest = digest;
+              manifest.mediaType = OciMediaTypes.OCI_MANIFEST_V1;
+              manifest.size = size;
+              manifest.createdAt = Instant.now();
+              ociManifests.persist(manifest);
+              OciTag row = new OciTag();
+              row.repository = "qits";
+              row.imageName = image;
+              row.tag = tag;
+              row.manifestDigest = digest;
+              row.updatedAt = Instant.now();
+              ociTags.persist(row);
+            });
+  }
 
   private void repository() {
     repositoryService.ensure(SBOM_REPO, SbomProfile.KEY);
