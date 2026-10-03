@@ -143,11 +143,12 @@ import java.util.TreeSet;
  * {@code x}, is why: as the only release of its artifact it is a belt seed on every run, and the
  * stricter reading kept every maven identity forever.
  *
- * <h2>npm deliberately stays never-collected</h2>
+ * <h2>npm follows the same shape</h2>
  *
- * <p>{@code NpmPackagesGcAdapter} keeps every release and this change does not reach it. Its
- * consumers' lockfiles are reached through submodule gitlinks that a release tag freezes, so no pin
- * source on this platform sees an npm pin at all — there is no seed set to close over.
+ * <p>{@code NpmPackagesGcAdapter} collects releases the same way since qits-740, over {@code
+ * NpmKeepClosure}: a manifest pin — including, via qits-maintenance, a lockfile reached through a
+ * service's frontend submodule gitlink, the hole that kept npm uncollected until then — the closure
+ * over dependency ranges and SBOMs, a dist-tag, or the newest two.
  *
  * <h2>Snapshots</h2>
  *

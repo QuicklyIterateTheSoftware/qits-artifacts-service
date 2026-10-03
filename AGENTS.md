@@ -521,19 +521,18 @@ collection" section is the contract; these are the rules that get "helpfully" re
   snapshot line** — what `maven-metadata.xml` redirects `1.0.1-SNAPSHOT` to; deleting it would point
   the document at a file the store no longer has. No N-per-line rule was invented: §3.6 named the
   shape and never priced it, so the window decides.
-- **`npm-packages` DOES NOT AGE-COLLECT PUBLISHED RELEASES EITHER. Same rule, ported the same day.**
-  Withdrawn the evening of 2026-09-05, hours after maven's, when the zero-window sweep took
-  `@qits/ui-components` from eight versions to three and `@qits/angular` to two — breaking fifteen
-  frontend lockfiles and failing two services' release runs on `npm ci`. The maven reasons all
-  transfer (an install is served from `node_modules` and a warm cache, not from here; ten megabytes
-  against 28.8 GB of images) and one is sharper: **no pin source on this platform can see an npm
-  pin**, because a frontend's lockfile is not on the service's main — it is reached through a
-  SUBMODULE GITLINK a release tag freezes. Fifteen services' gitlinks name frontend commits pinning
-  five different versions of one package. The keep is `NpmPackagesGcAdapter.pinnedBy`, the
-  correction rides `NpmPackagesGcStrategy.note()`, and the window now governs **prereleases only**
-  (the per-push `-main.g<sha>` builds — npm's analogue of maven's snapshots). No whole-or-nothing
-  repair was needed: an npm identity is one row and one tarball, removed with its tombstone in one
-  transaction.
+- **`npm-packages` collects a release only when nothing kept still needs it, since 2026-10-03
+  (qits-740).** Releases were kept forever from the evening of 2026-09-05, when the zero-window sweep
+  took `@qits/ui-components` from eight versions to three and `@qits/angular` to two — breaking
+  fifteen frontend lockfiles and failing two release runs on `npm ci` — because a frontend's
+  lockfile is reached through a SUBMODULE GITLINK no pin source saw. qits-maintenance now follows
+  that gitlink and reports the lockfile as manifest pins, which is what makes collection safe again.
+  `NpmPackagesGcAdapter.pinnedBy`: manifest pin → `NpmKeepClosure` (dependencies/peer/optional
+  ranges resolved to the highest hosted match, plus exact `pkg:npm` purls in stored SBOMs; seeded
+  from pins, the newest two per package and dist-tag targets) → dist-tag → engine belt. **It fails
+  closed** like maven: an unreadable/unparseable manifest or SBOM, or an unresolvable spec on a
+  hosted package, keeps every npm identity under `failClosed`. No whole-or-nothing repair was
+  needed: an npm identity is one row and one tarball, removed with its tombstone in one transaction.
 - **A collected npm version can be RESTORED with the bytes it had.** `NpmRegistryService.publish`
   compares the incoming tarball's blob id against the tombstone's `tarball_blob_id`: equal means a
   restore (the stone is cleared in the same transaction), anything else is the 403 it always was,
@@ -568,8 +567,10 @@ collection" section is the contract; these are the rules that get "helpfully" re
   it, and its line carries `MavenKeepClosure.NOT_XML` (`eu:probe:1`, pom = `x`, otherwise froze the
   type forever as a belt seed). A partial closure must never become a deletion —
   do not "soften" that into skipping the one bad pom, which is what the 2026-09-05 closure
-  (`03f60e8`, deleted in `d3375c1`) did. npm deliberately stays never-collected: its consumers'
-  lockfiles are reached through submodule gitlinks no pin source sees, so there is no seed set.
+  (`03f60e8`, deleted in `d3375c1`) did. npm has the same shape since qits-740: `NpmKeepClosure`
+  seeded from manifest pins (lockfiles through frontend submodule gitlinks included, via
+  qits-maintenance), the newest two per package and dist-tag targets; pin → closure → dist-tag →
+  belt, and an incomplete closure keeps every npm identity under `failClosed`.
 - **A maven coordinate is removed inside ONE transaction.** `MavenRegistryService.collect` is
   `@Transactional` per *file*, so the delete loop used to commit path by path: a throw on the second
   file left the first one deleted, and since paths sort `.jar` before `.pom` the shape it leaves is a

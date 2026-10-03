@@ -4,37 +4,30 @@ import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 
 /**
- * The platform's own npm packages, live on the rule the 2026-09-05 sweep settled: <b>every
- * published release stays, whatever its age; anything a dist-tag names stays; and prereleases — the
- * per-push {@code -main.g<sha>} builds — age out at the configured window.</b>
+ * The platform's own npm packages, live on the rule qits-740 settled on 2026-10-03: <b>a release
+ * lives while a manifest pin, the closure of the kept set, a dist-tag or the newest-two belt reaches
+ * it; everything else — a release included — goes at the configured window.</b>
  *
  * <p>This class used to carry npm's whole bespoke rule. The settlement of 2026-08-05 replaced "one
  * bespoke strategy per type" with "two engines, configured per type", so the <b>rule</b> is now
  * {@link OwnArtifactsStrategy}'s, the wiring {@link OwnGcStrategy}'s, and the facts — what a release
- * is, which of two is newer, what a dist-tag holds, how a row goes — are {@link
- * NpmPackagesGcAdapter}'s.
+ * is, which of two is newer, what a dist-tag holds, what a kept version needs, how a row goes — are
+ * {@link NpmPackagesGcAdapter}'s and {@link NpmKeepClosure}'s.
  *
- * <p><b>Releases are kept forever again, and that is not the settlement being undone.</b> The
- * settlement replaced "kept forever" with a belt of two plus an access window, on the reading that
- * an older release something still installs is warm. On 2026-09-05 the windows went to {@code P0D}
- * and that reading went with them: with access deciding nothing, the belt was the whole of what
- * stood between a published tarball and a delete. The same evening's sweep took this registry down
- * to three versions of {@code @qits/ui-components} and two of {@code @qits/angular}, broke fifteen
- * frontends' lockfiles and failed two services' release runs on {@code npm ci}. What changed is the
- * input the belt was standing in for, so the rule follows it. A prerelease still dies on the window,
- * which is the half of the settlement that was always about build output. {@link
+ * <p><b>Releases were kept forever from 2026-09-05 to 2026-10-03</b>, after the zero-window sweep
+ * took this registry down to three versions of {@code @qits/ui-components} and two of {@code
+ * @qits/angular}, broke fifteen frontends' lockfiles and failed two services' release runs on
+ * {@code npm ci}. The hole was that a frontend's lockfile is reached through a service's submodule
+ * gitlink, which no pin source saw. qits-maintenance now follows that gitlink and reports the
+ * lockfile as manifest pins (qits-740), and what a pinned version installs is kept with it by the
+ * closure, so the belt is no longer the only thing between a needed tarball and a delete. {@link
  * NpmPackagesGcAdapter} carries the argument in full.
  *
  * <p><b>{@link #note()} says so on every report line</b>, because the own engine's configured
  * sentence — "always keep the last 2 released versions … delete the rest once unaccessed" — is what
- * {@code GcRules} echoes for every own type out of the configuration, and for this one it now
- * describes a belt and a window that decide nothing. A reviewer must not be able to read that line
- * without reading this one. {@code maven-packages} carries the same correction for the same reason.
- *
- * <p>The newest-main-build rule and the unmodelled-prerelease backstop both retired into the access
- * window rather than being dropped: what {@code @main} resolves to was published minutes ago and is
- * young by construction, and an {@code -rc.1} somebody made by hand is kept for as long as anything
- * installs it. What is gone is "kept because nothing else claimed it", which was never a reason.
+ * {@code GcRules} echoes for every own type out of the configuration, and it cannot show the
+ * closure, the dist-tag keep or the fail-closed rule. {@code maven-packages} carries the same
+ * correction for the same reason.
  *
  * <p><b>The tombstone stays, and it is npm's alone.</b> Version immutability is enforced by looking
  * for the row, so deleting one would re-open that version's name for a publish with different bytes
@@ -51,16 +44,16 @@ public class NpmPackagesGcStrategy extends OwnGcStrategy {
 
   /**
    * What a report says about this type ahead of anything the run found, because the configuration
-   * echo beside it describes a belt this type no longer runs.
+   * echo beside it is the own engine's belt sentence and cannot show the closure.
    */
   static final String NOTE =
-      "npm-packages does not age-collect published releases. Every release version is kept whatever"
-          + " its age and whatever its position in the version order — the configured window governs"
-          + " prereleases only (the per-push -main.g<sha> builds), and anything a dist-tag names is"
-          + " kept on top of that. Withdrawn on 2026-09-05, after the zero-window sweep took this"
-          + " registry down to three versions of @qits/ui-components, broke fifteen frontend"
-          + " lockfiles and failed two services' release runs on npm ci; see NpmPackagesGcAdapter"
-          + " for the argument.";
+      "npm-packages collects a published version only when nothing kept still needs it (qits-740)."
+          + " Kept, in order: a version a manifest on some repository's main pins — lockfiles reached"
+          + " through a service's frontend submodule gitlink included; anything the closure of the"
+          + " kept set reaches through dependencies, peerDependencies and optionalDependencies"
+          + " ranges or a stored SBOM; anything a dist-tag names; and the newest 2 releases per"
+          + " package. If the closure cannot be completed, nothing npm is collected that run. See"
+          + " NpmPackagesGcAdapter for why releases were kept forever from 2026-09-05 until then.";
 
   @Inject NpmPackagesGcAdapter packages;
 
