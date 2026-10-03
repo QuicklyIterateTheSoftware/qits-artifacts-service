@@ -101,7 +101,7 @@ class GcSweepExecutorTest extends GcFixture {
         npmVersionTombstones.findOne("npm", PKG, SUPERSEDED).isPresent(),
         "the tombstone is written, so the name can never be silently republished");
     assertFalse(blobStore.exists(supersededBlob), "the tarball file is unlinked");
-    assertTrue(blobStore.exists(releaseBlob), "a release survives, always");
+    assertTrue(blobStore.exists(releaseBlob), "the only release survives on the belt");
     assertTrue(npmVersions.findOne("npm", PKG, NEWEST).isPresent(), "and so does the fresh publish");
     assertTrue(blobStore.exists(newestBlob));
 
@@ -350,7 +350,7 @@ class GcSweepExecutorTest extends GcFixture {
     assertTrue(
         blobStore.exists(sharedBlob),
         "and content the twin still rows survives, which a whole-store run would have freed");
-    assertTrue(blobStore.exists(releaseBlob), "a release survives, always");
+    assertTrue(blobStore.exists(releaseBlob), "the only release survives on the belt");
     assertTrue(blobStore.exists(release2Blob));
   }
 

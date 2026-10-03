@@ -11,14 +11,22 @@ import eu.wohlben.qits.blobstore.persistence.ArtifactRepositoryRepository;
 import eu.wohlben.qits.artifacts.persistence.ContentHashRepository;
 import eu.wohlben.qits.artifacts.persistence.NpmDistTagRepository;
 import eu.wohlben.qits.artifacts.persistence.NpmVersionRepository;
+import eu.wohlben.qits.artifacts.entity.SbomDocument;
+import eu.wohlben.qits.artifacts.persistence.SbomDocumentRepository;
+import eu.wohlben.qits.blobstore.control.BlobStore;
+import io.quarkus.logging.Log;
 import io.quarkus.narayana.jta.QuarkusTransaction;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -33,45 +41,69 @@ import java.util.Set;
  * <p>A version with <b>no prerelease part</b>. Consumers pin ranges, so {@code ^2026.801.85149} has
  * to keep resolving — including to the pre-calver {@code 0.0.x} line.
  *
- * <h2>A published release is never collected. Not by age, not by a belt.</h2>
+ * <h2>A release lives while something kept still needs it</h2>
+ *
+ * <p>Since 2026-10-03 (qits-740) a published release is collected again, and only when nothing the
+ * keep-set holds reaches it. In order, so a receipt names the strongest reason a version has:
+ *
+ * <ol>
+ *   <li><b>A manifest pin</b> — a manifest on some repository's main resolves to the version
+ *       ({@link GcPins#pinsNpmCoordinate}). Through qits-maintenance (qits-740) that includes the
+ *       lockfiles reached through a service's <b>frontend submodule gitlink</b>, which is what
+ *       closes the hole 2026-09-05 fell through (below).
+ *   <li><b>The closure</b> — the version is reached from the seeds by {@link NpmKeepClosure}: a
+ *       {@code dependencies}, {@code peerDependencies} or {@code optionalDependencies} range of a
+ *       reached version resolves to it, or the stored SBOM of one names it. The seeds are the
+ *       manifest pins, the newest {@link OwnArtifactsStrategy#RELEASES_KEPT} releases of every
+ *       package and every dist-tag target; the walk runs to a fixpoint, and the receipt names the
+ *       version that reached it.
+ *   <li><b>A dist-tag</b> names it (below).
+ *   <li><b>The belt</b> — the newest {@link OwnArtifactsStrategy#RELEASES_KEPT} releases of every
+ *       package, kept by the engine because nothing here answers for them first.
+ * </ol>
+ *
+ * <p>Everything else — a release included — is condemned under the configured window ({@code P0D})
+ * and then withheld by the sweep's six-hour blob grace, which is what still protects a version
+ * published minutes ago whose consumer has not folded yet. If the closure cannot be completed — a
+ * reached version's manifest or SBOM unreadable or unparseable, a dependency spec on a hosted
+ * package this cannot resolve — {@link #pinnedBy} keeps <b>every</b> npm identity that run under
+ * {@link #failClosed}, naming the version and the reason on every line.
+ *
+ * <h2>2026-09-05, and how each of its reasons is answered now</h2>
  *
  * <p>Releases used to be kept as the last two per package, with older ones surviving on
  * <em>use</em>: a lockfile install moves {@code npm_version.accessed_at}. On <b>2026-09-05</b> the
  * windows went to {@code P0D} — access decides nothing at all now — and the same evening the sweep
  * took {@code @qits/ui-components} down to three versions and {@code @qits/angular} to two. Fifteen
- * frontend lockfiles pin one of the versions it took; the release runs of two services died on
- * {@code npm ci} with {@code E404}, and two more frontends could not cut a release at all. So this
- * type takes the exemption {@code maven-packages} took that morning, for reasons that transfer
- * exactly and one that is sharper here:
+ * frontend lockfiles pinned one of the versions it took; the release runs of two services died on
+ * {@code npm ci} with {@code E404}, and two more frontends could not cut a release at all. Releases
+ * were then kept forever, and the argument was written here. Its reasons were sound against that
+ * rule; what changed is that each now has a keep of its own rather than an age:
  *
  * <ul>
  *   <li><b>An install is not a fetch of this registry.</b> A tarball is downloaded once and served
- *       from {@code node_modules}, a warm npm cache and every baked build image thereafter. A
- *       version fifteen repositories build against can show no read here for a week; with the
- *       window at zero it shows no protection at all.
- *   <li><b>The pin sources cannot see an npm pin.</b> {@code MaintenanceDependencyPins} names what
- *       manifests on main reference, and a frontend's lockfile is not on the service's main — it is
- *       reached through a <b>submodule gitlink</b> that a release tag freezes. Fifteen services'
- *       gitlinks name frontend commits whose locks pin five different versions of this package, and
- *       no source here reports one of them.
- *   <li><b>The disk rounds to nothing.</b> The whole hosted npm repository is on the order of ten
- *       megabytes against a 29 GB store that is 28.8 GB of images. There was never a trade here.
- *   <li><b>A collection here used to be irreversible.</b> A version leaving this registry left a
- *       tombstone that refused even an identical republish, so a mistaken sweep could only be
- *       answered by editing every consumer. That refusal has since narrowed to what it protects —
- *       different bytes — but the cheaper fix is not needing the restore.
+ *       from {@code node_modules}, a warm cache and every baked build image thereafter, so access
+ *       was never evidence. It is still not: nothing here keeps a version on access. What keeps one
+ *       is being <em>named</em> — by a manifest pin, by a kept version's dependencies or SBOM, or by
+ *       a dist-tag.
+ *   <li><b>The pin sources could not see an npm pin.</b> A frontend's lockfile is not on the
+ *       service's main — it is reached through a submodule gitlink that a release tag freezes, and
+ *       fifteen services' gitlinks named frontend commits whose locks pinned five different
+ *       versions of {@code @qits/angular}. qits-maintenance now follows that gitlink and reports the
+ *       lockfile it finds as the service's own manifest pins (qits-740), so those versions arrive
+ *       here as {@link GcPins#BY_MANIFEST} like any other.
+ *   <li><b>Transitive needs.</b> A pinned version's own dependencies are kept with it through the
+ *       closure, by range and by its SBOM's exact versions, so keeping a consumer's direct pin can
+ *       never strand what that pin installs.
+ *   <li><b>A collection used to be irreversible.</b> The tombstone once refused even an identical
+ *       republish; it has since narrowed to refusing different bytes, so a mistaken sweep is
+ *       answered by republishing the same tarball rather than by editing every consumer.
  * </ul>
  *
- * <p><b>What still ages out</b> is the one class npm has that is build output rather than a
- * published coordinate: <b>prereleases</b> — the {@code -main.g<sha>} a push publishes, npm's
- * analogue of maven's timestamped snapshots. Nothing's lockfile pins one for long, {@code @main}
- * resolves to the newest by dist-tag, and the dist-tag belt below keeps whatever a live pointer
- * names. A version that does not parse as semver is not a release either and is treated the same.
- *
- * <p>{@link #byAge()} and {@link OwnArtifactsStrategy#RELEASES_KEPT} therefore decide nothing for
- * releases any more — every one is kept before the belt is consulted. The comparator stays because
- * the engine's contract asks for one, it still orders prereleases, and semver precedence is the
- * honest answer to "which of two is newer" whether or not anything currently turns on it.
+ * <p><b>Prereleases and non-semver versions</b> are not releases: they never occupy a belt slot and
+ * age out on the window unless a pin, the closure or a dist-tag names them — the {@code
+ * -main.g<sha>} a push publishes is npm's analogue of maven's timestamped snapshots, and {@code
+ * @main} resolves through a dist-tag.
  *
  * <p>Newer is <b>semver precedence</b> ({@link NpmSemver}), not a row timestamp and not insertion
  * order: {@code 2026.801.85149} outranks {@code 2026.801.63140} whichever was published first, and a
@@ -82,19 +114,19 @@ import java.util.Set;
  * narrower answer than the old unmodelled-means-keep-forever and a wider one than deleting it for
  * being unrecognised.
  *
- * <h2>The dist-tag belt</h2>
+ * <h2>The dist-tag keep</h2>
  *
- * <p>{@link #pinnedBy} keeps anything a dist-tag currently names. It is a pin in the exact sense the
- * keep-class means: a live pointer something outside this rule resolves through, and a packument
- * whose {@code dist-tags} names a version its {@code versions} does not list is a broken package to
- * every npm client. Today it changes no outcome — {@code latest} names a release and {@code main}
- * names a build published minutes ago — and that is precisely when a backstop is worth having.
+ * <p>{@link #pinnedBy} keeps anything a dist-tag currently names, and seeds the closure with it. It
+ * is a pin in the exact sense the keep-class means: a live pointer something outside this rule
+ * resolves through, and a packument whose {@code dist-tags} names a version its {@code versions}
+ * does not list is a broken package to every npm client — which is also why {@code
+ * NpmRegistryCollection.collect} refuses one.
  *
  * <h2>Scope, and the one mistake this type can make</h2>
  *
  * <p>{@code npm_version} holds hosted and proxied rows in one table, so the enumeration filters by
  * the <b>repository row's type</b>. Getting that wrong would put upstream's cached content under the
- * platform's release protection, or the platform's own packages under a cache's eviction; both
+ * platform's own keep rules, or the platform's own packages under a cache's eviction; both
  * suites assert the scope from their own side.
  *
  * <p>Deletion goes through {@code NpmRegistryCollection.collect}, which writes the republish
@@ -110,16 +142,14 @@ import java.util.Set;
 @Singleton
 public class NpmPackagesGcAdapter implements GcTypeAdapter {
 
-  /**
-   * The keep every published release gets — the rule the 2026-09-05 npm sweep bought, said in full
-   * on every line it saves so a reviewer never has to ask why nothing npm died.
-   */
-  static final String KEPT_HOSTED_RELEASE =
-      "a published release of this platform's own npm registry — hosted releases are never"
-          + " collected, at any age and at any depth in the version order. An install is served from"
-          + " node_modules and a warm cache rather than from here, a lockfile reached through a"
-          + " service's submodule gitlink is named by no pin source, and the disk it would free"
-          + " rounds to nothing beside the image store";
+  /** What every npm identity is kept under on a run whose closure could not be completed. */
+  static String failClosed(String coordinate, String reason) {
+    return "npm collects nothing this run: "
+        + coordinate
+        + ": "
+        + reason
+        + ". A partial closure is never a deletion, so every npm identity is kept";
+  }
 
   /** The belt-and-braces keep, naming the tag so a reviewer can see which pointer saved a version. */
   static String keptByDistTag(String tag) {
@@ -131,6 +161,10 @@ public class NpmPackagesGcAdapter implements GcTypeAdapter {
   @Inject NpmDistTagRepository distTags;
   @Inject NpmRegistryCollection npm;
   @Inject ContentHashRepository contentHashes;
+  @Inject SbomDocumentRepository sbomDocuments;
+
+  /** How the closure reads an SBOM's bytes; read-only, and it moves no access timestamp. */
+  @Inject BlobStore blobs;
 
   @Override
   public String type() {
@@ -164,27 +198,28 @@ public class NpmPackagesGcAdapter implements GcTypeAdapter {
   }
 
   /**
-   * Anything a lockfile on main still resolves to, and anything a dist-tag currently names.
+   * Every keep this type has, in the order the class javadoc gives: the manifest pin, the closure,
+   * and the dist-tag. The release belt is the engine's and is asked after this answers null.
    *
    * <p>The dist-tags are read once per run over the packages the enumeration touched, rather than
    * per candidate: a plan judged against two readings of {@code npm_dist_tag} could condemn a
    * version the second reading had just tagged.
    *
    * <p><b>The dependency pin needs no translation</b>, which is what makes it safe: {@code
-   * name@version} is what a package.json resolves to and it is this adapter's identity verbatim, so
-   * the lookup is an equality test on the string the enumeration already built. It is asked first
+   * name@version} is what a lockfile resolves to and it is this adapter's identity verbatim, so the
+   * lookup is an equality test on the string the enumeration already built. It is asked first
    * because a consumer still building against a version is a stronger thing to report than the
-   * release rule that would have kept it anyway.
+   * closure edge that would have kept it anyway.
    *
-   * <p><b>The release keep is expressed here rather than in the engine</b>, and that is the seam
-   * working as designed: what a release <em>is</em> has always been this adapter's fact, and so is
-   * what one is worth. {@link OwnArtifactsStrategy} still counts to two for the types that want a
-   * belt; this type answers before it is asked, so no release ever reaches the belt or the window.
-   * Nothing about the engine changes, and nothing about the other own types does.
+   * <p><b>The closure is computed once per plan</b>, here, over the enumeration the binder already
+   * took and the pins the run already read, for the reason {@code MavenPackagesGcAdapter} gives. The
+   * belt seeds are asked of {@link OwnArtifactsStrategy#lastReleasesPerGroup} rather than
+   * re-derived, so the seeds and the belt the engine applies are one answer.
    */
   @Override
   public GcPinned pinnedBy(List<GcCandidate> candidates, GcPins pins) {
     Map<String, String> tagged = new HashMap<>();
+    Map<String, Map<String, String>> tagsByPackage = new HashMap<>();
     for (String group : groupsOf(candidates)) {
       // A repository name cannot contain a slash and a scoped package name can, so the FIRST one is
       // the boundary the group was built with.
@@ -193,18 +228,118 @@ public class NpmPackagesGcAdapter implements GcTypeAdapter {
       String packageName = group.substring(slash + 1);
       for (NpmDistTag tag : distTags.listTags(repository, packageName)) {
         tagged.putIfAbsent(repository + "/" + packageName + "@" + tag.version, tag.tag);
+        tagsByPackage
+            .computeIfAbsent(packageName, name -> new HashMap<>())
+            .putIfAbsent(tag.tag, tag.version);
       }
     }
+
+    Set<String> hosted = new LinkedHashSet<>();
+    Map<String, String> repositoryOf = new HashMap<>();
+    Set<String> seeds = new LinkedHashSet<>();
+    for (GcCandidate candidate : candidates) {
+      hosted.add(candidate.identity());
+      repositoryOf.putIfAbsent(candidate.identity(), candidate.repository());
+      if (pins.pinsNpmCoordinate(candidate.identity()) != null
+          || tagged.containsKey(candidate.group() + "@" + versionOf(candidate.identity()))) {
+        seeds.add(candidate.identity());
+      }
+    }
+    for (GcCandidate belted : OwnArtifactsStrategy.lastReleasesPerGroup(candidates, this)) {
+      seeds.add(belted.identity());
+    }
+
+    NpmKeepClosure.Result closure =
+        NpmKeepClosure.from(seeds, hosted, documents(repositoryOf, tagsByPackage));
+
+    if (closure instanceof NpmKeepClosure.Incomplete incomplete) {
+      String everything = failClosed(incomplete.coordinate(), incomplete.reason());
+      Log.warnf("gc: %s", everything);
+      return candidate -> {
+        String byManifest = pins.pinsNpmCoordinate(candidate.identity());
+        return byManifest != null ? byManifest : everything;
+      };
+    }
+
+    Map<String, String> reached = ((NpmKeepClosure.Closed) closure).reached();
     return candidate -> {
       String byManifest = pins.pinsNpmCoordinate(candidate.identity());
       if (byManifest != null) {
         return byManifest;
       }
-      if (candidate.released()) {
-        return KEPT_HOSTED_RELEASE;
+      String byClosure = reached.get(candidate.identity());
+      if (byClosure != null) {
+        return byClosure;
       }
       String tag = tagged.get(candidate.group() + "@" + versionOf(candidate.identity()));
       return tag == null ? null : keptByDistTag(tag);
+    };
+  }
+
+  /**
+   * The closure's view of this store: a version's manifest as it was published, its {@code npm}
+   * SBOM in any {@code sboms} repository, and the dist-tags this run already read.
+   *
+   * <p>The manifest is the {@code npm_version.manifest_json} column — the version's {@code
+   * package.json} as it arrived at publish, {@code dependencies} and all — read by a projection
+   * query and only when the walk reaches the version, so a plan never drags every manifest through
+   * the JVM. An SBOM is read from its blob, exactly as {@code MavenPackagesGcAdapter} reads one.
+   */
+  private NpmKeepClosure.Documents documents(
+      Map<String, String> repositoryOf, Map<String, Map<String, String>> tagsByPackage) {
+    Map<String, String> sboms = new HashMap<>();
+    for (SbomDocument row : sbomDocuments.<SbomDocument>list("packageType = ?1", "npm")) {
+      sboms.putIfAbsent(row.packageName + "@" + row.version, row.blobId);
+    }
+    return new NpmKeepClosure.Documents() {
+      @Override
+      public byte[] manifest(String coordinate) throws IOException {
+        String repository = repositoryOf.get(coordinate);
+        if (repository == null) {
+          return null;
+        }
+        List<String> found =
+            versions
+                .getEntityManager()
+                .createQuery(
+                    "select v.manifestJson from NpmVersion v where v.repository = :repository"
+                        + " and v.packageName = :packageName and v.version = :version",
+                    String.class)
+                .setParameter("repository", repository)
+                .setParameter("packageName", NpmKeepClosure.packageOf(coordinate))
+                .setParameter("version", NpmKeepClosure.versionOf(coordinate))
+                .getResultList();
+        if (found.isEmpty() || found.get(0) == null) {
+          return null;
+        }
+        byte[] bytes = found.get(0).getBytes(StandardCharsets.UTF_8);
+        if (bytes.length > NpmKeepClosure.MAX_DOCUMENT_BYTES) {
+          throw new IOException(
+              "manifest is larger than " + NpmKeepClosure.MAX_DOCUMENT_BYTES + " bytes");
+        }
+        return bytes;
+      }
+
+      @Override
+      public byte[] sbom(String coordinate) throws IOException {
+        String blobId = sboms.get(coordinate);
+        if (blobId == null) {
+          return null;
+        }
+        try (InputStream bytes = blobs.open(blobId)) {
+          byte[] read = bytes.readNBytes(NpmKeepClosure.MAX_DOCUMENT_BYTES + 1);
+          if (read.length > NpmKeepClosure.MAX_DOCUMENT_BYTES) {
+            throw new IOException(
+                "blob " + blobId + " is larger than " + NpmKeepClosure.MAX_DOCUMENT_BYTES + " bytes");
+          }
+          return read;
+        }
+      }
+
+      @Override
+      public String distTag(String packageName, String tag) {
+        return tagsByPackage.getOrDefault(packageName, Map.of()).get(tag);
+      }
     };
   }
 

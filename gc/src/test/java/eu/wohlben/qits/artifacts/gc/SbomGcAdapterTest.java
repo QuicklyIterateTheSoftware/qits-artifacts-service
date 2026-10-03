@@ -160,7 +160,7 @@ class SbomGcAdapterTest extends GcFixture {
 
   @Test
   void aReleasedDocumentIsKeptWhileItsNpmVersionIsStillStored() throws Exception {
-    // The same pair for npm, which keeps every hosted release for the same reason maven does.
+    // The same pair for npm: a stored version keeps its document, whatever keeps the version.
     repository();
     repositoryService.ensure("npm", NpmPackagesProfile.KEY);
     npmRow(NPM_NAME, "2026.601.10");

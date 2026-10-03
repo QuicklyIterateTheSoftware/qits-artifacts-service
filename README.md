@@ -1243,7 +1243,7 @@ this platform. What each one condemns, in one line each — the sections below c
 | type | engine, window | identity that dies | what keeps it | liveness expression |
 |---|---|---|---|---|
 | `oci-images` | `own`, `P0D` | a sha tag, or a manifest no tag and no tagged manifest reaches | the last 2 calver releases; a coordinate qits-platform-deployments pins; an image a repository's Dockerfile references; an image qits-configuration would configure; an image qits-workspaces or qits-projects would launch today; the tag literally named `latest`; the newest release per image | manifest closure over surviving tags and manifests |
-| `npm-packages` | `own`, `P0D` — **prereleases only** | a published version, and only ever a prerelease | **every published release, at any age**; anything a dist-tag names; anything a repository's package.json still resolves to | `npm_version.tarball_blob_id` of survivors |
+| `npm-packages` | `own`, `P0D` | a published version nothing kept reaches — a release or a prerelease | anything a repository's manifest or lockfile still resolves to (frontend submodule gitlinks included); **everything the kept set reaches** through dependency ranges and stored SBOMs; anything a dist-tag names; the last 2 releases per package — and **everything**, on a run whose closure could not be completed | `npm_version.tarball_blob_id` of survivors |
 | `maven-packages` | `own`, `P0D` | a **coordinate** — one version's whole file set: a release or a superseded snapshot set nothing kept reaches | anything a repository's pom still references; **everything the kept set reaches** through stored SBOMs, parent poms, imported BOMs and (with no SBOM) pom dependencies; the last 2 releases per artifact; the newest deployable set of every snapshot line; a path this layout cannot read — and **everything**, on a run whose closure could not be completed | `maven_artifact.blob_id`, sized from the row |
 | `daemon-binaries` | `own`, `P0D` | a `daemon_binary` row | the last 2 versions; both rungs qits-ci names; a binary a coordinate some repository's manifest references **carries**; a pinned digest's bytes | `daemon_binary.blob_id`, sized from the row |
 | `docs` | `own`, `P0D` | a published **version** of a site — never a file, because `docs_file` cascades | the last 2 versions of every site | `docs_file.blob_id` of surviving versions |
@@ -1517,49 +1517,34 @@ derived here — see "Live pins, and the whole-run abort" above.
 ### `npm-packages`, on the own engine — and the tombstone only it needs
 
 `NpmPackagesGcStrategy` is a four-line bean now: the rule is `OwnArtifactsStrategy`'s, the wiring is
-`OwnGcStrategy`'s, and npm's facts are `NpmPackagesGcAdapter`'s. The rule since the evening of
-2026-09-05: **every published release stays, anything a dist-tag names stays, anything a
-repository's package.json still resolves to stays, and prereleases die on the run that finds them.**
+`OwnGcStrategy`'s, and npm's facts are `NpmPackagesGcAdapter`'s. The rule since 2026-10-03
+(qits-740): **a release lives while something kept still needs it; everything else — a release
+included — goes at `P0D` behind the six-hour blob grace.** In the order a receipt names them:
 
 | Kept because | Spelled |
 |---|---|
-| **it is a published release** | the version has **no prerelease part** — `0.0.1` through `2026.801.85149`. Every one of them, at any age and any depth in the version order. See below — this replaced the belt of two the same evening `maven-packages` lost its |
-| a pointer names it | any version a dist-tag currently names. A packument whose `dist-tags` names a version its `versions` does not list is a broken package to every npm client, so this is checked before the window rather than left to it |
-| a repository still resolves it | any `name@version` `GET /maintenance/api/pins` names in the `npm` ecosystem — the identity spelling verbatim, so the lookup is an equality test. It is what a lockfile on `main` will install the next time that consumer builds, which may be well outside the window |
-| — | there is no fourth row any more. An install used to keep a version alive for `P3D`; at `P0D` it does not, because an install moves a timestamp and a timestamp cannot say whether anything will install again. The `@main` pointer and the dependency pin say it outright, and both are above |
+| a repository still resolves it | any `name@version` `GET /maintenance/api/pins` names in the `npm` ecosystem — the identity spelling verbatim. Since qits-740 that includes the lockfile qits-maintenance reaches through a service's **frontend submodule gitlink**, which is the hole 2026-09-05 fell through |
+| the closure reaches it | `NpmKeepClosure`, seeded from the pins, the newest two releases per package and every dist-tag target, run to a fixpoint: a `dependencies`/`peerDependencies`/`optionalDependencies` range of a reached version resolved to the **highest hosted match**, or an exact `pkg:npm/…` purl in a reached version's stored SBOM. The line names the referrer — `a dependency of @qits/x@1.2.3, which is kept` |
+| a pointer names it | any version a dist-tag currently names. A packument whose `dist-tags` names a version its `versions` does not list is a broken package to every npm client |
+| the belt | the newest 2 releases per package (`OwnArtifactsStrategy`) |
 
-**No published release is age-collected. Withdrawn 2026-09-05, hours after the maven one and for
-the same reasons plus a sharper one.** The settlement priced releases as a belt of two with an
-access window under it; when the windows went to `P0D` that afternoon, the belt became the whole of
-what stood between a published tarball and a delete. The sweep that evening took
-`@qits/ui-components` from eight versions to **three** and `@qits/angular` to **two**. Fifteen
-frontend `package-lock.json` files pin `@qits/ui-components@2026.904.202810`, which it took; two
-services' release runs died on `npm ci` with `E404`, and two more frontends could not cut a release
-at all. Why the rule went rather than the number:
+**Fail closed.** A reached version whose manifest or SBOM cannot be read or parsed, or a dependency
+spec on a hosted package the closure cannot resolve (`file:`, a git URL, an unknown tag), keeps
+**every** npm identity that run under `npm collects nothing this run: <coord>: <reason>`.
 
-- **An install is not a fetch of this registry.** A tarball is downloaded once and served from
-  `node_modules`, a warm npm cache and every baked build image after that. Age here measures cache
-  warmth, not need — and at `P0D` it measures nothing at all.
-- **No pin source can see an npm pin.** `MaintenanceDependencyPins` reads manifests on `main`, and a
-  frontend's lockfile is not on the service's `main`: it is reached through a **submodule gitlink**
-  that a release tag freezes. Fifteen services' gitlinks name frontend commits pinning five
-  different versions of this package, and nothing reports one of them.
-- **The disk rounds to nothing.** The whole hosted npm registry is on the order of ten megabytes
-  against a 29 GB store that is 28.8 GB of images.
-- **It used to be irreversible.** A collected version left a tombstone that refused even an
-  identical republish. That refusal has since narrowed to what it actually protects — different
-  bytes — but not needing the restore is the cheaper fix.
+**2026-09-05, and how its reasons are answered now.** When the windows went to `P0D` that afternoon
+the belt of two became the whole of what stood between a published tarball and a delete; the sweep
+that evening took `@qits/ui-components` from eight versions to three and `@qits/angular` to two,
+broke fifteen frontend lockfiles and failed two services' release runs on `npm ci`. Releases were
+then kept forever. Access was never evidence (an install is served from `node_modules` and a warm
+cache) and still keeps nothing; what keeps a version is being **named**. The lockfiles no pin source
+could see are now pins (qits-740, through the gitlink), and what a pinned version installs is kept
+with it through the closure. A collected version can be restored by republishing the same bytes.
 
-**What still ages out** is npm's build output: **prereleases**, the per-push `-main.g<sha>` builds,
-which are the analogue of the timestamped snapshots `maven-packages` still collects. Nothing's
-lockfile pins one for long and `@main` resolves to the newest by dist-tag. A version that does not
-parse as semver is never a release either (it cannot be ordered), and a pointer is what saves one: a
-dist-tag, or the dependency pin.
-
-`NpmPackagesGcAdapter.pinnedBy` answers the release keep, so no release reaches the belt or the
-window and `OwnArtifactsStrategy` is untouched; `NpmPackagesGcStrategy.note()` carries the
-correction onto every report line, because the configuration echo beside it is the own engine's
-sentence and still describes the belt.
+Prereleases (`-main.g<sha>`) and non-semver versions are not releases: no belt slot, gone at the
+window unless a pin, the closure or a dist-tag names them. `NpmPackagesGcStrategy.note()` carries
+the rule onto every report line, because the configuration echo beside it is the own engine's
+sentence and cannot show the closure.
 
 **No whole-or-nothing repair was needed here.** The half-collected version `maven-packages` had to
 be fixed that morning cannot occur: an npm identity is one row naming one tarball, and `collect`
@@ -1665,9 +1650,10 @@ reasons that incident gave are each answered by a keep now:
 - **Branches** are not a keep-class: owner ruling 2026-10-03, branches rebase onto main.
 
 A coordinate with no SBOM falls back to its pom's non-test dependencies. And the closure **fails
-closed**: if it cannot be completed, nothing maven is collected that run. npm stays
-never-collected, deliberately — its consumers' lockfiles are reached through submodule gitlinks no pin
-source sees.
+closed**: if it cannot be completed, nothing maven is collected that run. npm follows
+the same shape since qits-740 (`NpmKeepClosure`: manifest pins — including lockfiles qits-maintenance
+reaches through a service's frontend submodule gitlink — dependency ranges and SBOM purls of kept
+versions, dist-tags, and the newest two), failing closed the same way.
 
 `MavenPackagesGcAdapter.pinnedBy` answers the pin and the closure; the belt is
 `OwnArtifactsStrategy`'s. `MavenPackagesGcStrategy.note()` names the closure and the fail-closed rule
