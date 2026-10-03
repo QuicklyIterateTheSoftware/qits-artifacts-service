@@ -33,8 +33,8 @@ import org.junit.jupiter.api.Test;
  * dependencies nobody pins, parent poms and BOMs no SBOM lists, consumers that have not bumped — are
  * each a case here: {@code aVersionNamedOnlyInAKeptCoordinatesSbomIsKept…}, {@code
  * theParentPomOfAKeptCoordinateIsKept…} and {@code anImportScopedBom…}, and {@code
- * aVersionSomeRepositorysPomStillReferences…}. {@code anUnreadablePomOfAReachedCoordinate…} is the
- * fail-closed rule: a closure this adapter could not finish is never the keep-set a deletion runs
+ * aVersionSomeRepositorysPomStillReferences…}. {@code aPomWhoseBytesCannotBeRead…} is the
+ * fail-closed rule, and {@code aPomThatIsNotXml…} its one exception: a closure this adapter could not finish is never the keep-set a deletion runs
  * against.
  *
  * <p>The two cases that carry the type's structural promises are unchanged — {@code
@@ -269,17 +269,39 @@ class MavenPackagesGcAdapterTest extends GcFixture {
   }
 
   @Test
-  void anUnreadablePomOfAReachedCoordinateCondemnsNothingMavenThatRun() throws Exception {
-    // Fail closed. The same store as the belt case, one superseded snapshot set beside it — and the
-    // pom of a belt release is not XML. The closure cannot say what that coordinate's parent is, so
-    // it cannot say what is safe to delete: nothing is condemned, releases and the snapshot alike,
-    // and every line names the coordinate and the reason.
+  void aPomThatIsNotXmlIsADeadEndAndEverythingElseIsStillCollected() throws Exception {
+    // The leftover publish probe: eu:probe:1's pom is the byte "x". Maven cannot resolve through
+    // it, so it hides nothing anyone builds against. It is the only release of its artifact, so the
+    // belt keeps it — with the note on its line — and the run collects as it otherwise would.
     maven();
     for (String version : List.of("1.0.0", "2.0.0", "3.0.0")) {
       release(version, "pom", 0, daysAgo(400));
     }
+    String probe = GROUP_ID + ":qits-probe:1";
     rowBytes(
-        releasePath("3.1.0", "pom"), "not a pom".getBytes(StandardCharsets.UTF_8), daysAgo(400));
+        "eu/wohlben/qits/qits-probe/1/qits-probe-1.pom",
+        "x".getBytes(StandardCharsets.UTF_8),
+        daysAgo(400));
+
+    GcStrategy.Plan plan = strategy.plan(census.take(), GcPins.none());
+
+    assertEquals(List.of(COORDINATE + "1.0.0"), identities(plan.dead()));
+    assertEquals(
+        OwnArtifactsStrategy.KEPT_RELEASE + "; " + MavenKeepClosure.NOT_XML,
+        ruleFor(plan.kept(), probe));
+    assertEquals(OwnArtifactsStrategy.KEPT_RELEASE, ruleFor(plan.kept(), COORDINATE + "3.0.0"));
+  }
+
+  @Test
+  void aPomWhoseBytesCannotBeReadCondemnsNothingMavenThatRun() throws Exception {
+    // Fail closed. The same store, one superseded snapshot set beside it — and the newest release's
+    // pom row names a blob that is not there. Nothing says what that pom names, so nothing says
+    // what is safe to delete: nothing is condemned, and every line names the coordinate and why.
+    maven();
+    for (String version : List.of("1.0.0", "2.0.0", "3.0.0")) {
+      release(version, "pom", 0, daysAgo(400));
+    }
+    missingBlobRow(releasePath("3.1.0", "pom"), daysAgo(400));
     snapshot("4.0.0", "20260601.101010", 1, "pom", 0, daysAgo(400));
     snapshot("4.0.0", "20260802.123456", 2, "pom", 0, daysAgo(400));
 
@@ -289,7 +311,7 @@ class MavenPackagesGcAdapterTest extends GcFixture {
     String rule = ruleFor(plan.kept(), COORDINATE + "1.0.0");
     assertTrue(rule.startsWith("maven collects nothing this run"), rule);
     assertTrue(rule.contains(COORDINATE + "3.1.0"), "names the coordinate: " + rule);
-    assertTrue(rule.contains("does not parse"), "and the reason: " + rule);
+    assertTrue(rule.contains("could not be read"), "and the reason: " + rule);
     assertEquals(rule, ruleFor(plan.kept(), COORDINATE + "4.0.0-20260601.101010-1"));
     assertEquals(
         MavenPackagesGcAdapter.KEPT_RESOLVABLE_SNAPSHOT,
@@ -695,6 +717,21 @@ class MavenPackagesGcAdapterTest extends GcFixture {
       return rowBytes(path, pomXml("<!-- " + path + " -->"), createdAt, accessedAt);
     }
     return rowBytes(path, filled(size, (byte) (size % 251)), createdAt, accessedAt);
+  }
+
+  /** A pom row whose blob was never stored — bytes that cannot be read, on demand. */
+  private void missingBlobRow(String path, Instant createdAt) {
+    QuarkusTransaction.requiringNew()
+        .run(
+            () -> {
+              MavenArtifact artifact = new MavenArtifact();
+              artifact.repository = MAVEN_REPO;
+              artifact.path = path;
+              artifact.blobId = "0".repeat(64);
+              artifact.sizeBytes = 1;
+              artifact.createdAt = createdAt;
+              mavenArtifacts.persist(artifact);
+            });
   }
 
   private String rowBytes(String path, byte[] bytes, Instant createdAt) throws IOException {

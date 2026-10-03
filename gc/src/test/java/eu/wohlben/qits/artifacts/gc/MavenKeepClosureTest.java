@@ -265,15 +265,24 @@ class MavenKeepClosureTest {
   }
 
   @Test
-  void anUnparseableParentIsIncompleteAtTheParent() {
-    hosted("app:1.0.0", "parent:1.0.0");
+  void aParentThatIsNotXmlIsReachedAsADeadEndButCannotSupplyAVersion() {
+    hosted("app:1.0.0", "parent:1.0.0", "lib:1.0.0");
     pom("app:1.0.0", parent("parent", "1.0.0"));
     poms.put(c("parent:1.0.0"), "x".getBytes(StandardCharsets.UTF_8));
 
-    MavenKeepClosure.Incomplete incomplete = incomplete(Set.of(c("app:1.0.0")));
+    MavenKeepClosure.Closed closed =
+        assertInstanceOf(MavenKeepClosure.Closed.class, walk(Set.of(c("app:1.0.0"))));
+    assertEquals(
+        Map.of(c("parent:1.0.0"), MavenKeepClosure.PARENT_OF + c("app:1.0.0")), closed.reached());
+    assertEquals(Set.of(c("parent:1.0.0")), closed.deadEnds());
 
-    assertEquals(c("parent:1.0.0"), incomplete.coordinate());
-    assertTrue(incomplete.reason().contains("does not parse"), incomplete.reason());
+    // A hosted dependency whose version only that parent could have managed is still unknown.
+    pom(
+        "app:1.0.0",
+        parent("parent", "1.0.0")
+            + "<dependencies><dependency><groupId>" + G + "</groupId><artifactId>lib</artifactId>"
+            + "</dependency></dependencies>");
+    assertTrue(incomplete(Set.of(c("app:1.0.0"))).reason().contains("cannot resolve"));
   }
 
   // --- fail closed -------------------------------------------------------------------------------
@@ -292,12 +301,26 @@ class MavenKeepClosureTest {
   }
 
   @Test
-  void aPomThatIsNotXmlAndACoordinateWithNoPomAreBothIncomplete() {
-    hosted("app:1.0.0");
-    poms.put(c("app:1.0.0"), "not a pom".getBytes(StandardCharsets.UTF_8));
-    assertTrue(incomplete(Set.of(c("app:1.0.0"))).reason().contains("does not parse"));
+  void aPomThatIsNotXmlIsADeadEndThatFollowsNothingAndFailsNothing() {
+    // eu:probe:1's shape: the pom is the byte "x". Maven cannot resolve through it, so nothing it
+    // would name — not even its SBOM's components — is anybody's build input.
+    hosted("probe:1", "lib:1.0.0", "app:1.0.0");
+    poms.put(c("probe:1"), "x".getBytes(StandardCharsets.UTF_8));
+    sbom("probe:1", purl("lib", "1.0.0"));
+    pom("app:1.0.0", "");
 
-    poms.clear();
+    MavenKeepClosure.Closed closed =
+        assertInstanceOf(
+            MavenKeepClosure.Closed.class, walk(Set.of(c("probe:1"), c("app:1.0.0"))));
+
+    assertEquals(Map.of(), closed.reached());
+    assertEquals(Set.of(c("probe:1")), closed.deadEnds());
+  }
+
+  @Test
+  void aReachedCoordinateWithNoPomRowIsIncomplete() {
+    hosted("app:1.0.0");
+
     assertTrue(incomplete(Set.of(c("app:1.0.0"))).reason().contains("no pom"));
   }
 

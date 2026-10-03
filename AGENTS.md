@@ -562,7 +562,11 @@ collection" section is the contract; these are the rules that get "helpfully" re
   engine's belt of 2 answers after. **It fails closed**: a reached coordinate whose pom (or a pom
   it inherits from) or SBOM is missing, unreadable or unparseable, or a version on a reference this
   store hosts that no stored pom resolves (`${…}`, range, nothing manages it), makes `pinnedBy` keep EVERY maven identity that run under `failClosed(coordinate, reason)`,
-  so the receipt says why maven collected nothing. A partial closure must never become a deletion —
+  so the receipt says why maven collected nothing. **One exception (orchestrator ruling
+  2026-10-03): a pom whose bytes were read and are not XML is a dead end, not a gap** — maven
+  cannot resolve through it, so it stays kept by whatever keeps it, the walk follows nothing from
+  it, and its line carries `MavenKeepClosure.NOT_XML` (`eu:probe:1`, pom = `x`, otherwise froze the
+  type forever as a belt seed). A partial closure must never become a deletion —
   do not "soften" that into skipping the one bad pom, which is what the 2026-09-05 closure
   (`03f60e8`, deleted in `d3375c1`) did. npm deliberately stays never-collected: its consumers'
   lockfiles are reached through submodule gitlinks no pin source sees, so there is no seed set.

@@ -1645,7 +1645,7 @@ lives or dies together:
 | among the last 2 releases of its artifact | the own engine's belt, by maven's version order |
 | a resolver would break without it | **the newest deployable set of every snapshot version line**: the newest timestamped set if the line has any, else the literal `-SNAPSHOT` set. `maven-metadata.xml` is computed from the surviving rows at read time, so deleting that one would point the document at a file the store no longer has — the single failure this type must not produce |
 | this layout cannot read its path | a row that is not `<group>/<artifact>/<version>/<file>` is its own identity under its own path spelling, so the adapter cannot say which coordinate it is half of. It is not collected |
-| **the closure could not be completed** | a reached coordinate's pom or SBOM missing, unreadable or unparseable, or an unresolvable version on a reference this store hosts: **every** maven identity is kept that run, each naming the coordinate and the reason. A partial closure is never a deletion |
+| **the closure could not be completed** | a reached coordinate's pom or SBOM missing or unreadable, an SBOM that does not parse, or an unresolvable version on a reference this store hosts: **every** maven identity is kept that run, each naming the coordinate and the reason. A partial closure is never a deletion. A pom that was read and is not XML is the exception: a dead end the walk follows nothing from, kept by whatever keeps it, with a note on its line |
 | — | there is no further keep. A resolve used to keep a coordinate alive — the **newest** `max(created_at, accessed_at)` across its files — and at `P0D` it keeps nothing at all |
 
 **Releases are collected again since 2026-10-03 (qits-739), by closure rather than by age.** This

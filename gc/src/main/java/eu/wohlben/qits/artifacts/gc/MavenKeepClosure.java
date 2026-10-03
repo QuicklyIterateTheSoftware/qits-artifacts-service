@@ -72,12 +72,23 @@ import org.xml.sax.SAXParseException;
  * <p>The closure is a keep-set, so an incomplete one is a deletion of whatever the missing part
  * would have named. Every way of not knowing therefore stops the walk and answers {@link
  * Incomplete} instead of a smaller map: a reached coordinate with no pom, a pom (its own or one it
- * inherits from) or a document that cannot be read or parsed, and a version that stays unresolved
+ * inherits from) or a document whose bytes cannot be read, an SBOM that does not parse, and a
+ * version that stays unresolved
  * on a reference whose {@code groupId:artifactId} this store holds — a {@code ${property}} no
  * stored pom in the chain defines, a range, or a dependency nothing manages. An unresolvable version
  * on a reference this store does not host cannot name anything here, so it is not a gap. The caller
  * turns {@link Incomplete} into "keep everything", which is the only honest answer to a closure it
  * could not finish.
+ *
+ * <p><b>A pom whose bytes were read and are not XML is a dead end, not a gap.</b> Maven cannot
+ * resolve such a coordinate itself, so nothing builds through it and nothing it would name is a
+ * build input anyone relies on: there is nothing missing to be unsure about. The coordinate stays
+ * kept by whatever kept it, the walk follows no edge from it (its SBOM included), and {@link
+ * Closed#deadEnds} carries it so the receipt says so ({@link #NOT_XML}). The live case was {@code
+ * eu:probe:1}, a leftover publish probe whose pom is the byte {@code x} — under the stricter rule
+ * it was a belt release on every run, and kept the whole type uncollected for good. As a parent or
+ * an imported BOM it contributes no inherited value, so a version that needed one stays unresolved
+ * and fails closed as above.
  *
  * <h2>Bounds</h2>
  *
@@ -120,10 +131,15 @@ final class MavenKeepClosure {
   sealed interface Result permits Closed, Incomplete {}
 
   /**
-   * Every hosted coordinate an edge reached, mapped to the rule naming the first edge that did. A
-   * seed appears only if some other coordinate's edge reached it too.
+   * Every hosted coordinate an edge reached, mapped to the rule naming the first edge that did — a
+   * seed appears only if some other coordinate's edge reached it too — and the reached coordinates
+   * whose pom is not XML, which the walk kept but followed nothing from.
    */
-  record Closed(Map<String, String> reached) implements Result {}
+  record Closed(Map<String, String> reached, Set<String> deadEnds) implements Result {}
+
+  /** What a dead end's receipt line adds to the rule that kept it. */
+  static final String NOT_XML =
+      "pom is not XML — maven cannot resolve through it, so the closure follows nothing from it";
 
   /** The walk stopped at {@code coordinate} for {@code reason}; nothing it found may be trusted. */
   record Incomplete(String coordinate, String reason) implements Result {}
@@ -166,6 +182,7 @@ final class MavenKeepClosure {
     private final Documents documents;
     private final Map<String, Pom> poms = new HashMap<>();
     private final Map<String, Model> models = new HashMap<>();
+    private final Set<String> deadEnds = new TreeSet<>();
 
     private Walk(Set<String> hosted, Documents documents) {
       this.hosted = hosted;
@@ -208,13 +225,19 @@ final class MavenKeepClosure {
           }
         }
       }
-      return new Closed(Map.copyOf(reached));
+      return new Closed(Map.copyOf(reached), Set.copyOf(deadEnds));
     }
 
     /** One coordinate's outgoing edges. */
     private List<Edge> edgesOf(String coordinate) throws Gap {
       List<Edge> edges = new ArrayList<>();
       Model model = model(coordinate, 0);
+      if (model == null) {
+        // A pom that was read and is not XML: maven cannot resolve this coordinate, so nothing
+        // builds through it and nothing it would name is anybody's build input.
+        deadEnds.add(coordinate);
+        return edges;
+      }
       byte[] sbomBytes;
       try {
         sbomBytes = documents.sbom(coordinate);
@@ -308,7 +331,9 @@ final class MavenKeepClosure {
         }
         String bom = coordinateOfImport(model, imported);
         if (bom != null) {
-          String version = managedVersion(model(bom, depth + 1), groupId, artifactId, depth + 1);
+          Model bomModel = model(bom, depth + 1);
+          String version =
+              bomModel == null ? null : managedVersion(bomModel, groupId, artifactId, depth + 1);
           if (version != null) {
             return version;
           }
@@ -331,7 +356,8 @@ final class MavenKeepClosure {
 
     /**
      * The effective model of a stored coordinate's pom: its properties and managed entries with the
-     * hosted parent chain's underneath, and its parent's coordinate.
+     * hosted parent chain's underneath, and its parent's coordinate. Null when the pom is not XML: a
+     * parent or BOM like that contributes nothing, and a version that needed it stays unresolved.
      */
     private Model model(String coordinate, int depth) throws Gap {
       Model known = models.get(coordinate);
@@ -342,6 +368,9 @@ final class MavenKeepClosure {
         throw new Gap(coordinate, "its parent chain is deeper than " + MAX_CHAIN_DEPTH);
       }
       Pom pom = pom(coordinate);
+      if (pom == null) {
+        return null;
+      }
 
       // The parent's own coordinates are read with the pom's literal values only, as maven reads
       // them: a parent's version cannot come from properties the parent itself would supply.
@@ -385,11 +414,14 @@ final class MavenKeepClosure {
       return model;
     }
 
-    /** One stored coordinate's parsed pom; missing, unreadable and unparseable are all a gap. */
+    /**
+     * One stored coordinate's parsed pom, or null when its bytes were read and are not XML. Missing
+     * and unreadable are a gap: those say nothing about what the pom names, where bytes that are
+     * not a pom say that it names nothing maven could use.
+     */
     private Pom pom(String coordinate) throws Gap {
-      Pom known = poms.get(coordinate);
-      if (known != null) {
-        return known;
+      if (poms.containsKey(coordinate)) {
+        return poms.get(coordinate);
       }
       byte[] bytes;
       try {
@@ -403,9 +435,6 @@ final class MavenKeepClosure {
             "it has no pom in this store, so its parent and imported BOMs cannot be followed");
       }
       Pom pom = Pom.parse(bytes);
-      if (pom == null) {
-        throw new Gap(coordinate, "its pom does not parse as XML");
-      }
       poms.put(coordinate, pom);
       return pom;
     }

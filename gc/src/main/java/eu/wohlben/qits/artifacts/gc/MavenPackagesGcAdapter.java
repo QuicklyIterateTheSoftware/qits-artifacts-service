@@ -23,6 +23,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -124,8 +125,8 @@ import java.util.TreeSet;
  * <h2>Fail closed</h2>
  *
  * <p>The closure is a keep-set, so a partial one is a deletion of whatever the missing part would
- * have named. If any reached coordinate's pom or SBOM (or a pom it inherits from) cannot be read or
- * parsed, if a reached coordinate has no pom at all, or if a version on a reference this store hosts
+ * have named. If any reached coordinate's pom or SBOM (or a pom it inherits from) cannot be read, if
+ * an SBOM does not parse, if a reached coordinate has no pom at all, or if a version on a reference this store hosts
  * cannot be resolved (a {@code ${…}} no stored pom in its chain defines, a range, a dependency
  * nothing manages), {@link
  * #pinnedBy} keeps <b>every</b> maven identity that run under {@link #failClosed} — a rule string
@@ -133,6 +134,14 @@ import java.util.TreeSet;
  * collected nothing rather than leaving an empty dead list to be read as a finding. The type still
  * plans, and the other types are untouched: the failure is this type's fact, and refusing the plan
  * instead would read as an engine error rather than as the deliberate keep it is.
+ *
+ * <p><b>A pom that was read and is not XML is the exception, and a dead end rather than a gap</b>
+ * (orchestrator ruling, 2026-10-03). Maven itself cannot resolve such a coordinate, so nothing builds
+ * through it and it has no dependencies anyone relies on — nothing is unknown. It stays kept by
+ * whatever keeps it, the closure follows nothing from it, and its receipt line says so ({@link
+ * MavenKeepClosure#NOT_XML}). {@code eu:probe:1}, a leftover publish probe whose pom is the byte
+ * {@code x}, is why: as the only release of its artifact it is a belt seed on every run, and the
+ * stricter reading kept every maven identity forever.
  *
  * <h2>npm deliberately stays never-collected</h2>
  *
@@ -287,22 +296,44 @@ public class MavenPackagesGcAdapter implements GcTypeAdapter {
       };
     }
 
-    Map<String, String> reached = ((MavenKeepClosure.Closed) closure).reached();
+    MavenKeepClosure.Closed closed = (MavenKeepClosure.Closed) closure;
+    Map<String, String> reached = closed.reached();
+    Set<String> beltIdentities = new HashSet<>();
+    for (GcCandidate belted : OwnArtifactsStrategy.lastReleasesPerGroup(candidates, this)) {
+      beltIdentities.add(belted.identity());
+    }
+    GcPinned keeps =
+        candidate -> {
+          String byManifest = pins.pinsMavenCoordinate(candidate.identity());
+          if (byManifest != null) {
+            return byManifest;
+          }
+          String byClosure = reached.get(candidate.identity());
+          if (byClosure != null) {
+            return byClosure;
+          }
+          if (unreadable(candidate)) {
+            return KEPT_UNREADABLE_PATH;
+          }
+          return candidate.identity().equals(newestPerLine.get(candidate.group()))
+              ? KEPT_RESOLVABLE_SNAPSHOT
+              : null;
+        };
+    if (closed.deadEnds().isEmpty()) {
+      return keeps;
+    }
+    // A dead end is always kept by something — it was reached, or it is a seed — and its line
+    // carries the note. A belt seed is spelled with the belt's own sentence, because the engine
+    // would only have said that much and the note has to ride on the line that keeps it.
     return candidate -> {
-      String byManifest = pins.pinsMavenCoordinate(candidate.identity());
-      if (byManifest != null) {
-        return byManifest;
+      String rule = keeps.pinnedBy(candidate);
+      if (!closed.deadEnds().contains(candidate.identity())) {
+        return rule;
       }
-      String byClosure = reached.get(candidate.identity());
-      if (byClosure != null) {
-        return byClosure;
+      if (rule == null && beltIdentities.contains(candidate.identity())) {
+        rule = OwnArtifactsStrategy.KEPT_RELEASE;
       }
-      if (unreadable(candidate)) {
-        return KEPT_UNREADABLE_PATH;
-      }
-      return candidate.identity().equals(newestPerLine.get(candidate.group()))
-          ? KEPT_RESOLVABLE_SNAPSHOT
-          : null;
+      return rule == null ? null : rule + "; " + MavenKeepClosure.NOT_XML;
     };
   }
 
