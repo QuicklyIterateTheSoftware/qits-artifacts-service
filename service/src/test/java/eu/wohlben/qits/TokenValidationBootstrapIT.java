@@ -75,7 +75,7 @@ public class TokenValidationBootstrapIT {
    */
   public static class PackagedWithMockIdp implements QuarkusTestProfile {
 
-    /** The shipped {@code qits.auth.machine.audience} — deliberately NOT overridden. */
+    /** The shipped {@code qits.auth.machine.platform-audience} — deliberately NOT overridden. */
     static final String AUDIENCE = "qits-platform";
 
     @Override

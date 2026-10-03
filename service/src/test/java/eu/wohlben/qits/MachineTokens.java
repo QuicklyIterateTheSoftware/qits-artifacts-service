@@ -42,7 +42,7 @@ public final class MachineTokens {
 
   /**
    * The one platform audience — the {@code aud} every machine token carries, and {@code
-   * qits.auth.machine.audience}.
+   * qits.auth.machine.platform-audience}.
    */
   public static final String AUDIENCE = "qits-platform";
 

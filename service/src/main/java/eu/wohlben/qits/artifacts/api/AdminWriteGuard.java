@@ -12,8 +12,8 @@ import java.util.Set;
  * a machine token from qits-platform-idp. This is a pure system API (docs/epics/qits-artifacts/);
  * its callers are CI processes and platform services, never a browser session.
  *
- * <p>{@link MachineAuth#require()} is the whole check, and {@code qits.auth.machine.audience} is
- * {@code qits-platform}, the one audience every machine token carries, so it reads as "a validated
+ * <p>{@link MachineAuth#require()} is the whole check, and {@code qits.auth.machine.platform-audience}
+ * is {@code qits-platform}, the one audience every machine token carries, so it reads as "a validated
  * bearer this platform minted". No claim is inspected: nothing under this API belongs to one
  * project, and a token that reaches here at all was issued to a client qits-platform-idp trusts
  * with the blob store.
