@@ -103,7 +103,7 @@
              with, which is the half TokenValidationBootstrapIT's far-side edge label needs: a
              method and a path say the keys were asked for, the status says they were served. -->
         <qits.service-mock.version>2026.1002.70617</qits.service-mock.version>
-        <qits.maven.repository.url>http://registry.dev.localhost:8080/artifacts/maven/maven</qits.maven.repository.url>
+        <qits.maven.repository.url>https://registry.qits.wohlben.eu/artifacts/maven/maven</qits.maven.repository.url>
         <maven.compiler.release>25</maven.compiler.release>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>

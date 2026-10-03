@@ -723,9 +723,9 @@ precisely because it is harness plumbing and not a step in anybody's story.
   `userflows-base` (Maven + baked Chromium + skopeo, `user: pwuser` for zonky's initdb, the
   step-image contract since qits-build-images-oci 2026.828.162434) — one step because step
   containers share no workspace (each clones for itself), so the SPA bundle must be built in the
-  same container that packages it: the lockfile origin swap runs in the script and Quinoa's managed
-  node (the pinned 22.22.0) does the real `npm ci` + build with `npm_config_*` registries from the
-  environment. The 120s settle-hold it used to open with is gone: no QA run deploys anything, so
+  same container that packages it: the lockfile is installed exactly as committed, and Quinoa's
+  managed node (the pinned 22.22.0) does the real `npm ci` + build with `npm_config_*` registries
+  from the environment. The 120s settle-hold it used to open with is gone: no QA run deploys anything, so
   there is no container swap to wait out. It publishes the reports as the
   `@userflows/qits-artifacts` docs site, version = the fold's merged sha, and it **gates like every
   other step**: a red story is a red verdict for the whole fold. A run carries ONE verdict, never
