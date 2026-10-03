@@ -171,6 +171,15 @@ class GcTypeConfigTest extends GcFixture {
         OTHER_ARTIFACT + "/2.0.0/qits-other-2.0.0.jar",
         store(filled(70, (byte) 70)),
         daysAgo(380));
+    // Each with its pom, which the maven closure reads for every coordinate it keeps (qits-739):
+    // a kept coordinate with no pom would keep the whole type for the run instead.
+    for (String version : List.of("1.0.0", "1.1.0", "2.0.0")) {
+      mavenRow(
+          OTHER_ARTIFACT + "/" + version + "/qits-other-" + version + ".pom",
+          store(("<project><!-- qits-other " + version + " --></project>").getBytes(
+              java.nio.charset.StandardCharsets.UTF_8)),
+          daysAgo(380));
+    }
 
     GcPlanReport report = planner.plan(census.take(), planner.registered(), GcPins.none());
 
@@ -213,28 +222,23 @@ class GcTypeConfigTest extends GcFixture {
     assertEquals(
         List.of("@qits/thing@1.0.0", "@qits/thing@1.1.0"), kept.get(RepositoryTypeProfile.wireNameOf(NpmPackagesProfile.KEY)));
     assertEquals(
-        List.of(),
+        List.of("eu.wohlben.qits:qits-other:1.0.0"),
         dead.get(RepositoryTypeProfile.wireNameOf(MavenPackagesProfile.KEY)),
-        "maven-packages condemns NOTHING here since 2026-09-05: qits-other:1.0.0 is a published"
-            + " release a year cold and three deep, which is exactly the identity the access rule"
-            + " deleted 67 of on the night it ran");
+        "maven-packages collects releases again since 2026-10-03 (qits-739): qits-other:1.0.0 is"
+            + " below the belt, unpinned, and named by no kept coordinate's SBOM or pom");
     assertEquals(
         List.of(
             "eu.wohlben.qits:qits-eventstream:1.0.0",
-            "eu.wohlben.qits:qits-other:1.0.0",
             "eu.wohlben.qits:qits-other:1.1.0",
             "eu.wohlben.qits:qits-other:2.0.0"),
         kept.get(RepositoryTypeProfile.wireNameOf(MavenPackagesProfile.KEY)),
-        "the jar and pom of the fixture's release are one identity, and every release stays");
-    // And the correction travels with the echo. The configuration echo for this type is the OWN
-    // ENGINE's sentence — "keep the last 2 released versions … delete the rest once unaccessed for
-    // longer than P3D" — which for maven now describes a belt and a window that decide nothing. A
-    // reviewer must not be able to read that line without reading this one, so it rides the type's
-    // own note on every plan and every sweep receipt.
+        "the jar and pom of the fixture's release are one identity, and the belt keeps two");
+    // The echo's belt sentence is true for maven again; the type's own note adds what it cannot
+    // show — the closure in front of the belt and the fail-closed rule behind it.
     assertEquals(
         MavenPackagesGcStrategy.NOTE,
         typePlan(report, MavenPackagesProfile.KEY).note(),
-        "the type's own line has to say the echo beside it no longer holds");
+        "the type's own line names the closure and the fail-closed rule");
 
     // The two nobody collects — excluded by the settlement, and still saying so.
     for (String type : List.of(CiScreenshotsProfile.KEY, CiVideosProfile.KEY)) {
@@ -254,15 +258,18 @@ class GcTypeConfigTest extends GcFixture {
 
     // The blob half of the same comparison, and it is where both halves of this reconciliation show
     // up in one list. The cold daemon binary and the cold published tarball are released by the zero
-    // window. The cold JAR IS NOT, and that absence is the hotfix: its coordinate is a published
-    // release, so no window reaches it and its bytes stay. What the zero window adds is the doomed
+    // window, and since qits-739 so is the cold JAR: its coordinate is a release below the belt that
+    // nothing kept reaches. Its pom was stored this second, so that blob is still inside the grace
+    // period and only the jar shows here (and at execution the young pom withholds the coordinate
+    // whole, as GcSweepExecutorTest proves). What the zero window adds is the doomed
     // manifest's own layer, which the dead v2 tag released and nothing surviving names; the image's
     // other blobs stay, because the release tag reaches the kept manifest and the shared layer is an
     // npm tarball besides. This figure is the DRY RUN's, which runs one run ahead of the store for
     // OCI by design — the manifest rows the dead tags leave behind still hold their bytes until the
     // next run makes them candidates.
     assertEquals(
-        List.of(coldDaemon, coldTarball, store.layerDoomed(), store.manifestDoomed()).stream()
+        List.of(coldDaemon, coldTarball, coldJar, store.layerDoomed(), store.manifestDoomed())
+            .stream()
             .sorted()
             .toList(),
         report.sweep().blobIds());

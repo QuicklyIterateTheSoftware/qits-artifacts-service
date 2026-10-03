@@ -65,8 +65,10 @@ import java.util.regex.Pattern;
  *
  * <p>{@link #pinnedBy} keeps a calver document while the artifact it describes is still present in
  * this store — the maven coordinate, the npm version, the image tag, the daemon version — under
- * {@link #KEPT_ARTIFACT_PRESENT}. The maven and npm adapters keep every hosted release forever, so
- * without this rule the belt and a {@code P0D} window left jars whose bill of materials answered
+ * {@link #KEPT_ARTIFACT_PRESENT}. The npm adapter keeps every hosted release forever, and the maven
+ * adapter keeps whatever its closure reaches — a closure it reads out of these very documents, so a
+ * kept jar's SBOM is an input to the rule as well as a statement about the jar. Without this rule
+ * the belt and a {@code P0D} window left jars whose bill of materials answered
  * {@code 404}: {@code eu.wohlben.qits:qits-service-mock:2026.917.65806} was published with one on
  * 2026-09-17 and had lost it a few releases later. An SBOM is a statement about an artifact; one
  * that outlives its subject and one that dies before it are both wrong, and the second was

@@ -1205,7 +1205,7 @@ one.
 **All six windows went to `P0D` on 2026-09-05**, from `P3D` the day before and `P30D`/`P90D` before
 that, and zero is a different kind of number than the two that preceded it: **retention IS the
 keep-set now.** An identity lives because something names it — a pin source, a belt, or on
-`maven-packages` the fact that it is a published release — and not because somebody pulled it
+`maven-packages` the closure of what is kept — and not because somebody pulled it
 lately. The window was the last place where "in use"
 was *inferred* from a timestamp, and a timestamp is the one input here nobody owns: a container
 running untouched for months pulls its sha on restart, and a library nothing has resolved this week
@@ -1230,8 +1230,9 @@ build on the platform stopped resolving with `Could not find artifact … in qit
 pin coverage was not narrowed — the dependency source answered, with 114 pins across 96 repositories
 — it was simply never wide enough to be a floor: it names what **main's manifests directly
 reference**, and a build resolves branches, parent poms, transitive versions and every coordinate
-main pinned before its last bump. So `maven-packages` no longer age-collects published releases at
-all; its window governs superseded snapshot sets and nothing else. The reasoning is in
+main pinned before its last bump. So `maven-packages` stopped collecting published releases at
+all — until 2026-10-03 (qits-739), when the missing floor was built instead: a release now goes only
+when no pin, no belt and nothing the kept set's SBOMs and poms name reaches it. The reasoning is in
 `MavenPackagesGcAdapter`'s javadoc and in the section on that type below. The other five windows
 stand: an image, a tarball, a daemon binary, a docs site and an SBOM are each consumed by being
 fetched, which is the property a jar does not have.
@@ -1243,7 +1244,7 @@ this platform. What each one condemns, in one line each — the sections below c
 |---|---|---|---|---|
 | `oci-images` | `own`, `P0D` | a sha tag, or a manifest no tag and no tagged manifest reaches | the last 2 calver releases; a coordinate qits-platform-deployments pins; an image a repository's Dockerfile references; an image qits-configuration would configure; an image qits-workspaces or qits-projects would launch today; the tag literally named `latest`; the newest release per image | manifest closure over surviving tags and manifests |
 | `npm-packages` | `own`, `P0D` — **prereleases only** | a published version, and only ever a prerelease | **every published release, at any age**; anything a dist-tag names; anything a repository's package.json still resolves to | `npm_version.tarball_blob_id` of survivors |
-| `maven-packages` | `own`, `P0D` — **snapshots only** | a **coordinate** — one version's whole file set, and only ever a superseded timestamped snapshot set | **every published release, at any age and whatever the window says**; anything a repository's pom still references; the newest deployable set of every snapshot line; a path this layout cannot read | `maven_artifact.blob_id`, sized from the row |
+| `maven-packages` | `own`, `P0D` | a **coordinate** — one version's whole file set: a release or a superseded snapshot set nothing kept reaches | anything a repository's pom still references; **everything the kept set reaches** through stored SBOMs, parent poms, imported BOMs and (with no SBOM) pom dependencies; the last 2 releases per artifact; the newest deployable set of every snapshot line; a path this layout cannot read — and **everything**, on a run whose closure could not be completed | `maven_artifact.blob_id`, sized from the row |
 | `daemon-binaries` | `own`, `P0D` | a `daemon_binary` row | the last 2 versions; both rungs qits-ci names; a binary a coordinate some repository's manifest references **carries**; a pinned digest's bytes | `daemon_binary.blob_id`, sized from the row |
 | `docs` | `own`, `P0D` | a published **version** of a site — never a file, because `docs_file` cascades | the last 2 versions of every site | `docs_file.blob_id` of surviving versions |
 | `sboms` | `own`, `P0D` | one stored document, `packageType/packageName@version` | the last 2 released documents of every package | `sbom_document.blob_id`, sized from the row |
@@ -1639,33 +1640,39 @@ lives or dies together:
 
 | Kept because | Spelled |
 |---|---|
-| **it is a published release** | every release version, at any age and at any depth in the version order. See below — this replaced the belt of two on 2026-09-05 |
-| a repository's pom still references it | `groupId:artifactId:version` from `MaintenanceDependencyPins`, joined verbatim. Belt and braces for a release; the only non-structural keep a **snapshot** has |
+| a repository's pom still references it | `groupId:artifactId:version` from `MaintenanceDependencyPins`, joined verbatim. Asked first, so the receipt names the repository |
+| **something kept needs it to resolve** | `MavenKeepClosure`, seeded from the pins, the belt and the snapshot sets below and run to a fixpoint: every hosted coordinate a reached coordinate's stored **SBOM** names; its **parent pom** and **import-scoped BOMs**, always; its non-test **pom dependencies**, only when it has no SBOM. The rule names the referrer |
+| among the last 2 releases of its artifact | the own engine's belt, by maven's version order |
 | a resolver would break without it | **the newest deployable set of every snapshot version line**: the newest timestamped set if the line has any, else the literal `-SNAPSHOT` set. `maven-metadata.xml` is computed from the surviving rows at read time, so deleting that one would point the document at a file the store no longer has — the single failure this type must not produce |
 | this layout cannot read its path | a row that is not `<group>/<artifact>/<version>/<file>` is its own identity under its own path spelling, so the adapter cannot say which coordinate it is half of. It is not collected |
-| — | there is no fifth keep. A resolve used to keep a coordinate alive — the **newest** `max(created_at, accessed_at)` across its files, one warm file keeping the set — and at `P0D` it keeps nothing at all. For a release that changes nothing, because the release rule answers first; for a **superseded snapshot set** it means the set goes on the run that finds it |
+| **the closure could not be completed** | a reached coordinate's pom or SBOM missing, unreadable or unparseable, or an unresolvable version on a reference this store hosts: **every** maven identity is kept that run, each naming the coordinate and the reason. A partial closure is never a deletion |
+| — | there is no further keep. A resolve used to keep a coordinate alive — the **newest** `max(created_at, accessed_at)` across its files — and at `P0D` it keeps nothing at all |
 
-**No published release is age-collected. Withdrawn 2026-09-05, after it broke the platform.** This
-type was priced like the other three own types: a belt of two releases per artifact, everything older
-surviving on access inside the window. At `01:58Z` on 2026-09-05, with the window at `P3D`, that rule
-deleted **67 published `eu.wohlben.qits` coordinates** in one run — every one of them under
-"superseded and unaccessed for longer than P3D" — and every gating build on the platform stopped
-resolving. The argument for withdrawing rather than retuning, in short:
+**Releases are collected again since 2026-10-03 (qits-739), by closure rather than by age.** This
+type was once priced like the other own types: a belt of two releases per artifact, everything
+older surviving on access inside the window. At `01:58Z` on 2026-09-05, with the window at `P3D`,
+that rule deleted **67 published `eu.wohlben.qits` coordinates** in one run and every gating build on
+the platform stopped resolving; from then until 2026-10-03 no release was collected at all. The
+reasons that incident gave are each answered by a keep now:
 
-- **For a library, access was never consumption.** A jar is fetched once and answered out of a
-  hundred local `~/.m2` caches thereafter. Age on a maven row measures cache warmth, not need.
-- **A pin cannot be the floor.** `MaintenanceDependencyPins` names what main's manifests reference —
-  13 coordinates on the morning of the incident, against hundreds held that branches, parent poms and
-  unbumped consumers still resolve. And it is one service's reachability away from empty.
-- **The disk is not here.** Measured that morning: 29.4 GB of store, 28.8 GB of it images. The whole
-  hosted maven repository rounds to nothing beside that; the 67 coordinates freed a few megabytes.
-- **The registry is the artifact of record.** Nothing else holds these bytes and a release path is
-  immutable, so a collection here is not reclaimable space, it is the loss of a build input.
+- **Transitive dependencies** — main's manifest pins named 13 coordinates that morning against
+  hundreds a build resolved. Every release now publishes a CycloneDX SBOM into this store, and an
+  SBOM is transitive: the closure keeps every hosted coordinate a kept coordinate's document names.
+- **Parent poms and imported BOMs**, which no SBOM lists — the closure follows the stored pom's
+  `<parent>` and `import`-scoped managed dependencies. `qits-githost-events` → `qits-githost` is the
+  live case.
+- **Unbumped consumers** — the manifest pins, unchanged.
+- **Branches** are not a keep-class: owner ruling 2026-10-03, branches rebase onto main.
 
-`MavenPackagesGcAdapter.pinnedBy` answers the release keep, so no release ever reaches the belt or
-the window; `OwnArtifactsStrategy` is untouched and the other three own types keep their belt.
-`MavenPackagesGcStrategy.note()` carries the correction onto every report line, because the
-configuration echo beside it is the own engine's sentence and still describes the belt.
+A coordinate with no SBOM falls back to its pom's non-test dependencies. And the closure **fails
+closed**: if it cannot be completed, nothing maven is collected that run. npm stays
+never-collected, deliberately — its consumers' lockfiles are reached through submodule gitlinks no pin
+source sees.
+
+`MavenPackagesGcAdapter.pinnedBy` answers the pin and the closure; the belt is
+`OwnArtifactsStrategy`'s. `MavenPackagesGcStrategy.note()` names the closure and the fail-closed rule
+on every report line, because the configuration echo beside it is the own engine's belt sentence and
+cannot show either.
 
 **Where this is deliberately conservative.** `maven-repository-plan.md` §3.6 sketched "keep the
 newest N timestamped builds per snapshot version" and never settled N or priced the deletion, so no N

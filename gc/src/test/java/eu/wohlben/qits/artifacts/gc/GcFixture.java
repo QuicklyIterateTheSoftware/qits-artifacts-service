@@ -301,7 +301,9 @@ abstract class GcFixture {
   MavenStore seedMaven() throws IOException {
     repositoryService.ensure(MAVEN_REPO, MavenPackagesProfile.KEY);
     String jar = store(filled(MAVEN_JAR, (byte) 8));
-    String pom = store(filled(MAVEN_POM, (byte) 10));
+    // A real pom, still MAVEN_POM bytes long: the maven adapter's closure parses the pom of every
+    // coordinate it keeps, and one that does not parse keeps the whole type for the run.
+    String pom = store(mavenPomBytes());
     QuarkusTransaction.requiringNew()
         .run(
             () -> {
@@ -312,6 +314,14 @@ abstract class GcFixture {
       backdate(blobId, Duration.ofDays(30));
     }
     return new MavenStore(jar, pom);
+  }
+
+  /** {@code <project/>} padded with newlines to exactly {@link #MAVEN_POM} bytes. */
+  static byte[] mavenPomBytes() {
+    byte[] bytes = filled(MAVEN_POM, (byte) 10);
+    byte[] root = "<project/>".getBytes(StandardCharsets.UTF_8);
+    System.arraycopy(root, 0, bytes, 0, root.length);
+    return bytes;
   }
 
   static final String DAEMON_REPO = "daemons";

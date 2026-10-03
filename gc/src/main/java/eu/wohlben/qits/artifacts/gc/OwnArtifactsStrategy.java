@@ -149,8 +149,11 @@ public final class OwnArtifactsStrategy {
    * releases than the belt simply keeps all of them — the honest answer for a package that has
    * published once.
    *
+   * <p>Package-visible for one caller, {@code MavenPackagesGcAdapter}, whose closure is seeded from
+   * this belt: asking here rather than re-deriving it is what keeps the adapter from carrying a
+   * keep-count of its own, and keeps the seeds and the belt one answer rather than two that agree.
    */
-  private static Set<GcCandidate> lastReleasesPerGroup(
+  static Set<GcCandidate> lastReleasesPerGroup(
       List<GcCandidate> candidates, GcTypeAdapter adapter) {
     Map<String, List<GcCandidate>> releasesByGroup = new LinkedHashMap<>();
     for (GcCandidate candidate : candidates) {
