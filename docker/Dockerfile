@@ -122,16 +122,13 @@ COPY . .
 # platform's Quinoa recipe (docs/project-setup-quinoa-angular.md in the qits monorepo, which has the
 # builder run the client's real install and build):
 #
-#   service/src/main/webui is qits-spa-artifacts, and it depends on @qits/ui-components.
-#   That package exists ONLY on the platform's own npm registry — which is THIS SERVICE, and that
-#   changes nothing about the problem: a RUN step in a docker build reaches the public internet
-#   (Maven Central, npmjs.org, nodejs.org) and can reach the platform registry by NO address, not
-#   the qits-net alias, not registry.dev.localhost:8080, not host.docker.internal. Being the
-#   registry does not give the build a route to it; the running container is on qits-net and this
-#   stage is not. So the install cannot happen here — it hangs on the registry.dev.localhost:8080
-#   the submodule's own .npmrc names and then dies on npm's `Exit handler never called!`, which
-#   says nothing about why — and an install that "worked" here would have resolved the @qits scope
-#   against npmjs.org, where that name does not exist and never will.
+#   service/src/main/webui is qits-spa-artifacts, and it depends on @qits/ui-components. That
+#   package exists ONLY on the platform's own npm registry — which is THIS SERVICE, and that
+#   changes nothing about the problem: the registry is a public host now, registry.qits.$QITS_DOMAIN,
+#   reachable from a RUN step like any other address — but it answers 401 without a credential, and
+#   this stage is handed only the Maven one (see the ARG below). An install that "worked" here
+#   without it would have resolved the @qits scope against npmjs.org, where that name does not exist
+#   and never will.
 #
 # The bundle is therefore built BEFORE this image, by the pipeline step in
 # .config/qits/ci-post-receive.yml, which runs on qits-net where the registry answers, and arrives in
@@ -156,22 +153,26 @@ COPY . .
 #
 # One `cp` re-materialises it in the layer that is about to move it. It has to be in THIS `RUN` and
 # not a tidier one of its own — a layer boundary is exactly what it is undoing.
-ARG QITS_MAVEN_REPOSITORY_URL=http://registry.dev.localhost:8080/artifacts/maven/maven
-ENV QITS_MAVEN_REPOSITORY_URL=$QITS_MAVEN_REPOSITORY_URL
+# --- and where the two qits jars and Maven Central come from --------------------------------------
+# Both platform hosts are code plus one input, the public domain:
 #
-# --- and where Maven Central is mirrored, when it is ----------------------------------------------
-# The pipeline passes the platform's pull-through (qits-platform-mirror's central proxy, the same
-# authority the FROM lines above pull through); EMPTY — the default — means direct Maven Central.
-# `.qits-maven-settings.xml` activates its central-proxy profile only on a non-empty value, so a
-# bootstrap or hand build that passes nothing resolves exactly as it always did.
-ARG QITS_MAVEN_CENTRAL_URL=
-ENV QITS_MAVEN_CENTRAL_URL=$QITS_MAVEN_CENTRAL_URL
+#   https://registry.qits.$QITS_DOMAIN/artifacts/maven/maven   hosted Maven (qits-artifacts, this
+#                                                                service — but an image build cannot
+#                                                                reach itself; see the Quinoa comment
+#                                                                above)
+#   https://mirror.qits.$QITS_DOMAIN/mirror/maven/central      Maven Central cache (qits-mirror)
 #
-# --- and how Maven authenticates, once the registry stops answering anonymously -------------------
+# The RUN below derives both and exports them for that RUN alone; `.qits-maven-settings.xml` reads
+# them as ${env.…}, mirroring the `qits-maven` repository id onto the first and Central onto the
+# second. The CI recipe passes QITS_DOMAIN; the default is the live platform's.
+ARG QITS_DOMAIN=wohlben.eu
+#
+# --- and how Maven authenticates ------------------------------------------------------------------
+# Both hosts answer 401 anonymously, so every build that resolves through them needs a credential.
 # The two secret mounts put the CI run's commissioned client into THIS `RUN`'s environment and
 # nowhere else — not a layer, not the image history. That is the whole reason they are not build
 # args: this image is pullable, and a build arg is recorded where anyone who pulls it can read it.
-# `.qits-maven-settings.xml` reads the two variables as the `qits-maven-network` server.
+# `.qits-maven-settings.xml` presents them as the username and password of both mirrors.
 #
 # FILE FORM, NOT `env=`. The mounts are bare (`/run/secrets/<id>`, read into the command's own
 # environment by the `cat`s below) rather than the `env=` mount form they used to be. `env=` needs a
@@ -179,13 +180,15 @@ ENV QITS_MAVEN_CENTRAL_URL=$QITS_MAVEN_CENTRAL_URL
 # BUILDER's to pick, not this file's; the bare file mount is served identically by every frontend
 # version. See qits-buildkit-plan.md in the wrapper.
 #
-# Absent secrets leave both variables EMPTY — the `|| true` is every hand build's state — which
-# `.qits-maven-settings.xml` reads exactly as it read unset: Maven sends credentials only when a
-# repository answers 401, and the registry does not yet.
+# Absent secrets leave both variables empty — the `|| true` — so a hand build without them still
+# starts, and fails at the first 401 with Maven naming the host. Pass your own client to build by
+# hand: `--secret id=qits-client-id,env=… --secret id=qits-client-secret,env=…`.
 RUN --mount=type=secret,id=qits-client-id \
     --mount=type=secret,id=qits-client-secret \
     export QITS_MAVEN_AUTH_USR="$(cat /run/secrets/qits-client-id 2>/dev/null || true)"; \
     export QITS_MAVEN_AUTH_PSW="$(cat /run/secrets/qits-client-secret 2>/dev/null || true)"; \
+    export QITS_MAVEN_REPOSITORY_URL="https://registry.qits.$QITS_DOMAIN/artifacts/maven/maven"; \
+    export QITS_MAVEN_CENTRAL_URL="https://mirror.qits.$QITS_DOMAIN/mirror/maven/central"; \
     d=service/src/main/webui/dist/qits-spa-artifacts/browser; \
     test -f "$d/index.html" || { \
       echo "No built client at $d." >&2; \

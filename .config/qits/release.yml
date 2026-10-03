@@ -26,9 +26,14 @@ release-request:
           fi
         done
       fi
-      npm_hosted_origin=$(node -p 'new URL(process.env.QITS_NPM_REGISTRY_URL).origin')
-      npm_proxy_origin=$(node -p 'new URL(process.env.QITS_NPM_PROXY_URL).origin')
-      npm_hosted_path=$(node -p 'new URL(process.env.QITS_NPM_REGISTRY_URL).pathname')
+      # THE ADDRESSES ARE CODE (qits-731): the platform's public domain is the one input, and the
+      # hosts and paths below are constants — registry.qits.<domain> serves the hosted @qits scope,
+      # mirror.qits.<domain> the npmjs cache. `wohlben.eu` covers a qits-ci too old to inject
+      # $QITS_DOMAIN, which is what runs this file while the qits-ci that does is being released.
+      qits_domain=${QITS_DOMAIN:-wohlben.eu}
+      npm_hosted_origin="https://registry.qits.$qits_domain"
+      npm_proxy_origin="https://mirror.qits.$qits_domain"
+      npm_hosted_path=/artifacts/npm/npm/
       for dir in $webui_dirs; do
         (
           cd "$dir"
@@ -38,16 +43,17 @@ release-request:
               -e "s#(\"resolved\": \")https?://[^/\"]+($npm_hosted_path)#\1$npm_hosted_origin\2#" \
               package-lock.json
           fi
-          env npm_config_registry="$QITS_NPM_PROXY_URL" \
-              "npm_config_@qits:registry=$QITS_NPM_REGISTRY_URL" \
+          env npm_config_registry="$npm_proxy_origin/npm/npmjs/" \
+              "npm_config_@qits:registry=$npm_hosted_origin$npm_hosted_path" \
               npm ci --no-audit --no-fund
           npm run build
         )
       done
       buildctl build --frontend dockerfile.v0 \
         --local context=. --local dockerfile=docker \
-        --opt build-arg:QITS_MAVEN_REPOSITORY_URL="$QITS_MAVEN_REGISTRY_URL" \
-        --opt build-arg:QITS_MAVEN_CENTRAL_URL="${QITS_MAVEN_PROXY_URL:-}" \
+        --opt build-arg:QITS_DOMAIN="$qits_domain" \
+        --opt build-arg:QITS_MAVEN_REPOSITORY_URL="https://registry.qits.$qits_domain/artifacts/maven/maven" \
+        --opt build-arg:QITS_MAVEN_CENTRAL_URL="https://mirror.qits.$qits_domain/mirror/maven/central" \
         --secret id=qits-client-id,src=/tmp/qits-client-id \
         --secret id=qits-client-secret,src=/tmp/qits-client-secret
 
@@ -64,6 +70,13 @@ release-request:
     timeout-seconds: 3600
     script: |
       origin_parent="${QITS_CI_REPOSITORY_URL%/*}"
+      # THE ADDRESSES ARE CODE (qits-731): the platform's public domain is the one input, and the
+      # hosts and paths below are constants. `wohlben.eu` covers a qits-ci too old to inject
+      # $QITS_DOMAIN.
+      qits_domain=${QITS_DOMAIN:-wohlben.eu}
+      npm_hosted_origin="https://registry.qits.$qits_domain"
+      npm_proxy_origin="https://mirror.qits.$qits_domain"
+      npm_hosted_path=/artifacts/npm/npm/
       if [ -f .gitmodules ]; then
         for key in $(git config -f .gitmodules --name-only --get-regexp '^submodule\..*\.path$'); do
           name=${key#submodule.}
@@ -71,9 +84,6 @@ release-request:
           path=$(git config -f .gitmodules --get "$key")
           git -c "submodule.$name.url=$origin_parent/$name" submodule update --init "$path"
           if [ -f "$path/package-lock.json" ]; then
-            npm_hosted_origin=$(echo "$QITS_NPM_REGISTRY_URL" | sed -E 's#^(https?://[^/]+).*#\1#')
-            npm_proxy_origin=$(echo "$QITS_NPM_PROXY_URL" | sed -E 's#^(https?://[^/]+).*#\1#')
-            npm_hosted_path=$(echo "$QITS_NPM_REGISTRY_URL" | sed -E 's#^https?://[^/]+##')
             sed -i -E \
               -e "s#(\"resolved\": \")https?://[^/\"]+#\1$npm_proxy_origin#" \
               -e "s#(\"resolved\": \")https?://[^/\"]+($npm_hosted_path)#\1$npm_hosted_origin\2#" \
@@ -81,10 +91,14 @@ release-request:
           fi
         done
       fi
-      export npm_config_registry="$QITS_NPM_PROXY_URL"
-      export QITS_MAVEN_REPOSITORY_URL="$QITS_MAVEN_REGISTRY_URL"
-      export QITS_MAVEN_CENTRAL_URL="${QITS_MAVEN_PROXY_URL:-}"
-      env "npm_config_@qits:registry=$QITS_NPM_REGISTRY_URL" \
+      export npm_config_registry="$npm_proxy_origin/npm/npmjs/"
+      # The platform registry: the poms' default names a host-published address unreachable from a
+      # step container, and the exact-id mirror in .qits-maven-settings.xml is what passes Maven's
+      # HTTP blocker. Central rides the mirror. Both are code under the platform's public domain
+      # (qits-731); `wohlben.eu` covers a qits-ci too old to inject $QITS_DOMAIN.
+      export QITS_MAVEN_REPOSITORY_URL="https://registry.qits.$qits_domain/artifacts/maven/maven"
+      export QITS_MAVEN_CENTRAL_URL="https://mirror.qits.$qits_domain/mirror/maven/central"
+      env "npm_config_@qits:registry=$npm_hosted_origin$npm_hosted_path" \
         ./mvnw -B -ntp -s .qits-maven-settings.xml verify \
         -Dqits.maven.repository.url="$QITS_MAVEN_REPOSITORY_URL" \
         -Dquarkus.quinoa.package-manager-install=true \
@@ -115,7 +129,7 @@ release-request:
         -H "X-Artifacts-Meta-git.branch.name: $QITS_CI_BRANCH" \
         -H "X-Artifacts-Meta-git.commit.hash: $QITS_CI_SHA" \
         -H "X-Artifacts-Meta-git.repository.name: qits-artifacts" \
-        "$QITS_DOCS_URL/@userflows/qits-artifacts/-/$QITS_CI_SHA")
+        "https://registry.qits.$qits_domain/artifacts/docs/docs/@userflows/qits-artifacts/-/$QITS_CI_SHA")
       case "$status" in
         201) echo "published userflows for qits-artifacts@$QITS_CI_SHA ($QITS_CI_BRANCH)" ;;
         409) echo "userflows for qits-artifacts@$QITS_CI_SHA are already published — skipping" ;;
