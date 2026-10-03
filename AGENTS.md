@@ -451,14 +451,14 @@ collection" section is the contract; these are the rules that get "helpfully" re
   since 2026-09-05, down from `P3D`/`P2D` the day before and `P30D`/`P90D`/`P7D` before that. The
   windows are in the `gc` jar's config, the grace period in the `artifacts` jar's.
   **Zero is not "collect harder", it is the statement that RETENTION IS THE KEEP-SET**: an identity
-  lives because a pin source or a belt names it, and access — the one input here nobody owns —
+  lives because a pin source, a belt or a closure names it, and access — the one input here nobody owns —
   decides nothing. It is safe because per-push CI is retired: every QA build resolves the octopus
   FOLD with current main, and main's manifests are what the maintenance dependency pins name, so a
   branch's build resolves the keep-set by construction. The one branch that can miss hand-pins an
   internal version three releases stale, which fails loudly and is re-bumped in a commit.
-  **`maven-packages` is where the window decides least, and that was bought at the price of an
-  outage**: since 2026-09-05 no published release is age-collected at any window, so zero reaches
-  only superseded snapshot sets there. See the bullet below.
+  **`maven-packages` reaches zero only through its closure**: from 2026-09-05 to 2026-10-03 no
+  published release was collected at all, and since qits-739 a release goes only when no pin, no
+  belt and nothing the kept set's SBOMs and poms name reaches it. See the bullet below.
   **The grace period is the only clock left and it is race safety, not retention**: it gates
   identity rows as well as blob unlinks, so bytes pushed minutes ago — an image racing its
   deployment row, a lib racing its consumer's fold — are immune whole for six hours while their pin
@@ -517,7 +517,7 @@ collection" section is the contract; these are the rules that get "helpfully" re
 - **`maven-packages`' identity is a COORDINATE, not a row.** A version is a set of files, and half
   a version is a broken resolve, so `MavenPackagesGcAdapter` folds rows into
   `groupId:artifactId:version` (timestamped snapshots into their own resolvable coordinate) and the
-  grace window withholds the whole set. Its one derived belt is **the newest deployable set of every
+  grace window withholds the whole set. Its structural snapshot belt is **the newest deployable set of every
   snapshot line** — what `maven-metadata.xml` redirects `1.0.1-SNAPSHOT` to; deleting it would point
   the document at a file the store no longer has. No N-per-line rule was invented: §3.6 named the
   shape and never priced it, so the window decides.
@@ -543,18 +543,33 @@ collection" section is the contract; these are the rules that get "helpfully" re
   source tag reproduces the published tarball byte for byte, measured on tag `2026.904.202810` of
   `@qits/ui-components` against the integrity fifteen lockfiles carry. Shipped in
   qits-registries-javalib `2026.905.211257`.
-- **`maven-packages` DOES NOT AGE-COLLECT PUBLISHED RELEASES. Do not put the belt back.** Withdrawn
-  2026-09-05 after the `P3D` access rule deleted 67 published `eu.wohlben.qits` coordinates at
-  `01:58Z` and every gating build on the platform stopped resolving. The three reasons, so this is
-  not re-derived the next time the store looks large: a jar is fetched **once** and answered out of
-  local `~/.m2` caches forever after, so age here measures cache warmth rather than need; the
-  dependency pin names what main's manifests **directly** reference (13 coordinates against hundreds
-  held) and is a floor under nothing; and the whole hosted maven repository rounds to nothing beside
-  28.8 GB of images, so the trade was a platform-wide outage for a few megabytes. The keep is
-  answered in `MavenPackagesGcAdapter.pinnedBy` — the adapter's own facts, so `OwnArtifactsStrategy`
-  and the other three own types are untouched — and `MavenPackagesGcStrategy.note()` carries the
-  correction onto every report line, because the configuration echo is the engine's sentence and
-  still describes a belt. The window governs **superseded timestamped snapshot sets only**.
+- **`maven-packages` collects a release only when nothing kept still needs it — by SBOM closure,
+  since 2026-10-03 (qits-739, owner decision).** From 2026-09-05 to then no release was collected at
+  all, after the `P3D` access rule deleted 67 published `eu.wohlben.qits` coordinates at `01:58Z` and
+  every gating build on the platform stopped resolving. That incident's three reasons are each
+  answered by a keep now, never by an age: **transitive dependencies** by the stored CycloneDX SBOM
+  of every reached coordinate (transitive by construction; `SbomGcAdapter` keeps a document while its
+  artifact is stored); **parent poms and imported BOMs**, which no SBOM lists, by following the
+  stored `.pom`'s `<parent>` and `import`-scoped managed dependencies (`qits-githost-events` →
+  `qits-githost` is the live case); **unbumped consumers** by the manifest pins, unchanged. A
+  coordinate with **no SBOM** falls back to its pom's non-test `<dependencies>` — never a reason to
+  delete — with versions read from the pom's effective model (properties and `dependencyManagement`
+  inherited through stored parents and imported BOMs, maven's precedence): most stored poms predate
+  qits-620's flattening, and a literal-only reading failed closed on the live store. **Branches are not a keep-class** (owner ruling 2026-10-03: they rebase onto main). The
+  order in `MavenPackagesGcAdapter.pinnedBy` is manifest pin → closure (`MavenKeepClosure`, seeded
+  from the pins, the engine's own `lastReleasesPerGroup` belt and the snapshot belt, run to a
+  fixpoint over coordinates present in this store) → unreadable path → newest snapshot set; the
+  engine's belt of 2 answers after. **It fails closed**: a reached coordinate whose pom (or a pom
+  it inherits from) or SBOM is missing, unreadable or unparseable, or a version on a reference this
+  store hosts that no stored pom resolves (`${…}`, range, nothing manages it), makes `pinnedBy` keep EVERY maven identity that run under `failClosed(coordinate, reason)`,
+  so the receipt says why maven collected nothing. **One exception (orchestrator ruling
+  2026-10-03): a pom whose bytes were read and are not XML is a dead end, not a gap** — maven
+  cannot resolve through it, so it stays kept by whatever keeps it, the walk follows nothing from
+  it, and its line carries `MavenKeepClosure.NOT_XML` (`eu:probe:1`, pom = `x`, otherwise froze the
+  type forever as a belt seed). A partial closure must never become a deletion —
+  do not "soften" that into skipping the one bad pom, which is what the 2026-09-05 closure
+  (`03f60e8`, deleted in `d3375c1`) did. npm deliberately stays never-collected: its consumers'
+  lockfiles are reached through submodule gitlinks no pin source sees, so there is no seed set.
 - **A maven coordinate is removed inside ONE transaction.** `MavenRegistryService.collect` is
   `@Transactional` per *file*, so the delete loop used to commit path by path: a throw on the second
   file left the first one deleted, and since paths sort `.jar` before `.pom` the shape it leaves is a
