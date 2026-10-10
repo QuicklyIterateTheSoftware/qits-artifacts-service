@@ -31,7 +31,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.function.Supplier;
-import java.util.zip.GZIPOutputStream;
+import java.util.zip.CRC32;
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
 import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
 
@@ -478,12 +478,12 @@ public class ProviderStates {
 
   /**
    * A {@code .tar.gz} of the files, byte-stable: fixed entry order, mtime, owner and mode, and a
-   * gzip header with no time — so the recorded request body is the same on every run.
+   * gzip written by {@link #storedGzip} — so the recorded request body is the same on every run and
+   * on every machine.
    */
   static byte[] tarGz(Map<String, String> files) {
     ByteArrayOutputStream out = new ByteArrayOutputStream();
-    try (GZIPOutputStream gzip = new GZIPOutputStream(out);
-        TarArchiveOutputStream tar = new TarArchiveOutputStream(gzip)) {
+    try (TarArchiveOutputStream tar = new TarArchiveOutputStream(out)) {
       for (Map.Entry<String, String> file : new TreeMap<>(files).entrySet()) {
         byte[] content = file.getValue().getBytes(StandardCharsets.UTF_8);
         TarArchiveEntry entry = new TarArchiveEntry(file.getKey(), true);
@@ -501,7 +501,41 @@ public class ProviderStates {
     } catch (IOException e) {
       throw new IllegalStateException("could not build the bundle", e);
     }
+    return storedGzip(out.toByteArray());
+  }
+
+  /**
+   * A gzip of the bytes with stored (uncompressed) deflate blocks. {@code GZIPOutputStream} is not
+   * byte-stable: its deflate stream depends on the JVM's zlib build, and the CI image's differs
+   * from a workstation's. Stored blocks have one encoding only.
+   */
+  static byte[] storedGzip(byte[] data) {
+    ByteArrayOutputStream out = new ByteArrayOutputStream();
+    // magic, deflate, no flags, no mtime, no extra flags, OS unknown
+    out.writeBytes(new byte[] {0x1f, (byte) 0x8b, 8, 0, 0, 0, 0, 0, 0, (byte) 0xff});
+    int offset = 0;
+    do {
+      int length = Math.min(0xffff, data.length - offset);
+      boolean last = offset + length == data.length;
+      out.write(last ? 1 : 0);
+      out.write(length & 0xff);
+      out.write(length >>> 8);
+      out.write(~length & 0xff);
+      out.write((~length >>> 8) & 0xff);
+      out.write(data, offset, length);
+      offset += length;
+    } while (offset < data.length);
+    CRC32 crc = new CRC32();
+    crc.update(data);
+    writeIntLe(out, (int) crc.getValue());
+    writeIntLe(out, data.length);
     return out.toByteArray();
+  }
+
+  private static void writeIntLe(ByteArrayOutputStream out, int value) {
+    for (int shift = 0; shift < 32; shift += 8) {
+      out.write((value >>> shift) & 0xff);
+    }
   }
 
   private static String sha256(byte[] bytes) {
