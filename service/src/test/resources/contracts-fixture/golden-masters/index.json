@@ -1,0 +1,42 @@
+{
+  "formatVersion": 1,
+  "provider": "qits-fixture",
+  "states": [
+    {
+      "name": "fixture pins",
+      "slug": "fixture-pins",
+      "params": {},
+      "dependsOn": [],
+      "operations": [
+        {
+          "operationId": "listFixturePins",
+          "method": "GET",
+          "path": "/deployments/api/pins",
+          "status": 200,
+          "file": "fixture-pins/listFixturePins.json",
+          "frozen": {
+            "ids": [],
+            "instants": [
+              "$.generatedAt"
+            ],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        },
+        {
+          "operationId": "listNoFixturePins",
+          "method": "GET",
+          "path": "/deployments/api/pins",
+          "status": 200,
+          "file": "fixture-pins/listNoFixturePins.json",
+          "frozen": {
+            "ids": [],
+            "instants": [],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        }
+      ]
+    }
+  ]
+}

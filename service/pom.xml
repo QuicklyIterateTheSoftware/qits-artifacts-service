@@ -226,6 +226,18 @@
             <artifactId>qits-service-mock</artifactId>
             <scope>test</scope>
         </dependency>
+        <dependency>
+            <!-- The consumer pacts this service makes (contracts/consumer, qits-1149). -->
+            <groupId>au.com.dius.pact.consumer</groupId>
+            <artifactId>junit5</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <!-- ConsumerPactVerificationTest: verifies the consumer pacts this provider pins. -->
+            <groupId>au.com.dius.pact.provider</groupId>
+            <artifactId>junit5</artifactId>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 
     <build>

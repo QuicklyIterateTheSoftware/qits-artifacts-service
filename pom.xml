@@ -103,6 +103,11 @@
              with, which is the half TokenValidationBootstrapIT's far-side edge label needs: a
              method and a path say the keys were asked for, the status says they were served. -->
         <qits.service-mock.version>2026.1002.70617</qits.service-mock.version>
+        <!-- pact-jvm, the version every provider and consumer on the estate uses, so a pact is
+             written and read the same way at both ends (qits-1149). Consumer half: the pacts this
+             service makes against the six pin sources and the idp (contracts/consumer). Provider
+             half: ConsumerPactVerificationTest (contracts/). Test scope at every declaration site. -->
+        <pact.version>4.6.21</pact.version>
         <qits.maven.repository.url>https://registry.qits.wohlben.eu/artifacts/maven/maven</qits.maven.repository.url>
         <maven.compiler.release>25</maven.compiler.release>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
@@ -259,6 +264,16 @@
                 <groupId>${project.groupId}</groupId>
                 <artifactId>qits-service-mock</artifactId>
                 <version>${qits.service-mock.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>au.com.dius.pact.consumer</groupId>
+                <artifactId>junit5</artifactId>
+                <version>${pact.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>au.com.dius.pact.provider</groupId>
+                <artifactId>junit5</artifactId>
+                <version>${pact.version}</version>
             </dependency>
         </dependencies>
     </dependencyManagement>

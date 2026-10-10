@@ -75,7 +75,9 @@ public class GcPlanController {
    */
   @GET
   @Path("/plan")
-  @Operation(hidden = true)
+  // Hidden from the document, but named: the consumer pacts cite it as the trigger of every pin read
+  // (contracts/consumer/ConsumerContract, qits-1149).
+  @Operation(hidden = true, operationId = "getGcPlan")
   @jakarta.annotation.security.RolesAllowed({"qits:admin", "qits:agent", "qits:system", "qits:ci-run"})
   public GcPlanReport plan() {
     return planner.plan();

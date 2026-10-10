@@ -1,0 +1,20 @@
+{
+  "generatedAt": "2026-01-01T00:00:00Z",
+  "pins": [
+    {
+      "applicationName": "fixture-app",
+      "shas": [
+        "1111111",
+        "2222222"
+      ],
+      "environment": "not read by the consumer"
+    },
+    {
+      "applicationName": "fixture-other",
+      "shas": [
+        "3333333"
+      ],
+      "environment": "not read by the consumer"
+    }
+  ]
+}
