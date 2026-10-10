@@ -406,13 +406,60 @@ class GcPinsTest extends GcFixture {
    */
   private static GcPinSources answering() {
     GcPinSources sources = new GcPinSources();
-    sources.cd = List::of;
+    // One pin each: an empty answer from these two is a refusal (qits-1172), not "nothing pinned".
+    sources.cd = GcPinsTest::oneDeployment;
     sources.ci = () -> new CiDaemonPins.DaemonPin("", "", "", "none");
-    sources.maintenance = List::of;
+    sources.maintenance = GcPinsTest::oneDependency;
     sources.configuration = List::of;
     sources.workspaces = List::of;
     sources.projects = List::of;
     return sources;
+  }
+
+  /** A deployer that serves one application — the least a live platform answers. */
+  static List<CdDeploymentPins.ApplicationPin> oneDeployment() {
+    return List.of(new CdDeploymentPins.ApplicationPin("qits-answering", List.of("2026.1.1")));
+  }
+
+  /** A maintenance inventory with one reference — the least a live platform answers. */
+  static List<MaintenanceDependencyPins.DependencyPin> oneDependency() {
+    return List.of(
+        new MaintenanceDependencyPins.DependencyPin(
+            "maven", "eu.wohlben.qits:qits-answering", "2026.1.1", "qits-answering", "pom.xml"));
+  }
+
+  /**
+   * qits-1172: an empty answer from the deployer or from maintenance is a source that lost its data,
+   * never "nothing is pinned". Read as an answer it condemns every version, so the run refuses.
+   */
+  @Test
+  void anEmptyDeploymentAnswerFailsTheRun() {
+    GcPinSources sources = answering();
+    sources.cd = List::of;
+
+    GcPins pins = sources.fetch();
+
+    assertFalse(pins.complete());
+    assertTrue(pins.whyIncomplete().contains("qits-platform-deployments"), pins.whyIncomplete());
+    assertFalse(source(pins, "qits-platform-deployments").answered());
+  }
+
+  @Test
+  void anEmptyMaintenanceAnswerFailsTheRunAndLeavesNoHalfFoldedKeepSet() {
+    GcPinSources sources = answering();
+    sources.maintenance = List::of;
+
+    GcPins pins = sources.fetch();
+
+    assertFalse(pins.complete());
+    assertTrue(pins.whyIncomplete().contains("qits-platform-maintenance"), pins.whyIncomplete());
+    assertFalse(source(pins, "qits-platform-maintenance").answered());
+    assertEquals(java.util.Set.of(), pins.daemonDependencies());
+  }
+
+  @Test
+  void theDefaultAnsweringCollectorIsComplete() {
+    assertTrue(answering().fetch().complete());
   }
 
   private static GcPinSource source(GcPins pins, String name) {

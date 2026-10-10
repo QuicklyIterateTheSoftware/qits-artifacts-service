@@ -149,17 +149,22 @@ class AdminWriteGuardTest {
     // reads the plan, and it reads it with a body of supplied pins, which is the whole call.
     //
     // SIX members since 2026-09-05, and all six are needed for `executable`: a member left out is
-    // that source unanswered. Empty answers throughout, because what is on trial here is the role
-    // rather than the keep-set.
+    // that source unanswered. Near-empty answers, because what is on trial here is the role rather
+    // than the keep-set — but one pin each from the deployer and maintenance, whose empty answer is
+    // a refusal (qits-1172).
     given()
         .header("Authorization", bearer(MachineTokens.forSystem()))
         .contentType(ContentType.JSON)
         .body(
             """
-            {"pins":{"deployments":{"pins":[]},
+            {"pins":{"deployments":{"pins":[{"applicationName":"qits-artifacts",
+                                             "shas":["2026.1.1"]}]},
                      "ciDaemon":{"daemonName":"qits-ci-daemon","daemonVersion":"",
                                  "previousDaemonVersion":"","source":"none"},
-                     "dependencies":{"repositories":[],"pins":[]},
+                     "dependencies":{"repositories":[],"pins":[{"ecosystem":"maven",
+                                     "name":"eu.wohlben.qits:qits-auth-core",
+                                     "version":"2026.1.1","repository":"qits-artifacts-service",
+                                     "manifestPath":"pom.xml"}]},
                      "configuredImages":{"pins":[]},
                      "workspaceLaunches":{"pins":[]},
                      "projectLaunches":{"pins":[]}}}

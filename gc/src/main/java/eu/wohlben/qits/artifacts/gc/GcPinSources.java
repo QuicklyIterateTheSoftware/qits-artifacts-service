@@ -106,7 +106,7 @@ public class GcPinSources {
 
     Instant startedCd = Instant.now();
     try {
-      List<CdDeploymentPins.ApplicationPin> pins = cdSource.read().get();
+      List<CdDeploymentPins.ApplicationPin> pins = refuseEmpty(cdSource.read().get(), "deployment");
       Set<String> keeps = new TreeSet<>();
       for (CdDeploymentPins.ApplicationPin pin : pins) {
         deployments
@@ -175,7 +175,8 @@ public class GcPinSources {
 
     Instant startedMaintenance = Instant.now();
     try {
-      List<MaintenanceDependencyPins.DependencyPin> pins = maintenanceSource.read().get();
+      List<MaintenanceDependencyPins.DependencyPin> pins =
+          refuseEmpty(maintenanceSource.read().get(), "dependency");
       for (MaintenanceDependencyPins.DependencyPin pin : pins) {
         // The coordinate each ecosystem's adapter already spells its identities with, so the
         // lookup on the other side is an equality test and never a translation.
@@ -325,6 +326,26 @@ public class GcPinSources {
       sources.add(failed(source, startedAt, why));
       images.clear();
     }
+  }
+
+  /**
+   * <b>An empty answer from a source that can never be empty is a failure, not "nothing pinned"
+   * (qits-1172).</b>
+   *
+   * <p>Something always serves on a live platform, and some repository always pins something, so
+   * an empty list from qits-deployments or qits-platform-maintenance is a source that lost its
+   * data or answered before it had any — and read as an answer, it condemns every version. It
+   * lands in the fold's catch, and the run deletes nothing. The other sources may truly be empty:
+   * qits-ci's blank pin is documented as an answer, and qits-configuration and the two launching
+   * services name only what they are configured or about to start.
+   */
+  static <T> List<T> refuseEmpty(List<T> pins, String what) {
+    if (pins == null || pins.isEmpty()) {
+      throw new IllegalStateException(
+          "answered no " + what + " pins at all, which a live platform never has; refusing it"
+              + " rather than reading it as nothing pinned");
+    }
+    return pins;
   }
 
   private static GcPinSource answered(

@@ -279,10 +279,12 @@ class GcSuppliedPinsTest {
   }
 
   @Test
-  void anEmptyPinsArrayIsAnAnswerAndPinsNothing() throws IOException {
-    // A platform with nothing deployed. It is the opposite of a missing member: the source answered,
-    // the answer is "no application is serving", and the run may proceed — which means every tag
-    // old enough is a candidate. The orchestrator has to know these two states read differently.
+  void anEmptyPinsArrayIsAnAnswerOnlyWhereThePlatformCanTrulyHaveNone() throws IOException {
+    // qits-1172 (USER RULING: a version anything still pins must be kept). Something always serves
+    // and some repository always pins something, so an empty deployer or maintenance answer is a
+    // source that lost its data — the run refuses. The other three may truly be empty: a launching
+    // service with no image version configured launches nothing pinnable, which is the state a
+    // fresh install is in.
     GcPins pins =
         new GcPinSources()
             .fetch(
@@ -294,16 +296,13 @@ class GcSuppliedPinsTest {
                     "{\"pins\":[]}",
                     "{\"pins\":[]}"));
 
-    assertTrue(pins.complete());
-    assertEquals(0, source(pins, GcSuppliedPins.CD_SOURCE).pinCount());
-    assertTrue(source(pins, GcSuppliedPins.CD_SOURCE).answered());
-    assertEquals(Set.of(), pins.deploymentShas("qits-artifacts"));
-    assertTrue(source(pins, GcSuppliedPins.MAINTENANCE_SOURCE).answered());
+    assertFalse(pins.complete());
+    assertEquals(2, pins.failures().size(), pins.whyIncomplete());
+    assertFalse(source(pins, GcSuppliedPins.CD_SOURCE).answered());
+    assertFalse(source(pins, GcSuppliedPins.MAINTENANCE_SOURCE).answered());
     assertEquals(Set.of(), pins.mavenDependencies());
     assertTrue(source(pins, GcSuppliedPins.CONFIGURATION_SOURCE).answered());
     assertEquals(Set.of(), pins.configuredImages());
-    // A launching service with no image version configured launches nothing pinnable, and that is
-    // an answer rather than an outage — the state a fresh install is in.
     assertTrue(source(pins, GcSuppliedPins.WORKSPACES_SOURCE).answered());
     assertEquals(Set.of(), pins.workspaceLaunchImages());
     assertTrue(source(pins, GcSuppliedPins.PROJECTS_SOURCE).answered());

@@ -209,13 +209,14 @@ class CiDaemonPinsTest {
    */
   private static GcPinSources sources(String ciBaseUrl) {
     GcPinSources sources = new GcPinSources();
-    sources.cd = List::of;
+    // One pin each: an empty answer from these two is a refusal (qits-1172), not "nothing pinned".
+    sources.cd = GcPinsTest::oneDeployment;
     CiHttpDaemonPins ci = new CiHttpDaemonPins();
     ci.baseUrl = ciBaseUrl;
     ci.timeout = Duration.ofSeconds(5);
     ci.objectMapper = new ObjectMapper();
     sources.ci = ci;
-    sources.maintenance = List::of;
+    sources.maintenance = GcPinsTest::oneDependency;
     sources.configuration = List::of;
     sources.workspaces = List::of;
     sources.projects = List::of;
