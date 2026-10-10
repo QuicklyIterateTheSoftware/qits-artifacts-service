@@ -709,6 +709,18 @@ has had it all along, and a multi-segment name needs a marker or `<name>/<versio
 split more than one way. What closes the ambiguity is the segment shape rather than route ordering —
 a bare `-` cannot begin a name segment, which `DocsPathsTest` pins.
 
+**`@changelog/<repository>` is a reserved site name, not a project's own namespacing (qits-893).**
+Every release publishes one version of it — one version per release, calver, holding a single file,
+`CHANGELOG.md` — through the release step's `qits artifacts publish changelog`, the same `PUT` every
+other docs site uses. It is otherwise an ordinary `docs_site` row and reads exactly like any other
+site; what is different is retention. **Docs GC never offers it**: `DocsGcAdapter.CHANGELOG_SCOPE`
+skips every row whose name starts with `@changelog/` in `enumerate()`, before the belt or the access
+window ever sees it, so it is kept forever for now — owner, 2026-10-04. qits-maintenance has to read
+every changelog between two pins, and the belt's "last 2 releases" would delete exactly the versions
+that reading needs. It should probably be deleted during GC along with the release it belongs to
+(owner, 2026-10-04), but the owner wants to experience the feature first before that pin source
+exists; when it is built it reads qits-projects' release tags rather than reusing this skip.
+
 **A whole bundle is one request, and a version is the unit of everything.** The `PUT` streams a
 `.tar.gz` to a temp file, walks it entry by entry into `BlobStore`, and writes one `docs_site` row
 plus one `docs_file` row per path — **all in one transaction**. So a version is either wholly

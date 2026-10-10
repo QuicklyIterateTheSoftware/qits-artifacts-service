@@ -75,6 +75,13 @@ import java.util.regex.Pattern;
  * served and coalesced hourly, so one page load is one write rather than fifty. Reading a site is
  * what keeps it, which is the right basis here: documentation nobody has opened in a quarter is
  * documentation for a version nobody is on.
+ *
+ * <h2>Changelogs are never offered</h2>
+ *
+ * <p>Changelogs ({@code @changelog/<repository>}, qits-893) are kept forever for now — owner,
+ * 2026-10-04: they should probably be deleted during GC along with the releases they belong to, but
+ * the owner wants to experience the feature first. When that is done it is a pin source reading
+ * qits-projects' release tags, not this skip.
  */
 @Singleton
 public class DocsGcAdapter implements GcTypeAdapter {
@@ -84,6 +91,13 @@ public class DocsGcAdapter implements GcTypeAdapter {
 
   /** A calver release version: {@code <year>.<month><day>.<time>}. */
   static final Pattern CALVER = Pattern.compile("\\d{4}\\.\\d{1,4}\\.\\d+");
+
+  /**
+   * The site-name prefix a changelog publishes under. See the class javadoc,
+   * "Changelogs are never offered" — this type is kept forever for now and {@link #enumerate} skips
+   * every row under it rather than offering it to the belt.
+   */
+  static final String CHANGELOG_SCOPE = "@changelog/";
 
   @Inject ArtifactRepositoryRepository repositories;
   @Inject DocsSiteRepository sites;
@@ -103,6 +117,11 @@ public class DocsGcAdapter implements GcTypeAdapter {
         continue;
       }
       for (DocsSite row : sites.<DocsSite>list("repository = ?1", repository.name)) {
+        // Changelogs are never offered — kept forever for now. See the class javadoc,
+        // "Changelogs are never offered".
+        if (row.name.startsWith(CHANGELOG_SCOPE)) {
+          continue;
+        }
         candidates.add(
             new GcCandidate(
                 row.repository,

@@ -135,6 +135,33 @@ class DocsGcAdapterTest extends GcFixture {
   }
 
   @Test
+  void changelogSitesAreNeverOfferedAsCandidates() throws Exception {
+    // @changelog/x (qits-893) is kept forever for now (owner, 2026-10-04): enumerate must skip
+    // every one of its rows outright rather than offer it to the belt. @apidocs/x is an ordinary
+    // docs site sitting right beside it and enumerates normally, so all five of its released
+    // versions must still appear.
+    repository();
+    String changelogSite = DocsGcAdapter.CHANGELOG_SCOPE + "x";
+    String apidocsSite = "@apidocs/x";
+    for (int i = 0; i < 5; i++) {
+      String version = "2026.101." + (10 + i);
+      docsSite(DOCS_REPO, changelogSite, version, daysAgo(10), null, Map.of(), blob(60 + i));
+      docsSite(DOCS_REPO, apidocsSite, version, daysAgo(10), null, Map.of(), blob(70 + i));
+    }
+
+    List<GcCandidate> candidates = adapter.enumerate();
+
+    assertEquals(5, candidates.size(), "the changelog site's five rows must not be enumerated");
+    assertTrue(
+        candidates.stream()
+            .allMatch(candidate -> candidate.identity().startsWith(apidocsSite + DocsGcAdapter.AT)),
+        "every surviving candidate is @apidocs/x");
+    assertTrue(
+        candidates.stream().noneMatch(candidate -> candidate.identity().startsWith(changelogSite)),
+        "none of @changelog/x's rows are offered");
+  }
+
+  @Test
   void aCollectedShaVersionTakesItsMetadataWithIt() throws Exception {
     // The V2 cascade, driven through the real funnel: collecting the version removes its
     // docs_site_metadata rows with its files — no orphaned branch facts about a bundle that no
