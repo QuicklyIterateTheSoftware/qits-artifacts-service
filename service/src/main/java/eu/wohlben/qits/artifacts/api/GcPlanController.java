@@ -18,6 +18,10 @@ import jakarta.ws.rs.PathParam;
 import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.core.MediaType;
 import org.eclipse.microprofile.openapi.annotations.Operation;
+import org.eclipse.microprofile.openapi.annotations.enums.SchemaType;
+import org.eclipse.microprofile.openapi.annotations.media.Content;
+import org.eclipse.microprofile.openapi.annotations.media.Schema;
+import org.eclipse.microprofile.openapi.annotations.parameters.RequestBody;
 
 /**
  * The whole GC surface: the dry-run plan to read, and the sweep to invoke once it has been read.
@@ -75,9 +79,9 @@ public class GcPlanController {
    */
   @GET
   @Path("/plan")
-  // Hidden from the document, but named: the consumer pacts cite it as the trigger of every pin read
+  // Named: the consumer pacts cite it as the trigger of every pin read
   // (contracts/consumer/ConsumerContract, qits-1149).
-  @Operation(hidden = true, operationId = "getGcPlan")
+  @Operation(operationId = "getGcPlan")
   @jakarta.annotation.security.RolesAllowed({"qits:admin", "qits:agent", "qits:system", "qits:ci-run"})
   public GcPlanReport plan() {
     return planner.plan();
@@ -110,9 +114,16 @@ public class GcPlanController {
    */
   @POST
   @Path("/plan")
-  @Operation(hidden = true)
+  @Operation(operationId = "planGcWithSuppliedPins")
   @jakarta.annotation.security.RolesAllowed({"qits:admin", "qits:system"})
-  public GcPlanReport planWithSuppliedPins(String body) {
+  public GcPlanReport planWithSuppliedPins(
+      @RequestBody(
+              required = false,
+              content =
+                  @Content(
+                      mediaType = MediaType.APPLICATION_JSON,
+                      schema = @Schema(type = SchemaType.OBJECT)))
+          String body) {
     return planner.plan(suppliedPins(body));
   }
 
@@ -163,9 +174,16 @@ public class GcPlanController {
    */
   @POST
   @Path("/sweep")
-  @Operation(hidden = true)
+  @Operation(operationId = "sweepGc")
   @jakarta.annotation.security.RolesAllowed("qits:system")
-  public GcSweepReport sweep(String body) {
+  public GcSweepReport sweep(
+      @RequestBody(
+              required = false,
+              content =
+                  @Content(
+                      mediaType = MediaType.APPLICATION_JSON,
+                      schema = @Schema(type = SchemaType.OBJECT)))
+          String body) {
     return executor.sweep(suppliedPins(body));
   }
 

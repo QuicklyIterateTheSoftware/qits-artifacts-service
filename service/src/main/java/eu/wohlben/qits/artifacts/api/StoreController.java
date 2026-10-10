@@ -32,7 +32,7 @@ public class StoreController {
 
   @GET
   @Path("/summary")
-  @Operation(hidden = true)
+  @Operation(operationId = "getStoreSummary")
   public StoreSummary summary() {
     return explorer.storeSummary();
   }

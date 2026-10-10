@@ -1,0 +1,145 @@
+# The JSON doors of the Vert.x wires that other qits repositories call (qits-1149).
+#
+# These routes are Vert.x, not JAX-RS, so no annotation can describe them. SmallRye merges this file
+# into the served document at /artifacts/q/openapi. It names each door a consumer's pact cites, so
+# the golden masters and the pacts share one operationId per door. The registry protocols (/v2,
+# /artifacts/npm, /artifacts/maven) stay out: their clients speak a protocol, not this API.
+#
+# A {site} or {packageName} may hold slashes (@changelog/<repository>, @scope/name), which an
+# OpenAPI path parameter cannot express; the routes accept them all the same.
+openapi: 3.1.0
+paths:
+  /artifacts/docs/{repository}:
+    get:
+      operationId: listDocsSites
+      summary: Every docs site in the repository, with its version count and latest version.
+      parameters:
+        - { name: repository, in: path, required: true, schema: { type: string } }
+      responses:
+        "200": { description: "The catalog, {sites:[{name, versionCount, latestVersion, latestPublishedAt}]}." }
+  /artifacts/docs/{repository}/{site}:
+    get:
+      operationId: listDocsVersions
+      summary: The versions of one docs site, newest first. meta.<key>=<value> query parameters filter by metadata.
+      parameters:
+        - { name: repository, in: path, required: true, schema: { type: string } }
+        - { name: site, in: path, required: true, schema: { type: string } }
+      responses:
+        "200": { description: "{name, versions:[{name, version, fileCount, totalBytes, publishedAt, metadata?}]}; an empty list when a filter matches nothing." }
+        "404": { description: "No such site." }
+  /artifacts/docs/{repository}/{site}/-/{version}:
+    get:
+      operationId: getDocsVersion
+      summary: One version of a docs site, with the paths of its files.
+      parameters:
+        - { name: repository, in: path, required: true, schema: { type: string } }
+        - { name: site, in: path, required: true, schema: { type: string } }
+        - { name: version, in: path, required: true, schema: { type: string } }
+      responses:
+        "200": { description: "{name, version, fileCount, totalBytes, publishedAt, metadata?, files:[path]}." }
+        "404": { description: "No such version." }
+    put:
+      operationId: putDocs
+      summary: Publishes one version of a docs site from a .tar.gz bundle. X-Artifacts-Meta-<key> headers set its metadata.
+      parameters:
+        - { name: repository, in: path, required: true, schema: { type: string } }
+        - { name: site, in: path, required: true, schema: { type: string } }
+        - { name: version, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/gzip: { schema: { type: string, format: binary } }
+      responses:
+        "201": { description: "The receipt, {name, version, fileCount, totalBytes, publishedAt, metadata?}." }
+        "409": { description: "The version exists; versions are immutable." }
+  /artifacts/docs/{repository}/{site}/-/{version}/{path}:
+    get:
+      operationId: getDocsFile
+      summary: One file of a docs version, as stored, with its media type and ETag.
+      parameters:
+        - { name: repository, in: path, required: true, schema: { type: string } }
+        - { name: site, in: path, required: true, schema: { type: string } }
+        - { name: version, in: path, required: true, schema: { type: string } }
+        - { name: path, in: path, required: true, schema: { type: string } }
+      responses:
+        "200": { description: "The file's bytes." }
+        "404": { description: "No such file." }
+  /artifacts/sboms/{packageType}/{packageName}/-/{version}:
+    get:
+      operationId: getSbom
+      summary: The CycloneDX document published for one release, byte for byte.
+      parameters:
+        - { name: packageType, in: path, required: true, schema: { type: string } }
+        - { name: packageName, in: path, required: true, schema: { type: string } }
+        - { name: version, in: path, required: true, schema: { type: string } }
+      responses:
+        "200": { description: "The document, application/vnd.cyclonedx+json." }
+        "404": { description: "No document for the release." }
+    head:
+      operationId: headSbom
+      summary: Whether a document is published for one release; its digest in Docker-Content-Digest.
+      parameters:
+        - { name: packageType, in: path, required: true, schema: { type: string } }
+        - { name: packageName, in: path, required: true, schema: { type: string } }
+        - { name: version, in: path, required: true, schema: { type: string } }
+      responses:
+        "200": { description: "Published." }
+        "404": { description: "Not published." }
+    put:
+      operationId: putSbom
+      summary: Publishes the CycloneDX document of one release. First write wins.
+      parameters:
+        - { name: packageType, in: path, required: true, schema: { type: string } }
+        - { name: packageName, in: path, required: true, schema: { type: string } }
+        - { name: version, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/vnd.cyclonedx+json: { schema: { type: object } }
+      responses:
+        "201": { description: "The receipt, {packageType, packageName, version, digest, sizeBytes, specVersion, createdAt}." }
+        "200": { description: "A document was already published; the receipt of the stored one, with alreadyPublished: true." }
+  /artifacts/daemons/{daemon}/{version}:
+    head:
+      operationId: headDaemon
+      summary: Whether one daemon version is published; its digest in Docker-Content-Digest and ETag.
+      parameters:
+        - { name: daemon, in: path, required: true, schema: { type: string } }
+        - { name: version, in: path, required: true, schema: { type: string } }
+      responses:
+        "200": { description: "Published." }
+        "404": { description: "Not published." }
+    put:
+      operationId: putDaemon
+      summary: Publishes one daemon binary version.
+      parameters:
+        - { name: daemon, in: path, required: true, schema: { type: string } }
+        - { name: version, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/octet-stream: { schema: { type: string, format: binary } }
+      responses:
+        "201": { description: "The receipt, {name, version, digest, sizeBytes, publishedAt}." }
+        "409": { description: "The version exists; versions are immutable." }
+  /artifacts/content-hashes/{type}/{name}/-/{version}:
+    get:
+      operationId: getContentHash
+      summary: The content hash recorded for one version of a maven or npm package.
+      parameters:
+        - { name: type, in: path, required: true, schema: { type: string, enum: [maven, npm] } }
+        - { name: name, in: path, required: true, schema: { type: string } }
+        - { name: version, in: path, required: true, schema: { type: string } }
+      responses:
+        "200": { description: "{ecosystem, name, version, contentHash}; contentHash is null when none was recorded." }
+        "404": { description: "No such version." }
+  /artifacts/content-hashes/{type}/{name}/-/newest:
+    get:
+      operationId: getNewestContentHash
+      summary: The newest version of a maven or npm package, by version order, and its content hash.
+      parameters:
+        - { name: type, in: path, required: true, schema: { type: string, enum: [maven, npm] } }
+        - { name: name, in: path, required: true, schema: { type: string } }
+      responses:
+        "200": { description: "{ecosystem, name, version, contentHash}." }
+        "404": { description: "No version of the package exists." }
