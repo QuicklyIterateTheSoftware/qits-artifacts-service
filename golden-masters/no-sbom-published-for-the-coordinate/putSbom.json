@@ -1,0 +1,9 @@
+{
+  "packageType": "maven",
+  "packageName": "eu.wohlben.qits:contract-artifact",
+  "version": "2100.1.0",
+  "digest": "sha256:d041a852de37bb7da84b49234b59978aa9984d0706987af57d92b5577ff2d386",
+  "sizeBytes": 921,
+  "specVersion": "1.6",
+  "createdAt": "2026-01-01T00:00:00Z"
+}

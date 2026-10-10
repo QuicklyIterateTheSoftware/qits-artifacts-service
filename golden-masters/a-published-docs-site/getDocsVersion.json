@@ -1,0 +1,13 @@
+{
+  "name": "contract-docs-site",
+  "version": "2100.1.0",
+  "fileCount": 1,
+  "totalBytes": 44,
+  "publishedAt": "2026-01-01T00:00:00Z",
+  "metadata": {
+    "git.branch.name": "main"
+  },
+  "files": [
+    "index.html"
+  ]
+}

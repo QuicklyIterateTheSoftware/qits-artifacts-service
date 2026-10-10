@@ -1,0 +1,15 @@
+{
+  "ociPerImageSumBytes": 0,
+  "ociUnionBytes": 0,
+  "ociMirrorBytes": 0,
+  "orphanBytes": 0,
+  "npmPublishedBytes": 0,
+  "npmProxyTarballBytes": 0,
+  "npmProxyPackumentBytes": 0,
+  "mavenPublishedBytes": 0,
+  "mavenProxyBytes": 0,
+  "daemonBinaryBytes": 0,
+  "docsBytes": 0,
+  "sbomBytes": 0,
+  "diskTotalBytes": 0
+}

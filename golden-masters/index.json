@@ -3,14 +3,65 @@
   "provider": "qits-artifacts",
   "states": [
     {
+      "name": "a content hash recorded for the coordinate",
+      "slug": "a-content-hash-recorded-for-the-coordinate",
+      "params": {
+        "name": "eu.wohlben.qits:contract-artifact",
+        "type": "maven",
+        "version": "2100.1.0"
+      },
+      "dependsOn": [],
+      "operations": [
+        {
+          "operationId": "getContentHash",
+          "method": "GET",
+          "path": "/artifacts/content-hashes/{type}/{name}/-/{version}",
+          "status": 200,
+          "file": "a-content-hash-recorded-for-the-coordinate/getContentHash.json",
+          "frozen": {
+            "ids": [],
+            "instants": [],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        },
+        {
+          "operationId": "getNewestContentHash",
+          "method": "GET",
+          "path": "/artifacts/content-hashes/{type}/{name}/-/newest",
+          "status": 200,
+          "file": "a-content-hash-recorded-for-the-coordinate/getNewestContentHash.json",
+          "frozen": {
+            "ids": [],
+            "instants": [],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        }
+      ]
+    },
+    {
       "name": "a daemon nothing has published",
       "slug": "a-daemon-nothing-has-published",
       "params": {
         "daemon": "contract-daemon",
-        "repository": "daemons"
+        "repository": "daemons",
+        "version": "2026.3.0"
       },
       "dependsOn": [],
       "operations": [
+        {
+          "operationId": "headDaemon",
+          "method": "HEAD",
+          "path": "/artifacts/daemons/{daemon}/{version}",
+          "status": 404,
+          "frozen": {
+            "ids": [],
+            "instants": [],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        },
         {
           "operationId": "listDaemonVersions",
           "method": "GET",
@@ -23,6 +74,23 @@
             "strings": [],
             "listFilteredTo": null
           }
+        },
+        {
+          "operationId": "putDaemon",
+          "method": "PUT",
+          "path": "/artifacts/daemons/{daemon}/{version}",
+          "contentType": "application/octet-stream",
+          "body": "contract-daemon 2026.3.0\n",
+          "status": 201,
+          "file": "a-daemon-nothing-has-published/putDaemon.json",
+          "frozen": {
+            "ids": [],
+            "instants": [
+              "$.publishedAt"
+            ],
+            "strings": [],
+            "listFilteredTo": null
+          }
         }
       ]
     },
@@ -31,10 +99,28 @@
       "slug": "a-daemon-with-two-versions",
       "params": {
         "daemon": "contract-daemon",
-        "repository": "daemons"
+        "repository": "daemons",
+        "version": "2026.2.0"
       },
       "dependsOn": [],
       "operations": [
+        {
+          "operationId": "headDaemon",
+          "method": "HEAD",
+          "path": "/artifacts/daemons/{daemon}/{version}",
+          "status": 200,
+          "headers": {
+            "Content-Length": "24",
+            "Docker-Content-Digest": "sha256:6caecc97403739b2273c00a43c649e5efdebddde20a0ed27ed4fe356a1344aa4",
+            "ETag": "\"6caecc97403739b2273c00a43c649e5efdebddde20a0ed27ed4fe356a1344aa4\""
+          },
+          "frozen": {
+            "ids": [],
+            "instants": [],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        },
         {
           "operationId": "listDaemonVersions",
           "method": "GET",
@@ -45,6 +131,692 @@
             "ids": [],
             "instants": [
               "$.versions[*].publishedAt"
+            ],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        }
+      ]
+    },
+    {
+      "name": "a docs site published from two branches",
+      "slug": "a-docs-site-published-from-two-branches",
+      "params": {
+        "branch": "main",
+        "site": "contract-docs-site"
+      },
+      "dependsOn": [],
+      "operations": [
+        {
+          "operationId": "listDocsVersions",
+          "method": "GET",
+          "path": "/artifacts/docs/docs/{site}",
+          "query": {
+            "meta.git.branch.name": "main"
+          },
+          "status": 200,
+          "file": "a-docs-site-published-from-two-branches/listDocsVersions.json",
+          "frozen": {
+            "ids": [],
+            "instants": [
+              "$.versions[*].publishedAt"
+            ],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        }
+      ]
+    },
+    {
+      "name": "a published docs site",
+      "slug": "a-published-docs-site",
+      "params": {
+        "path": "index.html",
+        "site": "contract-docs-site",
+        "version": "2100.1.0"
+      },
+      "dependsOn": [],
+      "operations": [
+        {
+          "operationId": "getDocsFile",
+          "method": "GET",
+          "path": "/artifacts/docs/docs/{site}/-/{version}/{path}",
+          "status": 200,
+          "headers": {
+            "Content-Length": "44",
+            "Content-Type": "text/html; charset=utf-8",
+            "ETag": "\"b5b5c49e35d128ab5d50b2413c6bbddd2d77feeb6f6ea387d6ed9e4e12ad263b\""
+          },
+          "frozen": {
+            "ids": [],
+            "instants": [],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        },
+        {
+          "operationId": "getDocsVersion",
+          "method": "GET",
+          "path": "/artifacts/docs/docs/{site}/-/{version}",
+          "status": 200,
+          "file": "a-published-docs-site/getDocsVersion.json",
+          "frozen": {
+            "ids": [],
+            "instants": [
+              "$.publishedAt"
+            ],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        },
+        {
+          "operationId": "listDocsSites",
+          "method": "GET",
+          "path": "/artifacts/docs/docs",
+          "status": 200,
+          "file": "a-published-docs-site/listDocsSites.json",
+          "frozen": {
+            "ids": [],
+            "instants": [
+              "$.sites[*].latestPublishedAt"
+            ],
+            "strings": [],
+            "listFilteredTo": "$.sites"
+          }
+        },
+        {
+          "operationId": "listDocsVersions",
+          "method": "GET",
+          "path": "/artifacts/docs/docs/{site}",
+          "status": 200,
+          "file": "a-published-docs-site/listDocsVersions.json",
+          "frozen": {
+            "ids": [],
+            "instants": [
+              "$.versions[*].publishedAt"
+            ],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        }
+      ]
+    },
+    {
+      "name": "a registry store with content",
+      "slug": "a-registry-store-with-content",
+      "params": {},
+      "dependsOn": [],
+      "operations": [
+        {
+          "operationId": "getStoreSummary",
+          "method": "GET",
+          "path": "/artifacts/api/store/summary",
+          "status": 200,
+          "file": "a-registry-store-with-content/getStoreSummary.json",
+          "frozen": {
+            "ids": [],
+            "instants": [],
+            "strings": [],
+            "volatile": [
+              "$.ociPerImageSumBytes",
+              "$.ociUnionBytes",
+              "$.ociMirrorBytes",
+              "$.orphanBytes",
+              "$.npmPublishedBytes",
+              "$.npmProxyTarballBytes",
+              "$.npmProxyPackumentBytes",
+              "$.mavenPublishedBytes",
+              "$.mavenProxyBytes",
+              "$.daemonBinaryBytes",
+              "$.docsBytes",
+              "$.sbomBytes",
+              "$.diskTotalBytes"
+            ],
+            "listFilteredTo": null
+          }
+        }
+      ]
+    },
+    {
+      "name": "a registry with unpinned identities",
+      "slug": "a-registry-with-unpinned-identities",
+      "params": {},
+      "dependsOn": [],
+      "operations": [
+        {
+          "operationId": "planGcWithSuppliedPins",
+          "method": "POST",
+          "path": "/artifacts/api/gc/plan",
+          "contentType": "application/json",
+          "body": {
+            "pins": {
+              "deployments": {
+                "pins": [
+                  {
+                    "applicationName": "qits-artifacts",
+                    "shas": [
+                      "aaaa",
+                      "bbbb"
+                    ]
+                  }
+                ]
+              },
+              "ciDaemon": {
+                "daemonName": "qits-ci-daemon",
+                "daemonVersion": "2026.805.1",
+                "previousDaemonVersion": "",
+                "source": "adopted"
+              },
+              "dependencies": {
+                "generatedAt": "2026-09-04T20:00:00Z",
+                "repositories": [
+                  {
+                    "name": "qits-githost-service",
+                    "status": "OK"
+                  }
+                ],
+                "pins": [
+                  {
+                    "ecosystem": "maven",
+                    "name": "eu.wohlben.qits:qits-blobstore",
+                    "version": "2026.903.85122",
+                    "repository": "qits-githost-service",
+                    "manifestPath": "pom.xml"
+                  }
+                ]
+              },
+              "configuredImages": {
+                "generatedAt": "2026-09-04T20:00:00Z",
+                "pins": [
+                  {
+                    "image": "qits/workspace",
+                    "version": "2026.904.160522",
+                    "application": "qits-workspaces",
+                    "key": "env.QITS_WORKSPACE_IMAGE_VERSION"
+                  }
+                ]
+              },
+              "workspaceLaunches": {
+                "generatedAt": "2026-09-05T06:00:00Z",
+                "pins": [
+                  {
+                    "image": "qits/workspace",
+                    "version": "2026.903.120000",
+                    "launches": "workspace"
+                  }
+                ]
+              },
+              "projectLaunches": {
+                "generatedAt": "2026-09-05T06:00:00Z",
+                "pins": [
+                  {
+                    "image": "qits/project-agent",
+                    "version": "2026.903.090000",
+                    "launches": "agent"
+                  }
+                ]
+              }
+            }
+          },
+          "status": 200,
+          "file": "a-registry-with-unpinned-identities/planGcWithSuppliedPins.json",
+          "frozen": {
+            "ids": [],
+            "instants": [
+              "$.generatedAt",
+              "$.pins[*].readAt"
+            ],
+            "strings": [],
+            "volatile": [
+              "$.summary.headline",
+              "$.summary.reclaimable",
+              "$.summary.types[*]",
+              "$.summary.identitiesCondemned",
+              "$.summary.blobsSweepable",
+              "$.summary.reclaimableBytes",
+              "$.summary.withheldByGraceWindow",
+              "$.pins[*].tookMillis",
+              "$.pins[*].pinCount"
+            ],
+            "listFilteredTo": null
+          }
+        },
+        {
+          "operationId": "sweepGc",
+          "method": "POST",
+          "path": "/artifacts/api/gc/sweep",
+          "contentType": "application/json",
+          "body": {
+            "pins": {
+              "deployments": {
+                "pins": [
+                  {
+                    "applicationName": "qits-artifacts",
+                    "shas": [
+                      "aaaa",
+                      "bbbb"
+                    ]
+                  }
+                ]
+              },
+              "ciDaemon": {
+                "daemonName": "qits-ci-daemon",
+                "daemonVersion": "2026.805.1",
+                "previousDaemonVersion": "",
+                "source": "adopted"
+              },
+              "dependencies": {
+                "generatedAt": "2026-09-04T20:00:00Z",
+                "repositories": [
+                  {
+                    "name": "qits-githost-service",
+                    "status": "OK"
+                  }
+                ],
+                "pins": [
+                  {
+                    "ecosystem": "maven",
+                    "name": "eu.wohlben.qits:qits-blobstore",
+                    "version": "2026.903.85122",
+                    "repository": "qits-githost-service",
+                    "manifestPath": "pom.xml"
+                  }
+                ]
+              },
+              "configuredImages": {
+                "generatedAt": "2026-09-04T20:00:00Z",
+                "pins": [
+                  {
+                    "image": "qits/workspace",
+                    "version": "2026.904.160522",
+                    "application": "qits-workspaces",
+                    "key": "env.QITS_WORKSPACE_IMAGE_VERSION"
+                  }
+                ]
+              },
+              "workspaceLaunches": {
+                "generatedAt": "2026-09-05T06:00:00Z",
+                "pins": [
+                  {
+                    "image": "qits/workspace",
+                    "version": "2026.903.120000",
+                    "launches": "workspace"
+                  }
+                ]
+              },
+              "projectLaunches": {
+                "generatedAt": "2026-09-05T06:00:00Z",
+                "pins": [
+                  {
+                    "image": "qits/project-agent",
+                    "version": "2026.903.090000",
+                    "launches": "agent"
+                  }
+                ]
+              }
+            }
+          },
+          "status": 200,
+          "file": "a-registry-with-unpinned-identities/sweepGc.json",
+          "frozen": {
+            "ids": [],
+            "instants": [
+              "$.executedAt",
+              "$.pins[*].readAt"
+            ],
+            "strings": [],
+            "volatile": [
+              "$.pins[*].tookMillis",
+              "$.pins[*].pinCount",
+              "$.sweep.blobsUnlinked",
+              "$.sweep.bytesReclaimed",
+              "$.sweep.withheldByGraceWindow",
+              "$.sweep.withheldBytes",
+              "$.sweep.stillReferenced",
+              "$.sweep.alreadyGone"
+            ],
+            "listFilteredTo": null
+          }
+        }
+      ]
+    },
+    {
+      "name": "a repository with no changelog",
+      "slug": "a-repository-with-no-changelog",
+      "params": {
+        "repository": "contract-repository",
+        "version": "2100.1.0"
+      },
+      "dependsOn": [],
+      "operations": [
+        {
+          "operationId": "listDocsVersions",
+          "method": "GET",
+          "path": "/artifacts/docs/docs/@changelog/{repository}",
+          "status": 404,
+          "frozen": {
+            "ids": [],
+            "instants": [],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        }
+      ]
+    },
+    {
+      "name": "a repository with published changelogs",
+      "slug": "a-repository-with-published-changelogs",
+      "params": {
+        "repository": "contract-repository",
+        "version": "2100.1.0"
+      },
+      "dependsOn": [],
+      "operations": [
+        {
+          "operationId": "getDocsFile",
+          "method": "GET",
+          "path": "/artifacts/docs/docs/@changelog/{repository}/-/{version}/CHANGELOG.md",
+          "status": 200,
+          "headers": {
+            "Content-Length": "46",
+            "Content-Type": "text/markdown; charset=utf-8",
+            "ETag": "\"22967a669d2438a98534af7846e3cbb02c06bf2b2281ba29e7d9c8deed054f3d\""
+          },
+          "frozen": {
+            "ids": [],
+            "instants": [],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        },
+        {
+          "operationId": "listDocsVersions",
+          "method": "GET",
+          "path": "/artifacts/docs/docs/@changelog/{repository}",
+          "status": 200,
+          "file": "a-repository-with-published-changelogs/listDocsVersions.json",
+          "frozen": {
+            "ids": [],
+            "instants": [
+              "$.versions[*].publishedAt"
+            ],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        }
+      ]
+    },
+    {
+      "name": "an sbom published for the coordinate",
+      "slug": "an-sbom-published-for-the-coordinate",
+      "params": {
+        "coordinate": "maven/eu.wohlben.qits:contract-artifact",
+        "packageName": "eu.wohlben.qits:contract-artifact",
+        "packageType": "maven",
+        "version": "2100.1.0"
+      },
+      "dependsOn": [],
+      "operations": [
+        {
+          "operationId": "getSbom",
+          "method": "GET",
+          "path": "/artifacts/sboms/{packageType}/{packageName}/-/{version}",
+          "status": 200,
+          "file": "an-sbom-published-for-the-coordinate/getSbom.json",
+          "headers": {
+            "Content-Type": "application/vnd.cyclonedx+json; version=1.6",
+            "Docker-Content-Digest": "sha256:d041a852de37bb7da84b49234b59978aa9984d0706987af57d92b5577ff2d386",
+            "ETag": "\"d041a852de37bb7da84b49234b59978aa9984d0706987af57d92b5577ff2d386\""
+          },
+          "frozen": {
+            "ids": [],
+            "instants": [],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        },
+        {
+          "operationId": "headSbom",
+          "method": "HEAD",
+          "path": "/artifacts/sboms/{packageType}/{packageName}/-/{version}",
+          "status": 200,
+          "headers": {
+            "Content-Length": "921",
+            "Docker-Content-Digest": "sha256:d041a852de37bb7da84b49234b59978aa9984d0706987af57d92b5577ff2d386",
+            "ETag": "\"d041a852de37bb7da84b49234b59978aa9984d0706987af57d92b5577ff2d386\""
+          },
+          "frozen": {
+            "ids": [],
+            "instants": [],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        },
+        {
+          "operationId": "putSbom",
+          "method": "PUT",
+          "path": "/artifacts/sboms/{packageType}/{packageName}/-/{version}",
+          "contentType": "application/vnd.cyclonedx+json",
+          "body": {
+            "bomFormat": "CycloneDX",
+            "specVersion": "1.6",
+            "version": 1,
+            "metadata": {
+              "component": {
+                "bom-ref": "pkg:maven/eu.wohlben.qits/contract-artifact@2100.1.0",
+                "type": "library",
+                "name": "contract-artifact",
+                "version": "2100.1.0",
+                "purl": "pkg:maven/eu.wohlben.qits/contract-artifact@2100.1.0"
+              }
+            },
+            "components": [
+              {
+                "bom-ref": "pkg:maven/eu.wohlben.qits/contract-library@1.0.0",
+                "type": "library",
+                "name": "contract-library",
+                "version": "1.0.0",
+                "purl": "pkg:maven/eu.wohlben.qits/contract-library@1.0.0"
+              },
+              {
+                "bom-ref": "pkg:npm/contract-helper@2.0.0",
+                "type": "library",
+                "name": "contract-helper",
+                "version": "2.0.0",
+                "purl": "pkg:npm/contract-helper@2.0.0"
+              }
+            ],
+            "dependencies": [
+              {
+                "ref": "pkg:maven/eu.wohlben.qits/contract-artifact@2100.1.0",
+                "dependsOn": [
+                  "pkg:maven/eu.wohlben.qits/contract-library@1.0.0"
+                ]
+              },
+              {
+                "ref": "pkg:maven/eu.wohlben.qits/contract-library@1.0.0",
+                "dependsOn": [
+                  "pkg:npm/contract-helper@2.0.0"
+                ]
+              },
+              {
+                "ref": "pkg:npm/contract-helper@2.0.0",
+                "dependsOn": []
+              }
+            ]
+          },
+          "status": 200,
+          "file": "an-sbom-published-for-the-coordinate/putSbom.json",
+          "frozen": {
+            "ids": [],
+            "instants": [
+              "$.createdAt"
+            ],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        }
+      ]
+    },
+    {
+      "name": "no docs bundle published for the coordinate",
+      "slug": "no-docs-bundle-published-for-the-coordinate",
+      "params": {
+        "path": "index.html",
+        "site": "contract-docs-site",
+        "version": "2100.1.0"
+      },
+      "dependsOn": [],
+      "operations": [
+        {
+          "operationId": "getDocsFile",
+          "method": "GET",
+          "path": "/artifacts/docs/docs/{site}/-/{version}/{path}",
+          "status": 404,
+          "frozen": {
+            "ids": [],
+            "instants": [],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        },
+        {
+          "operationId": "getDocsVersion",
+          "method": "GET",
+          "path": "/artifacts/docs/docs/{site}/-/{version}",
+          "status": 404,
+          "frozen": {
+            "ids": [],
+            "instants": [],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        },
+        {
+          "operationId": "listDocsVersions",
+          "method": "GET",
+          "path": "/artifacts/docs/docs/{site}",
+          "status": 404,
+          "frozen": {
+            "ids": [],
+            "instants": [],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        },
+        {
+          "operationId": "putDocs",
+          "method": "PUT",
+          "path": "/artifacts/docs/docs/{site}/-/{version}",
+          "contentType": "application/gzip",
+          "bodyBase64": "H4sIAAAAAAAA/8vMS0mt0Msoyc1hoBkwMDAwMDMxUTCAAHTawMDUBMEGiRsampoYMigY0M5JCFBaXJJYxGBAsV3onqOO62gObBRT8pNLKgtSFUBpwM6mJLMkJ9UuOT+vpCgxuUQhJT+52EYfIsg10G4dBaNgFIyCUUA9AAC8TqLQAAgAAA==",
+          "status": 201,
+          "file": "no-docs-bundle-published-for-the-coordinate/putDocs.json",
+          "frozen": {
+            "ids": [],
+            "instants": [
+              "$.publishedAt"
+            ],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        }
+      ]
+    },
+    {
+      "name": "no sbom published for the coordinate",
+      "slug": "no-sbom-published-for-the-coordinate",
+      "params": {
+        "coordinate": "maven/eu.wohlben.qits:contract-artifact",
+        "packageName": "eu.wohlben.qits:contract-artifact",
+        "packageType": "maven",
+        "version": "2100.1.0"
+      },
+      "dependsOn": [],
+      "operations": [
+        {
+          "operationId": "getSbom",
+          "method": "GET",
+          "path": "/artifacts/sboms/{packageType}/{packageName}/-/{version}",
+          "status": 404,
+          "frozen": {
+            "ids": [],
+            "instants": [],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        },
+        {
+          "operationId": "headSbom",
+          "method": "HEAD",
+          "path": "/artifacts/sboms/{packageType}/{packageName}/-/{version}",
+          "status": 404,
+          "frozen": {
+            "ids": [],
+            "instants": [],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        },
+        {
+          "operationId": "putSbom",
+          "method": "PUT",
+          "path": "/artifacts/sboms/{packageType}/{packageName}/-/{version}",
+          "contentType": "application/vnd.cyclonedx+json",
+          "body": {
+            "bomFormat": "CycloneDX",
+            "specVersion": "1.6",
+            "version": 1,
+            "metadata": {
+              "component": {
+                "bom-ref": "pkg:maven/eu.wohlben.qits/contract-artifact@2100.1.0",
+                "type": "library",
+                "name": "contract-artifact",
+                "version": "2100.1.0",
+                "purl": "pkg:maven/eu.wohlben.qits/contract-artifact@2100.1.0"
+              }
+            },
+            "components": [
+              {
+                "bom-ref": "pkg:maven/eu.wohlben.qits/contract-library@1.0.0",
+                "type": "library",
+                "name": "contract-library",
+                "version": "1.0.0",
+                "purl": "pkg:maven/eu.wohlben.qits/contract-library@1.0.0"
+              },
+              {
+                "bom-ref": "pkg:npm/contract-helper@2.0.0",
+                "type": "library",
+                "name": "contract-helper",
+                "version": "2.0.0",
+                "purl": "pkg:npm/contract-helper@2.0.0"
+              }
+            ],
+            "dependencies": [
+              {
+                "ref": "pkg:maven/eu.wohlben.qits/contract-artifact@2100.1.0",
+                "dependsOn": [
+                  "pkg:maven/eu.wohlben.qits/contract-library@1.0.0"
+                ]
+              },
+              {
+                "ref": "pkg:maven/eu.wohlben.qits/contract-library@1.0.0",
+                "dependsOn": [
+                  "pkg:npm/contract-helper@2.0.0"
+                ]
+              },
+              {
+                "ref": "pkg:npm/contract-helper@2.0.0",
+                "dependsOn": []
+              }
+            ]
+          },
+          "status": 201,
+          "file": "no-sbom-published-for-the-coordinate/putSbom.json",
+          "frozen": {
+            "ids": [],
+            "instants": [
+              "$.createdAt"
             ],
             "strings": [],
             "listFilteredTo": null

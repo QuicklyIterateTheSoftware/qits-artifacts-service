@@ -1,0 +1,10 @@
+{
+  "sites": [
+    {
+      "name": "contract-docs-site",
+      "versionCount": 1,
+      "latestVersion": "2100.1.0",
+      "latestPublishedAt": "2026-01-01T00:00:00Z"
+    }
+  ]
+}

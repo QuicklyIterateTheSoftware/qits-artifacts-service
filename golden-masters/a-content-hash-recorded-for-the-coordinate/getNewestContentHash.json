@@ -1,0 +1,6 @@
+{
+  "ecosystem": "maven",
+  "name": "eu.wohlben.qits:contract-artifact",
+  "version": "2100.1.0",
+  "contentHash": "v1:sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+}
