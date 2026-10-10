@@ -68,7 +68,8 @@ public class DaemonBrowseController {
    */
   @GET
   @Path("/{daemon}/versions")
-  @Operation(hidden = true)
+  // Hidden from the document, but named: golden-masters/ records it under this operationId.
+  @Operation(hidden = true, operationId = "listDaemonVersions")
   public ListDaemonVersionsResponse versions(
       @PathParam("repo") String repo, @PathParam("daemon") String daemon) {
     return new ListDaemonVersionsResponse(explorer.listDaemonVersions(repo, daemon));

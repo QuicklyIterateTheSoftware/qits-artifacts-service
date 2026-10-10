@@ -1,0 +1,18 @@
+{
+  "versions": [
+    {
+      "version": "2026.2.0",
+      "digest": "sha256:6caecc97403739b2273c00a43c649e5efdebddde20a0ed27ed4fe356a1344aa4",
+      "sizeBytes": 24,
+      "publishedAt": "2026-01-01T00:00:00Z",
+      "accessedAt": null
+    },
+    {
+      "version": "2026.1.0",
+      "digest": "sha256:b64194627597174960c6080e8c97b782a9093df02b14632ab7b9a0500274d8ba",
+      "sizeBytes": 24,
+      "publishedAt": "2026-01-01T00:00:00Z",
+      "accessedAt": null
+    }
+  ]
+}

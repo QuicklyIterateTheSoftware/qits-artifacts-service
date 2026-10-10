@@ -1,0 +1,56 @@
+{
+  "formatVersion": 1,
+  "provider": "qits-artifacts",
+  "states": [
+    {
+      "name": "a daemon nothing has published",
+      "slug": "a-daemon-nothing-has-published",
+      "params": {
+        "daemon": "contract-daemon",
+        "repository": "daemons"
+      },
+      "dependsOn": [],
+      "operations": [
+        {
+          "operationId": "listDaemonVersions",
+          "method": "GET",
+          "path": "/artifacts/api/repositories/{repository}/daemons/{daemon}/versions",
+          "status": 200,
+          "file": "a-daemon-nothing-has-published/listDaemonVersions.json",
+          "frozen": {
+            "ids": [],
+            "instants": [],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        }
+      ]
+    },
+    {
+      "name": "a daemon with two versions",
+      "slug": "a-daemon-with-two-versions",
+      "params": {
+        "daemon": "contract-daemon",
+        "repository": "daemons"
+      },
+      "dependsOn": [],
+      "operations": [
+        {
+          "operationId": "listDaemonVersions",
+          "method": "GET",
+          "path": "/artifacts/api/repositories/{repository}/daemons/{daemon}/versions",
+          "status": 200,
+          "file": "a-daemon-with-two-versions/listDaemonVersions.json",
+          "frozen": {
+            "ids": [],
+            "instants": [
+              "$.versions[*].publishedAt"
+            ],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        }
+      ]
+    }
+  ]
+}

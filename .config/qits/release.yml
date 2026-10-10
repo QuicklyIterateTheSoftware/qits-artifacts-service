@@ -1,6 +1,17 @@
 archetype: java-service
 artifacts:
   - { type: docker, name: qits/qits-artifacts, sbom: .sbom/sbom.json }
+# The provider golden masters (qits-1149): the platform packages `golden-masters/` as
+# `eu.wohlben.qits:qits-artifacts-golden-masters` and `@qits/artifacts-golden-masters`, each
+# published only when its content changed. `GoldenMasterRecordingTest` records them.
+#
+# No `pacts:` entry yet. This service's consumer pacts (contracts/consumer) wait on provider states
+# the seven providers have not recorded, so no `pacts/*.json` exists, and the platform refuses to
+# pack a declared provider with no file. Add `<provider-repository>: { packages: [maven] }` here
+# with the first file for that provider.
+contracts:
+  application: qits-artifacts
+  golden-masters: { from: golden-masters/, packages: [maven, npm] }
 userflows: qits-artifacts
 
 # THE VERIFY HERE RUNS WITH QUINOA ON, which is the opposite of every sibling and of the recipe.
