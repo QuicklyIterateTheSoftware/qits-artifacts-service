@@ -60,6 +60,12 @@
 
     <properties>
         <qits.auth-core.version>2026.1002.70617</qits.auth-core.version>
+        <!-- qits-http-core: QitsHttpClients.wrap puts a CLIENT span and X-Qits-Caller on every
+             outbound java.net.http.HttpClient this repo builds to another qits service, the same
+             way quarkus-opentelemetry already does for the REST client. Published by
+             libs/qits-integrations-quarkus, same publisher as qits-auth-core and qits-db-core
+             above. -->
+        <qits.http-core.version>0-qits-1198-local</qits.http-core.version>
         <!-- The two shared libraries the byte plane was carved into. Published from their own
              repositories (libs/qits-blobstore, libs/qits-registries) and consumed here like any
              other artifact.
@@ -251,6 +257,12 @@
                 <groupId>${project.groupId}</groupId>
                 <artifactId>qits-db-core</artifactId>
                 <version>${qits.db-core.version}</version>
+            </dependency>
+            <dependency>
+                <!-- QitsHttpClients, CallerServerFilter/CallerClientFilter and @RawHttpClient. -->
+                <groupId>${project.groupId}</groupId>
+                <artifactId>qits-http-core</artifactId>
+                <version>${qits.http-core.version}</version>
             </dependency>
             <dependency>
                 <!-- Test scope at every declaration site: the story framework runs in the build

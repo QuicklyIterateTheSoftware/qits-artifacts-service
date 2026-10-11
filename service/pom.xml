@@ -93,6 +93,14 @@
             <artifactId>qits-auth-core</artifactId>
         </dependency>
         <dependency>
+            <!-- RegistryTokenEndpoint wraps its outbound HttpClient to qits-idp through
+                 QitsHttpClients, and this is the app module whose jandex index CallerServerFilter /
+                 CallerClientFilter need to be discovered from, so every JAX-RS request this service
+                 serves records its inbound X-Qits-Caller too. -->
+            <groupId>${project.groupId}</groupId>
+            <artifactId>qits-http-core</artifactId>
+        </dependency>
+        <dependency>
             <groupId>io.quarkus</groupId>
             <artifactId>quarkus-arc</artifactId>
         </dependency>

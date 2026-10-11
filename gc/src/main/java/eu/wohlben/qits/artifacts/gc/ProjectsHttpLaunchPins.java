@@ -2,6 +2,7 @@ package eu.wohlben.qits.artifacts.gc;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import eu.wohlben.qits.http.QitsHttpClients;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import java.net.URI;
@@ -31,8 +32,12 @@ public class ProjectsHttpLaunchPins implements ProjectsLaunchPins {
   /** The service named in every refusal this reader makes. */
   public static final String SERVICE = "qits-projects";
 
-  private final HttpClient client =
-      HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(2)).build();
+  /**
+   * Wrapped through {@link QitsHttpClients} so this call to qits-projects opens a CLIENT span and
+   * carries {@code X-Qits-Caller}. Built in the injecting constructor, not at field declaration —
+   * a container-managed field's initialiser runs before field injection does.
+   */
+  private final HttpClient client;
 
   @ConfigProperty(name = "qits.artifacts.gc.pins.projects-base-url")
   String baseUrl;
@@ -41,6 +46,16 @@ public class ProjectsHttpLaunchPins implements ProjectsLaunchPins {
   Duration timeout;
 
   @Inject ObjectMapper objectMapper;
+
+  /** For the client proxy ArC puts in front of this bean, and for nothing else. */
+  ProjectsHttpLaunchPins() {
+    this.client = null;
+  }
+
+  @Inject
+  ProjectsHttpLaunchPins(QitsHttpClients clients) {
+    this.client = clients.wrap(HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(2)).build());
+  }
 
   @Override
   public String url() {

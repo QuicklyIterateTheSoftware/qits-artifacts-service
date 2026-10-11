@@ -8,6 +8,8 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import eu.wohlben.qits.http.QitsHttpClients;
+import io.opentelemetry.api.OpenTelemetry;
 import java.io.IOException;
 import java.time.Duration;
 import java.util.List;
@@ -205,7 +207,7 @@ class CiDaemonPinsTest {
     GcPinSources sources = new GcPinSources();
     // One pin each: an empty answer from these two is a refusal (qits-1172), not "nothing pinned".
     sources.cd = GcPinsTest::oneDeployment;
-    CiHttpDaemonPins ci = new CiHttpDaemonPins();
+    CiHttpDaemonPins ci = new CiHttpDaemonPins(QitsHttpClients.of(OpenTelemetry.noop(), null));
     ci.baseUrl = ciBaseUrl;
     ci.timeout = Duration.ofSeconds(5);
     ci.objectMapper = new ObjectMapper();

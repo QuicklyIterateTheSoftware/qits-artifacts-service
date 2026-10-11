@@ -2,6 +2,7 @@ package eu.wohlben.qits.artifacts.gc;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import eu.wohlben.qits.http.QitsHttpClients;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import java.net.URI;
@@ -63,8 +64,12 @@ public class MaintenanceHttpDependencyPins implements MaintenanceDependencyPins 
    */
   static final Set<String> ECOSYSTEMS = Set.of("maven", "npm", "docker", "daemon");
 
-  private final HttpClient client =
-      HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(2)).build();
+  /**
+   * Wrapped through {@link QitsHttpClients} so this call to qits-maintenance opens a CLIENT span
+   * and carries {@code X-Qits-Caller}. Built in the injecting constructor, not at field
+   * declaration — a container-managed field's initialiser runs before field injection does.
+   */
+  private final HttpClient client;
 
   @ConfigProperty(name = "qits.artifacts.gc.pins.maintenance-base-url")
   String baseUrl;
@@ -73,6 +78,16 @@ public class MaintenanceHttpDependencyPins implements MaintenanceDependencyPins 
   Duration timeout;
 
   @Inject ObjectMapper objectMapper;
+
+  /** For the client proxy ArC puts in front of this bean, and for nothing else. */
+  MaintenanceHttpDependencyPins() {
+    this.client = null;
+  }
+
+  @Inject
+  MaintenanceHttpDependencyPins(QitsHttpClients clients) {
+    this.client = clients.wrap(HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(2)).build());
+  }
 
   @Override
   public String url() {

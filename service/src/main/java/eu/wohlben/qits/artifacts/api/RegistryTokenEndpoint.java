@@ -2,6 +2,7 @@ package eu.wohlben.qits.artifacts.api;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import eu.wohlben.qits.http.QitsHttpClients;
 import io.vertx.core.http.HttpHeaders;
 import io.vertx.core.http.HttpServerRequest;
 import io.vertx.core.json.JsonObject;
@@ -84,9 +85,14 @@ public class RegistryTokenEndpoint {
    * the other ten: an <b>instance</b> field, never a static one, or native-image freezes an
    * {@code HttpClientFacade} into the image heap and the build fails. The rule travels with the
    * client.
+   *
+   * <p>Wrapped through {@link QitsHttpClients} so this relay to qits-idp opens a CLIENT span and
+   * carries {@code X-Qits-Caller}, same as every other internal client in this repository. Built
+   * in the injecting constructor rather than at field declaration, because the field initialiser
+   * of a container-managed field runs before field injection does — a wrap here would see an unset
+   * {@code clients}.
    */
-  private final HttpClient client =
-      HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(2)).build();
+  private final HttpClient client;
 
   /**
    * qits-platform-idp's token endpoint. Derived in {@code application.properties} from {@code
@@ -111,6 +117,16 @@ public class RegistryTokenEndpoint {
   Optional<String> tokenRealm;
 
   @Inject ObjectMapper objectMapper;
+
+  /** For the client proxy ArC puts in front of this bean, and for nothing else. */
+  RegistryTokenEndpoint() {
+    this.client = null;
+  }
+
+  @Inject
+  RegistryTokenEndpoint(QitsHttpClients clients) {
+    this.client = clients.wrap(HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(2)).build());
+  }
 
   /**
    * Both verbs, because clients differ: docker GETs the realm with {@code ?service=&scope=}, while

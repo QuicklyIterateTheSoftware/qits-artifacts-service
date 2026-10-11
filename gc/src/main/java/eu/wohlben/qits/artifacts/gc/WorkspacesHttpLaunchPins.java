@@ -2,6 +2,7 @@ package eu.wohlben.qits.artifacts.gc;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import eu.wohlben.qits.http.QitsHttpClients;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import java.net.URI;
@@ -35,8 +36,12 @@ public class WorkspacesHttpLaunchPins implements WorkspacesLaunchPins {
   /** The service named in every refusal this reader makes. */
   public static final String SERVICE = "qits-workspaces";
 
-  private final HttpClient client =
-      HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(2)).build();
+  /**
+   * Wrapped through {@link QitsHttpClients} so this call to qits-workspaces opens a CLIENT span
+   * and carries {@code X-Qits-Caller}. Built in the injecting constructor, not at field
+   * declaration — a container-managed field's initialiser runs before field injection does.
+   */
+  private final HttpClient client;
 
   @ConfigProperty(name = "qits.artifacts.gc.pins.workspaces-base-url")
   String baseUrl;
@@ -45,6 +50,16 @@ public class WorkspacesHttpLaunchPins implements WorkspacesLaunchPins {
   Duration timeout;
 
   @Inject ObjectMapper objectMapper;
+
+  /** For the client proxy ArC puts in front of this bean, and for nothing else. */
+  WorkspacesHttpLaunchPins() {
+    this.client = null;
+  }
+
+  @Inject
+  WorkspacesHttpLaunchPins(QitsHttpClients clients) {
+    this.client = clients.wrap(HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(2)).build());
+  }
 
   @Override
   public String url() {
