@@ -165,7 +165,6 @@ class AdminWriteGuardTest {
                                      "name":"eu.wohlben.qits:qits-auth-core",
                                      "version":"2026.1.1","repository":"qits-artifacts-service",
                                      "manifestPath":"pom.xml"}]},
-                     "configuredImages":{"pins":[]},
                      "workspaceLaunches":{"pins":[]},
                      "projectLaunches":{"pins":[]}}}
             """)

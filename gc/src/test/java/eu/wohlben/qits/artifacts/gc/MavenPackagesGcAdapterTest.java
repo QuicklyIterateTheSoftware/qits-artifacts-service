@@ -633,7 +633,6 @@ class MavenPackagesGcAdapterTest extends GcFixture {
         Set.of(coordinates),
         Set.of(),
         Set.of(),
-        Set.of(),
         List.of());
   }
 

@@ -15,14 +15,17 @@ import java.util.Optional;
  *
  * <p>Each member is the peer's response body <b>verbatim</b>: {@code deployments} is what {@code
  * GET /deployments/api/pins} answered, {@code ciDaemon} is what {@code GET /ci/api/daemon}
- * answered, {@code dependencies} is what {@code GET /maintenance/api/pins} answered, {@code
- * configuredImages} is what {@code GET /configuration/api/pins} answered, and {@code
+ * answered, {@code dependencies} is what {@code GET /maintenance/api/pins} answered, and {@code
  * workspaceLaunches} / {@code projectLaunches} are what {@code GET /workspaces/api/pins} and {@code
  * GET /projects/api/pins} answered. Verbatim rather than a re-shaped keep-set, because they are then
  * read by the very same parsers the HTTP readers use ({@link CdHttpDeploymentPins#parse}, {@link
  * CiHttpDaemonPins#parse}, {@link MaintenanceHttpDependencyPins#parse}, {@link
- * ConfigurationHttpImagePins#parse}, {@link LaunchImagePins#parse}); a caller-shaped keep-set would
- * be a second definition of the same document waiting to disagree with the first.
+ * LaunchImagePins#parse}); a caller-shaped keep-set would be a second definition of the same
+ * document waiting to disagree with the first.
+ *
+ * <p><b>A member this record does not read is ignored.</b> An orchestrator released before
+ * qits-1176 still sends {@code configuredImages}, the body of the retired {@code GET
+ * /configuration/api/pins}; nothing reads it.
  *
  * <p><b>A missing member is not "nothing is pinned".</b> It is that source unanswered, and it fails
  * the run closed exactly as an unreachable service does: the plan reports itself non-executable and
@@ -40,8 +43,6 @@ import java.util.Optional;
  * @param ciDaemon qits-ci's daemon document, or null when the caller sent none
  * @param dependencies qits-platform-maintenance's dependency pins document, or null when the caller
  *     sent none
- * @param configuredImages qits-configuration's configured image document, or null when the caller
- *     sent none
  * @param workspaceLaunches qits-workspaces' launch pins document, or null when the caller sent none
  * @param projectLaunches qits-projects' launch pins document, or null when the caller sent none
  */
@@ -49,7 +50,6 @@ public record GcSuppliedPins(
     JsonNode deployments,
     JsonNode ciDaemon,
     JsonNode dependencies,
-    JsonNode configuredImages,
     JsonNode workspaceLaunches,
     JsonNode projectLaunches) {
 
@@ -61,9 +61,6 @@ public record GcSuppliedPins(
 
   /** How the dependency source is named on a report when it was supplied rather than fetched. */
   public static final String MAINTENANCE_SOURCE = "supplied: qits-platform-maintenance";
-
-  /** How the configured-image source is named on a report when it was supplied. */
-  public static final String CONFIGURATION_SOURCE = "supplied: qits-configuration";
 
   /** How the workspace launch source is named on a report when it was supplied. */
   public static final String WORKSPACES_SOURCE = "supplied: qits-workspaces";
@@ -78,7 +75,6 @@ public record GcSuppliedPins(
    * {"pins": {"deployments":       &lt;verbatim body of GET /deployments/api/pins&gt;,
    *           "ciDaemon":          &lt;verbatim body of GET /ci/api/daemon&gt;,
    *           "dependencies":      &lt;verbatim body of GET /maintenance/api/pins&gt;,
-   *           "configuredImages":  &lt;verbatim body of GET /configuration/api/pins&gt;,
    *           "workspaceLaunches": &lt;verbatim body of GET /workspaces/api/pins&gt;,
    *           "projectLaunches":   &lt;verbatim body of GET /projects/api/pins&gt;}}
    * </pre>
@@ -109,14 +105,13 @@ public record GcSuppliedPins(
     if (!pins.isObject()) {
       throw new IllegalArgumentException(
           "'pins' must be an object holding 'deployments', 'ciDaemon', 'dependencies',"
-              + " 'configuredImages', 'workspaceLaunches' and 'projectLaunches'");
+              + " 'workspaceLaunches' and 'projectLaunches'");
     }
     return Optional.of(
         new GcSuppliedPins(
             pins.get("deployments"),
             pins.get("ciDaemon"),
             pins.get("dependencies"),
-            pins.get("configuredImages"),
             pins.get("workspaceLaunches"),
             pins.get("projectLaunches")));
   }
@@ -151,16 +146,6 @@ public record GcSuppliedPins(
   public List<MaintenanceDependencyPins.DependencyPin> dependencyPins() {
     return MaintenanceHttpDependencyPins.parse(
         require(dependencies, "dependencies"), "the supplied document");
-  }
-
-  /**
-   * The configured container images, read from the supplied document.
-   *
-   * @throws IllegalStateException no document was supplied, or its shape cannot be read
-   */
-  public List<ConfigurationImagePins.ImagePin> configuredImagePins() {
-    return ConfigurationHttpImagePins.parse(
-        require(configuredImages, "configuredImages"), "the supplied document");
   }
 
   /**

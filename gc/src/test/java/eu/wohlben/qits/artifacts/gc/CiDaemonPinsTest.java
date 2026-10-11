@@ -133,11 +133,6 @@ class CiDaemonPinsTest {
           throw new IllegalStateException(
               "qits-platform-maintenance unreachable at http://qits-platform-maintenance:8080");
         };
-    sources.configuration =
-        () -> {
-          throw new IllegalStateException(
-              "qits-configuration unreachable at http://qits-configuration:8080");
-        };
     sources.workspaces =
         () -> {
           throw new IllegalStateException(
@@ -151,11 +146,10 @@ class CiDaemonPinsTest {
 
     GcPins pins = sources.fetch();
 
-    assertEquals(6, pins.failures().size());
+    assertEquals(5, pins.failures().size());
     assertTrue(pins.whyIncomplete().contains("qits-platform-deployments"));
     assertTrue(pins.whyIncomplete().contains("qits-ci"));
     assertTrue(pins.whyIncomplete().contains("qits-platform-maintenance"));
-    assertTrue(pins.whyIncomplete().contains("qits-configuration"));
     assertTrue(pins.whyIncomplete().contains("qits-workspaces"));
     assertTrue(pins.whyIncomplete().contains("qits-projects"));
   }
@@ -199,10 +193,10 @@ class CiDaemonPinsTest {
   }
 
   /**
-   * The six sources as CDI would wire them, with only ci at the stub and the other five answering
+   * The five sources as CDI would wire them, with only ci at the stub and the other four answering
    * with nothing.
    *
-   * <p>All six are set because they are all injection points: a collector built by hand with any of
+   * <p>All five are set because they are all injection points: a collector built by hand with any of
    * them left null meets an NPE rather than the fold the case is about. Answering with nothing is
    * the honest stand-in — this suite is about qits-ci, and a source that answers empty neither fails
    * the aggregate nor contributes to it.
@@ -217,7 +211,6 @@ class CiDaemonPinsTest {
     ci.objectMapper = new ObjectMapper();
     sources.ci = ci;
     sources.maintenance = GcPinsTest::oneDependency;
-    sources.configuration = List::of;
     sources.workspaces = List::of;
     sources.projects = List::of;
     return sources;

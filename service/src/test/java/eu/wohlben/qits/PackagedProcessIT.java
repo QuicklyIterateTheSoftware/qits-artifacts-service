@@ -120,7 +120,6 @@ public class PackagedProcessIT {
       overrides.put("qits.artifacts.gc.pins.cd-base-url", "http://localhost:1/deployments/api");
       overrides.put("qits.artifacts.gc.pins.ci-base-url", "http://localhost:1/ci/api");
       overrides.put("qits.artifacts.gc.pins.maintenance-base-url", "http://localhost:1/maintenance/api");
-      overrides.put("qits.artifacts.gc.pins.configuration-base-url", "http://localhost:1/configuration/api");
       overrides.put("qits.artifacts.gc.pins.workspaces-base-url", "http://localhost:1/workspaces/api");
       overrides.put("qits.artifacts.gc.pins.projects-base-url", "http://localhost:1/projects/api");
       // The mirror upstream override stays although nothing here mirrors. V14 took V7's three

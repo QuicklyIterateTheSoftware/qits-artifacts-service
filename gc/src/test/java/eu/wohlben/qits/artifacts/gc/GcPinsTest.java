@@ -28,9 +28,9 @@ import org.junit.jupiter.api.Test;
 /**
  * What a run does when a pin source cannot answer: the sweep refuses whole, the dry-run degrades.
  *
- * <p>This suite runs under the shipped test configuration, which points all six pin urls at a
+ * <p>This suite runs under the shipped test configuration, which points all five pin urls at a
  * closed port — so every case here is the deployed failure rather than a simulated one. None of the
- * six peers exists in this repository, and that is what makes the refusal path the easy one to
+ * five peers exists in this repository, and that is what makes the refusal path the easy one to
  * exercise honestly.
  *
  * <p><b>The settlement's rule is all-or-nothing, and the second case is why.</b> It would be
@@ -61,17 +61,16 @@ class GcPinsTest extends GcFixture {
     GcPins pins = pinSources.fetch();
 
     assertFalse(pins.complete());
-    assertEquals(6, pins.failures().size(), "every source is asked, so every outage is named");
+    assertEquals(5, pins.failures().size(), "every source is asked, so every outage is named");
     assertTrue(pins.whyIncomplete().contains("qits-platform-deployments"));
     assertTrue(pins.whyIncomplete().contains("qits-ci"));
     assertTrue(pins.whyIncomplete().contains("qits-platform-maintenance"));
-    assertTrue(pins.whyIncomplete().contains("qits-configuration"));
     assertTrue(pins.whyIncomplete().contains("qits-workspaces"));
     assertTrue(pins.whyIncomplete().contains("qits-projects"));
 
     // And the provenance says which url produced which outage, so a fix starts from the report
     // rather than from a grep for the config key.
-    assertEquals(6, pins.sources().size());
+    assertEquals(5, pins.sources().size());
     GcPinSource cd = source(pins, "qits-platform-deployments");
     assertFalse(cd.answered());
     assertTrue(cd.url().endsWith("/deployments/api/pins"), cd.url());
@@ -80,7 +79,6 @@ class GcPinsTest extends GcFixture {
     assertEquals(List.of(), cd.keeps());
     assertTrue(source(pins, "qits-ci").url().endsWith("/ci/api/daemon"));
     assertTrue(source(pins, "qits-platform-maintenance").url().endsWith("/maintenance/api/pins"));
-    assertTrue(source(pins, "qits-configuration").url().endsWith("/configuration/api/pins"));
     assertTrue(source(pins, "qits-workspaces").url().endsWith("/workspaces/api/pins"));
     assertTrue(source(pins, "qits-projects").url().endsWith("/projects/api/pins"));
 
@@ -90,7 +88,6 @@ class GcPinsTest extends GcFixture {
     assertEquals(java.util.Set.of(), pins.npmDependencies());
     assertEquals(java.util.Set.of(), pins.manifestImages());
     assertEquals(java.util.Set.of(), pins.daemonDependencies());
-    assertEquals(java.util.Set.of(), pins.configuredImages());
     assertEquals(java.util.Set.of(), pins.workspaceLaunchImages());
     assertEquals(java.util.Set.of(), pins.projectLaunchImages());
   }
@@ -148,12 +145,11 @@ class GcPinsTest extends GcFixture {
   }
 
   @Test
-  void theTwoConsumptionSourcesFoldIntoTheirEcosystemsOwnCoordinateSpelling() {
-    // The fold that makes the P3D windows defensible: what repositories still build against, and
-    // what the platform is configured to launch, in the exact string each adapter's identities are
-    // spelled with — so the lookup on the other side is an equality test and never a translation.
-    // A maven pin joins on "g:a:v", an npm pin on "name@version", a docker pin and a configured
-    // image on "full/image:tag".
+  void theConsumptionSourceFoldsIntoEachEcosystemsOwnCoordinateSpelling() {
+    // The fold that makes the P3D windows defensible: what repositories still build against, in the
+    // exact string each adapter's identities are spelled with — so the lookup on the other side is
+    // an equality test and never a translation. A maven pin joins on "g:a:v", an npm pin on
+    // "name@version", a docker pin on "full/image:tag".
     GcPinSources sources = answering();
     sources.maintenance =
         () ->
@@ -184,21 +180,6 @@ class GcPinsTest extends GcFixture {
                     "2026.903.85122",
                     "qits-ci-service",
                     "pom.xml"));
-    sources.configuration =
-        () ->
-            List.of(
-                new ConfigurationImagePins.ImagePin(
-                    "qits/workspace",
-                    "2026.904.160522",
-                    "qits-workspaces",
-                    "env.QITS_WORKSPACE_IMAGE_VERSION"),
-                // Two applications, one image version — one keep, two rows.
-                new ConfigurationImagePins.ImagePin(
-                    "qits/workspace",
-                    "2026.904.160522",
-                    "qits-projects",
-                    "env.QITS_PROJECTS_REFINEMENT_IMAGE_VERSION"));
-
     GcPins pins = sources.fetch();
 
     assertTrue(pins.complete());
@@ -207,13 +188,10 @@ class GcPinsTest extends GcFixture {
         pins.mavenDependencies());
     assertEquals(java.util.Set.of("@qits/ui-components@2026.902.204627"), pins.npmDependencies());
     assertEquals(java.util.Set.of("qits/workspace-base:2026.902.143920"), pins.manifestImages());
-    assertEquals(java.util.Set.of("qits/workspace:2026.904.160522"), pins.configuredImages());
 
     assertEquals(GcPins.BY_MANIFEST, pins.pinsMavenCoordinate("eu.wohlben.qits:qits-blobstore:2026.903.85122"));
     assertEquals(GcPins.BY_MANIFEST, pins.pinsNpmCoordinate("@qits/ui-components@2026.902.204627"));
     assertEquals(GcPins.BY_MANIFEST, pins.pinsManifestImage("qits/workspace-base", "2026.902.143920"));
-    assertEquals(GcPins.BY_CONFIGURATION, pins.pinsConfiguredImage("qits/workspace", "2026.904.160522"));
-    assertNull(pins.pinsConfiguredImage("qits/workspace-base", "2026.902.143920"));
 
     GcPinSource maintenance = source(pins, "qits-platform-maintenance");
     assertEquals(4, maintenance.pinCount(), "references, which is what maintenance answers with");
@@ -225,10 +203,6 @@ class GcPinsTest extends GcFixture {
         maintenance.keeps(),
         "the three coordinates the four references resolve to, in name order");
     assertTrue(maintenance.outcome().contains("1 maven, 1 npm, 1 docker"), maintenance.outcome());
-
-    GcPinSource configuration = source(pins, "qits-configuration");
-    assertEquals(2, configuration.pinCount(), "entries, which is what configuration answers with");
-    assertEquals(List.of("qits/workspace:2026.904.160522"), configuration.keeps());
   }
 
   @Test
@@ -286,23 +260,10 @@ class GcPinsTest extends GcFixture {
   }
 
   @Test
-  void theTwoEffectiveSourcesAreSeparateKeepSetsAndMayDisagreeWithTheConfiguredOne() {
-    // The residual the fifth source could not close, written as a fixture: qits-configuration says
-    // the workspace image is 2026.904.160522 — what the NEXT deploy of qits-workspaces will be
-    // handed — while qits-workspaces itself is still running 2026.903.120000 and pulling that. Both
-    // must survive, and they are three different coordinates over two images.
-    //
+  void theTwoLaunchSourcesAreSeparateKeepSets() {
     // Two sets rather than one because qits/workspace is launched by BOTH services, and a report has
     // to be able to say which of them saved a tag.
     GcPinSources sources = answering();
-    sources.configuration =
-        () ->
-            List.of(
-                new ConfigurationImagePins.ImagePin(
-                    "qits/workspace",
-                    "2026.904.160522",
-                    "qits-workspaces",
-                    "env.QITS_WORKSPACE_IMAGE_VERSION"));
     sources.workspaces =
         () ->
             List.of(
@@ -320,7 +281,6 @@ class GcPinsTest extends GcFixture {
     GcPins pins = sources.fetch();
 
     assertTrue(pins.complete());
-    assertEquals(java.util.Set.of("qits/workspace:2026.904.160522"), pins.configuredImages());
     assertEquals(
         java.util.Set.of(
             "qits/workspace:2026.903.120000", "qits/workspace-editor:2026.904.100239"),
@@ -329,19 +289,13 @@ class GcPinsTest extends GcFixture {
         java.util.Set.of("qits/project-agent:2026.903.090000", "qits/workspace:2026.903.120000"),
         pins.projectLaunchImages());
 
-    // The three sentences, and they are three because a reviewer reads them to decide whether a tag
-    // may go — "configured" and "being pulled" are different answers to that question.
-    assertEquals(
-        GcPins.BY_CONFIGURATION, pins.pinsConfiguredImage("qits/workspace", "2026.904.160522"));
+    // Two sentences, one per service, because a reviewer reads them to decide whether a tag may go.
     assertEquals(
         GcPins.BY_WORKSPACE_LAUNCH,
         pins.pinsWorkspaceLaunchImage("qits/workspace", "2026.903.120000"));
     assertEquals(
         GcPins.BY_PROJECT_LAUNCH,
         pins.pinsProjectLaunchImage("qits/project-agent", "2026.903.090000"));
-    assertNull(
-        pins.pinsConfiguredImage("qits/workspace", "2026.903.120000"),
-        "the version being pulled is NOT the configured one, which is the whole point");
     assertNull(pins.pinsProjectLaunchImage("qits/workspace-editor", "2026.904.100239"));
 
     GcPinSource workspaces = source(pins, "qits-workspaces");
@@ -381,23 +335,8 @@ class GcPinsTest extends GcFixture {
     assertEquals(java.util.Set.of("qits/project-agent:1"), pins.projectLaunchImages());
   }
 
-  @Test
-  void anEmptyConfiguredImageAnswerIsAnAnswerRatherThanAnOutage() {
-    // A platform that has released none of the on-demand images yet. It must read as a source that
-    // answered with nothing pinned — the opposite of an outage, and the state a fresh install is in.
-    GcPinSources sources = answering();
-
-    GcPins pins = sources.fetch();
-
-    assertTrue(pins.complete());
-    GcPinSource configuration = source(pins, "qits-configuration");
-    assertTrue(configuration.answered());
-    assertEquals(0, configuration.pinCount());
-    assertEquals(List.of(), configuration.keeps());
-  }
-
   /**
-   * A collector whose six ports all answer with nothing, for a case to override the one it is
+   * A collector whose five ports all answer with nothing, for a case to override the one it is
    * about.
    *
    * <p>The fields are the CDI injection points, and a hand-built collector leaves them null — so a
@@ -410,7 +349,6 @@ class GcPinsTest extends GcFixture {
     sources.cd = GcPinsTest::oneDeployment;
     sources.ci = () -> new CiDaemonPins.DaemonPin("", "", "", "none");
     sources.maintenance = GcPinsTest::oneDependency;
-    sources.configuration = List::of;
     sources.workspaces = List::of;
     sources.projects = List::of;
     return sources;
@@ -486,7 +424,6 @@ class GcPinsTest extends GcFixture {
     assertTrue(report.aborted().contains("qits-platform-deployments"));
     assertTrue(report.aborted().contains("qits-ci"));
     assertTrue(report.aborted().contains("qits-platform-maintenance"));
-    assertTrue(report.aborted().contains("qits-configuration"));
     assertTrue(report.aborted().contains("qits-workspaces"));
     assertTrue(report.aborted().contains("qits-projects"));
     assertFalse(report.dryRun(), "it is still the execute surface's receipt");
@@ -501,7 +438,7 @@ class GcPinsTest extends GcFixture {
         report.untouchable().reason().contains("not computed"),
         "no census was taken, so claiming an empty row-less pool would be claiming something");
     assertEquals(
-        6,
+        5,
         report.pins().size(),
         "a receipt of a run that never started still shows what it tried to read");
     assertFalse(report.pins().get(0).answered());
@@ -524,8 +461,8 @@ class GcPinsTest extends GcFixture {
     GcPlanReport report = planner.plan();
 
     assertFalse(report.executable());
-    assertEquals(6, report.pinFailures().size());
-    assertEquals(6, report.pins().size(), "and the same six sources are named in the pins section");
+    assertEquals(5, report.pinFailures().size());
+    assertEquals(5, report.pins().size(), "and the same five sources are named in the pins section");
     GcTypePlan oci = typePlan(report, OciImagesProfile.KEY);
     assertNotNull(oci.error());
     assertTrue(oci.error().contains("live pins unavailable"));

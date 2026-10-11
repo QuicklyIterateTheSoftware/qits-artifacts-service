@@ -19,9 +19,9 @@ import java.util.function.Function;
  * each answer</b> (qits-1149) — the one table the consumer pact tests and the pact file tests are
  * built from, so a committed pact and the verified behaviour cannot drift apart.
  *
- * <p><b>Seven calls, seven providers, one row each.</b> Six are the GC pin readers in the {@code gc}
+ * <p><b>Six calls, six providers, one row each.</b> Five are the GC pin readers in the {@code gc}
  * module, one GET each, made by {@code GcPinSources.fetch()} at the start of every plan and sweep;
- * the seventh is {@code RegistryTokenEndpoint}'s relay of a docker login to the idp's token door.
+ * the sixth is {@code RegistryTokenEndpoint}'s relay of a docker login to the idp's token door.
  *
  * <p><b>One trigger per GC row, not five.</b> The five GC routes ({@code GET /gc/plan}, {@code GET
  * /gc/repositories}, {@code GET /gc/repositories/{repository}/plan}, and the two sweeps when no
@@ -48,8 +48,6 @@ public final class ConsumerContract {
   public static final Provider CI = new Provider("qits-ci", "qits-ci-service");
   public static final Provider MAINTENANCE =
       new Provider("qits-maintenance", "qits-maintenance-service");
-  public static final Provider CONFIGURATION =
-      new Provider("qits-configuration", "qits-configuration-service");
   public static final Provider WORKSPACES =
       new Provider("qits-workspaces", "qits-workspaces-service");
   public static final Provider PROJECTS = new Provider("qits-projects", "qits-projects-service");
@@ -161,19 +159,6 @@ public final class ConsumerContract {
                   "$.pins[*].manifestPath"),
               Request.NONE,
               base -> ContractPinReaders.maintenance(base, MAPPER).pins(),
-              "$.pins"),
-          new Row(
-              CONFIGURATION,
-              GC_PLAN,
-              "configured image pins",
-              "listImagePins",
-              List.of(
-                  "$.pins[*].image",
-                  "$.pins[*].version",
-                  "$.pins[*].application",
-                  "$.pins[*].key"),
-              Request.NONE,
-              base -> ContractPinReaders.configuration(base, MAPPER).pins(),
               "$.pins"),
           new Row(
               WORKSPACES,

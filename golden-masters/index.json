@@ -325,17 +325,6 @@
                   }
                 ]
               },
-              "configuredImages": {
-                "generatedAt": "2026-09-04T20:00:00Z",
-                "pins": [
-                  {
-                    "image": "qits/workspace",
-                    "version": "2026.904.160522",
-                    "application": "qits-workspaces",
-                    "key": "env.QITS_WORKSPACE_IMAGE_VERSION"
-                  }
-                ]
-              },
               "workspaceLaunches": {
                 "generatedAt": "2026-09-05T06:00:00Z",
                 "pins": [
@@ -420,17 +409,6 @@
                     "version": "2026.903.85122",
                     "repository": "qits-githost-service",
                     "manifestPath": "pom.xml"
-                  }
-                ]
-              },
-              "configuredImages": {
-                "generatedAt": "2026-09-04T20:00:00Z",
-                "pins": [
-                  {
-                    "image": "qits/workspace",
-                    "version": "2026.904.160522",
-                    "application": "qits-workspaces",
-                    "key": "env.QITS_WORKSPACE_IMAGE_VERSION"
                   }
                 ]
               },

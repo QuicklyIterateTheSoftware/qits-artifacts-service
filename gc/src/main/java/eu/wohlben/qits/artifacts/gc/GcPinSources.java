@@ -15,13 +15,13 @@ import java.util.TreeSet;
 import java.util.function.Supplier;
 
 /**
- * Reads all six pin sources once and folds them into one {@link GcPins}.
+ * Reads all five pin sources once and folds them into one {@link GcPins}.
  *
  * <p>Called at the start of a plan and at the start of a sweep, and nowhere else — one aggregate per
  * run is what keeps two halves of a run from planning against two different truths.
  *
  * <p><b>Every source is asked even when an earlier one fails.</b> A run that stopped at the first
- * failure would report one broken service and hide the other five, and whoever fixed it would find
+ * failure would report one broken service and hide the other four, and whoever fixed it would find
  * the next run just as dead with no warning it was coming. Every failure lands in {@link
  * GcPins#failures()}, and the run's refusal is what the executor and the planner do with it.
  *
@@ -41,7 +41,6 @@ public class GcPinSources {
   @Inject CdDeploymentPins cd;
   @Inject CiDaemonPins ci;
   @Inject MaintenanceDependencyPins maintenance;
-  @Inject ConfigurationImagePins configuration;
   @Inject WorkspacesLaunchPins workspaces;
   @Inject ProjectsLaunchPins projects;
 
@@ -57,7 +56,6 @@ public class GcPinSources {
         new Source<>("qits-platform-deployments", cd.url(), cd::pins),
         new Source<>("qits-ci", ci.url(), ci::daemonPin),
         new Source<>("qits-platform-maintenance", maintenance.url(), maintenance::pins),
-        new Source<>("qits-configuration", configuration.url(), configuration::pins),
         new Source<>(WorkspacesHttpLaunchPins.SERVICE, workspaces.url(), workspaces::pins),
         new Source<>(ProjectsHttpLaunchPins.SERVICE, projects.url(), projects::pins));
   }
@@ -78,17 +76,15 @@ public class GcPinSources {
         new Source<>(GcSuppliedPins.CD_SOURCE, "", supplied::deploymentPins),
         new Source<>(GcSuppliedPins.CI_SOURCE, "", supplied::daemonPin),
         new Source<>(GcSuppliedPins.MAINTENANCE_SOURCE, "", supplied::dependencyPins),
-        new Source<>(GcSuppliedPins.CONFIGURATION_SOURCE, "", supplied::configuredImagePins),
         new Source<>(GcSuppliedPins.WORKSPACES_SOURCE, "", supplied::workspaceLaunchPins),
         new Source<>(GcSuppliedPins.PROJECTS_SOURCE, "", supplied::projectLaunchPins));
   }
 
-  /** All six answers folded into one aggregate, whoever produced them. */
+  /** All five answers folded into one aggregate, whoever produced them. */
   private GcPins fold(
       Source<List<CdDeploymentPins.ApplicationPin>> cdSource,
       Source<CiDaemonPins.DaemonPin> ciSource,
       Source<List<MaintenanceDependencyPins.DependencyPin>> maintenanceSource,
-      Source<List<ConfigurationImagePins.ImagePin>> configurationSource,
       Source<List<LaunchImagePins.LaunchPin>> workspacesSource,
       Source<List<LaunchImagePins.LaunchPin>> projectsSource) {
     Map<String, Set<String>> deployments = new HashMap<>();
@@ -98,7 +94,6 @@ public class GcPinSources {
     Set<String> npmDependencies = new TreeSet<>();
     Set<String> manifestImages = new TreeSet<>();
     Set<String> daemonDependencies = new TreeSet<>();
-    Set<String> configuredImages = new TreeSet<>();
     Set<String> workspaceLaunchImages = new TreeSet<>();
     Set<String> projectLaunchImages = new TreeSet<>();
     List<String> failures = new ArrayList<>();
@@ -234,30 +229,7 @@ public class GcPinSources {
       daemonDependencies.clear();
     }
 
-    Instant startedConfiguration = Instant.now();
-    try {
-      List<ConfigurationImagePins.ImagePin> pins = configurationSource.read().get();
-      for (ConfigurationImagePins.ImagePin pin : pins) {
-        configuredImages.add(pin.image() + ":" + pin.version());
-      }
-      sources.add(
-          answered(
-              configurationSource,
-              startedConfiguration,
-              pins.size()
-                  + " configured entries over "
-                  + configuredImages.size()
-                  + " image coordinates — what a launch would pull, which no deployment row names",
-              pins.size(),
-              configuredImages));
-    } catch (RuntimeException unreachable) {
-      String why = configurationSource.name() + " configured images: " + message(unreachable);
-      failures.add(why);
-      sources.add(failed(configurationSource, startedConfiguration, why));
-      configuredImages.clear();
-    }
-
-    // The two EFFECTIVE sources. Same fold twice, because they are two services answering the same
+    // The two launch sources. Same fold twice, because they are two services answering the same
     // question about themselves — and two sets rather than one, because a report has to be able to
     // say which of them saved a tag.
     foldLaunches(
@@ -278,7 +250,6 @@ public class GcPinSources {
         npmDependencies,
         manifestImages,
         daemonDependencies,
-        configuredImages,
         workspaceLaunchImages,
         projectLaunchImages,
         failures,
@@ -316,8 +287,7 @@ public class GcPinSources {
                   + images.size()
                   + " coordinates — what "
                   + start
-                  + " would pull TODAY, which the configured version only names after the next"
-                  + " deploy",
+                  + " would pull TODAY",
               pins.size(),
               images));
     } catch (RuntimeException unreachable) {
@@ -336,8 +306,8 @@ public class GcPinSources {
    * an empty list from qits-deployments or qits-platform-maintenance is a source that lost its
    * data or answered before it had any — and read as an answer, it condemns every version. It
    * lands in the fold's catch, and the run deletes nothing. The other sources may truly be empty:
-   * qits-ci's blank pin is documented as an answer, and qits-configuration and the two launching
-   * services name only what they are configured or about to start.
+   * qits-ci's blank pin is documented as an answer, and the two launching services name only what
+   * they are about to start.
    */
   static <T> List<T> refuseEmpty(List<T> pins, String what) {
     if (pins == null || pins.isEmpty()) {

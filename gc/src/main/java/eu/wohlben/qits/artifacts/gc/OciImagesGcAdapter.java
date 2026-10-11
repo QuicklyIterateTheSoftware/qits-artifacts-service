@@ -189,28 +189,23 @@ public class OciImagesGcAdapter implements GcTypeAdapter {
   }
 
   /**
-   * Five coordinate pins and two structural belts: every coordinate qits-platform-deployments holds,
-   * every image a repository's Dockerfile references, every image qits-configuration would
-   * configure, every image qits-workspaces or qits-projects would launch today, the moving {@code
-   * latest} pointer, and each image's newest release tag.
+   * Four coordinate pins and two structural belts: every coordinate qits-platform-deployments holds,
+   * every image a repository's Dockerfile references, every image qits-workspaces or qits-projects
+   * would launch today, the moving {@code latest} pointer, and each image's newest release tag.
    *
-   * <p><b>The pin sources differ by TENSE and no two of them are the same claim.</b> The deployer
-   * names containers that exist; qits-platform-maintenance names what source still builds {@code
-   * FROM}; qits-configuration names what the NEXT deploy of a launching service will be handed; and
-   * qits-workspaces and qits-projects each name what they would pull if somebody clicked right now.
-   * The last is not implied by the one before it — a service keeps launching the version it was
-   * deployed with, so the two disagree for as long as that service is behind its configuration, and
-   * the coordinate everybody is actually pulling is the one on the wrong side of that gap.
+   * <p><b>No two pin sources are the same claim.</b> The deployer names containers that exist;
+   * qits-platform-maintenance names what source still builds {@code FROM}; and qits-workspaces and
+   * qits-projects each name what they would pull if somebody clicked right now.
    *
    * <p>The order below is the order they are checked in and it is only a report-readability
    * decision: a tag pinned by two sources is kept once, under the first sentence, and the first is
    * the deployer because "a deployment holds it" is the answer a reviewer expects to see first.
    *
-   * <p><b>Four of the five join on the FULL image name and the deployer does not.</b> A Dockerfile,
-   * a configuration entry and a launch answer all spell {@code qits/workspace-base}, while an {@code
-   * oci_tag} row carries the repository and the image in two columns; cd's {@code applicationName}
-   * is the image half alone, because it deploys within one repository. So the four lookups compose
-   * the name and the old one does not, and conflating them would silently pin nothing.
+   * <p><b>Three of the four join on the FULL image name and the deployer does not.</b> A Dockerfile
+   * and a launch answer both spell {@code qits/workspace-base}, while an {@code oci_tag} row carries
+   * the repository and the image in two columns; cd's {@code applicationName} is the image half
+   * alone, because it deploys within one repository. So the three lookups compose the name and the
+   * old one does not, and conflating them would silently pin nothing.
    *
    * <p>The newest release is read straight off the enumeration in hand — no second query and no
    * timestamp. {@link #BY_CALVER} orders releases by the version itself, so nothing a pull or a
@@ -236,10 +231,6 @@ public class OciImagesGcAdapter implements GcTypeAdapter {
       String byManifest = pins.pinsManifestImage(fullImage, tag);
       if (byManifest != null) {
         return byManifest;
-      }
-      String byConfiguration = pins.pinsConfiguredImage(fullImage, tag);
-      if (byConfiguration != null) {
-        return byConfiguration;
       }
       String byWorkspaceLaunch = pins.pinsWorkspaceLaunchImage(fullImage, tag);
       if (byWorkspaceLaunch != null) {

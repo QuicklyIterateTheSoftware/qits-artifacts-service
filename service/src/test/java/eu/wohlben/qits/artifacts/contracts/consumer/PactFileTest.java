@@ -65,12 +65,6 @@ class PactFileTest {
   }
 
   @Test
-  @Disabled("needs provider state 'configured image pins' for listImagePins in qits-configuration-service")
-  void configuration() {
-    check(ConsumerContract.CONFIGURATION);
-  }
-
-  @Test
   @Disabled("needs provider state 'a configured workspace image' for listLaunchPins in qits-workspaces-service")
   void workspaces() {
     check(ConsumerContract.WORKSPACES);

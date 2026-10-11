@@ -9,31 +9,24 @@ import java.util.regex.Pattern;
 /**
  * Every live pin one run holds, read once at its start and never cached.
  *
- * <p>Six services answer it, and they answer six different questions. qits-platform-deployments
+ * <p>Five services answer it, and they answer five different questions. qits-platform-deployments
  * names the image shas a restart or a rollback would pull; qits-ci names the daemon versions its
  * ladder would launch; qits-platform-maintenance names the internal maven, npm, docker and
- * <b>daemon</b> versions repositories' manifests still <b>reference</b> on main; qits-configuration
- * names the container images the platform is <b>configured</b> to launch; qits-workspaces and
- * qits-projects each name
- * the images they would launch <b>today</b>. All six are facts no timestamp in this store implies —
+ * <b>daemon</b> versions repositories' manifests still <b>reference</b> on main; qits-workspaces and
+ * qits-projects each name the images they would launch <b>today</b>. All five are facts no timestamp
+ * in this store implies —
  * a container running untouched for months still pulls its sha the moment it restarts, and a library
  * nothing has resolved this month is still what every build of its consumer needs — which is why
  * pinned is a keep-class the engines check <b>before</b> the access rule.
  *
- * <p><b>The four consumption sources exist because age stopped carrying the safety.</b> The windows
+ * <p><b>The three consumption sources exist because age stopped carrying the safety.</b> The windows
  * are short now (P3D), which is only defensible while what is in use is named explicitly rather than
  * inferred from a pull that may not have happened inside three days. The deployment and ladder pins
- * cover what is running; these four cover what is referenced, what would be configured and what
- * would actually be pulled.
+ * cover what is running; these three cover what is referenced and what would actually be pulled.
  *
- * <p><b>The last two are the fourth source in a different tense, and they close its residual.</b>
- * qits-configuration holds the version the NEXT deploy of a launching service will be handed; the
- * service running right now still launches whatever it was deployed with. For as long as that gap
- * lasts — and it can last days — the configured coordinate names an image nobody pulls while the one
- * every workspace start pulls is named by nothing at all, kept alive only by the access the short
- * window stopped trusting. So each launching service answers for itself, and the two answers are
- * kept as separate sets: a report that folded them into {@code configuredImages} could not say which
- * of the two saved a tag, which is precisely the distinction a reviewer is checking.
+ * <p><b>Each launching service answers for its own images.</b> Its image versions come from its own
+ * config, built from its pom, so the service is the only one that knows what its next start pulls.
+ * The two answers are kept as separate sets, so a report can say which of the two saved a tag.
  *
  * <p><b>The maintenance source's fourth ecosystem is DERIVED, and that is why it exists.</b> No
  * manifest on this platform spells a daemon binary: a daemon's version travels inside the maven or
@@ -74,9 +67,7 @@ import java.util.regex.Pattern;
  *     {@code AT} separator. Beside {@link #daemonVersions} rather than folded into it: that set is
  *     qits-ci's ladder for one daemon, this one is any daemon any repository's manifest reaches
  *     through a carrier, and a receipt has to be able to say which of the two saved a version
- * @param configuredImages images qits-configuration is configured to launch, spelled the same way
- * @param workspaceLaunchImages images qits-workspaces would launch today, spelled the same way —
- *     the EFFECTIVE coordinate, which lags {@code configuredImages} until that service is redeployed
+ * @param workspaceLaunchImages images qits-workspaces would launch today, spelled the same way
  * @param projectLaunchImages images qits-projects would launch today, on the same terms
  * @param failures one sentence per pin source that could not answer; empty is a complete aggregate
  * @param sources how this aggregate was read — one entry per source, with its url, its outcome, how
@@ -93,7 +84,6 @@ public record GcPins(
     Set<String> npmDependencies,
     Set<String> manifestImages,
     Set<String> daemonDependencies,
-    Set<String> configuredImages,
     Set<String> workspaceLaunchImages,
     Set<String> projectLaunchImages,
     List<String> failures,
@@ -123,9 +113,6 @@ public record GcPins(
       "a daemon binary carried by a coordinate a repository manifest on main references"
           + " (qits-platform-maintenance dependency pins)";
 
-  /** The rule an image is kept under when the platform is configured to launch it. */
-  public static final String BY_CONFIGURATION = "a configured container image (qits-configuration)";
-
   /** The rule an image is kept under when qits-workspaces would pull it on the next start. */
   public static final String BY_WORKSPACE_LAUNCH =
       "the image qits-workspaces would launch today (effective pin)";
@@ -145,7 +132,6 @@ public record GcPins(
     npmDependencies = Set.copyOf(npmDependencies);
     manifestImages = Set.copyOf(manifestImages);
     daemonDependencies = Set.copyOf(daemonDependencies);
-    configuredImages = Set.copyOf(configuredImages);
     workspaceLaunchImages = Set.copyOf(workspaceLaunchImages);
     projectLaunchImages = Set.copyOf(projectLaunchImages);
     failures = List.copyOf(failures);
@@ -192,14 +178,12 @@ public record GcPins(
         Set.of(),
         Set.of(),
         Set.of(),
-        Set.of(),
         failures,
         sources);
   }
 
   /**
-   * The four keep-sets a stored fact can name, and no provenance — what a case about manifests or
-   * configured images states.
+   * The three manifest keep-sets, and no provenance — what a case about manifests states.
    *
    * <p>Kept beside the wider overload below rather than folded into it, so the cases written before
    * the two effective sources existed still say exactly what they meant: those keep-sets are empty
@@ -213,7 +197,6 @@ public record GcPins(
       Set<String> mavenDependencies,
       Set<String> npmDependencies,
       Set<String> manifestImages,
-      Set<String> configuredImages,
       List<String> failures) {
     this(
         deployments,
@@ -224,7 +207,6 @@ public record GcPins(
         npmDependencies,
         manifestImages,
         Set.of(),
-        configuredImages,
         Set.of(),
         Set.of(),
         failures,
@@ -246,7 +228,6 @@ public record GcPins(
       Set<String> mavenDependencies,
       Set<String> npmDependencies,
       Set<String> manifestImages,
-      Set<String> configuredImages,
       Set<String> workspaceLaunchImages,
       Set<String> projectLaunchImages,
       List<String> failures) {
@@ -259,7 +240,6 @@ public record GcPins(
         npmDependencies,
         manifestImages,
         Set.of(),
-        configuredImages,
         workspaceLaunchImages,
         projectLaunchImages,
         failures,
@@ -276,7 +256,6 @@ public record GcPins(
       Set<String> npmDependencies,
       Set<String> manifestImages,
       Set<String> daemonDependencies,
-      Set<String> configuredImages,
       Set<String> workspaceLaunchImages,
       Set<String> projectLaunchImages,
       List<String> failures) {
@@ -289,7 +268,6 @@ public record GcPins(
         npmDependencies,
         manifestImages,
         daemonDependencies,
-        configuredImages,
         workspaceLaunchImages,
         projectLaunchImages,
         failures,
@@ -388,20 +366,8 @@ public record GcPins(
   }
 
   /**
-   * {@link #BY_CONFIGURATION} when the platform is configured to launch this image's tag, else null.
-   * The full image name, for the reason {@link #pinsManifestImage} spells out.
-   */
-  public String pinsConfiguredImage(String image, String tag) {
-    return configuredImages.contains(image + ":" + tag) ? BY_CONFIGURATION : null;
-  }
-
-  /**
    * {@link #BY_WORKSPACE_LAUNCH} when qits-workspaces would pull this image's tag on its next start,
    * else null. The full image name, for the reason {@link #pinsManifestImage} spells out.
-   *
-   * <p>Beside {@link #pinsConfiguredImage} rather than folded into it: the two answer for the same
-   * image at two different versions whenever that service is behind its configuration, and which of
-   * the two saved a tag is the fact a reviewer of the report is reading for.
    */
   public String pinsWorkspaceLaunchImage(String image, String tag) {
     return workspaceLaunchImages.contains(image + ":" + tag) ? BY_WORKSPACE_LAUNCH : null;

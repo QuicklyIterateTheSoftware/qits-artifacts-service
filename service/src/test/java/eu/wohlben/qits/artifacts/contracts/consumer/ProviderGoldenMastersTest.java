@@ -129,6 +129,6 @@ class ProviderGoldenMastersTest {
       assertFalse(row.consumes().isEmpty(), row.description());
       assertTrue(row.waitingFor().contains(row.provider().repository()), row.waitingFor());
     }
-    assertEquals(7, ConsumerContract.ROWS.size());
+    assertEquals(6, ConsumerContract.ROWS.size());
   }
 }

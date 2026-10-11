@@ -514,8 +514,8 @@ class GcPlanTest extends GcFixture {
     assertEquals("oci-images", report.type());
     assertTrue(report.dryRun());
     assertFalse(report.executable(), "no qits-platform-deployments and no qits-ci here");
-    assertEquals(6, report.pinFailures().size());
-    assertEquals(6, report.pins().size(), "the provenance of a keep-set is half of what is reviewed");
+    assertEquals(5, report.pinFailures().size());
+    assertEquals(5, report.pins().size(), "the provenance of a keep-set is half of what is reviewed");
     assertEquals("oci-images", report.configuration().type());
     assertEquals("own", report.configuration().strategy());
     assertEquals("OciImageGcStrategy", report.strategy());

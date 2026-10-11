@@ -42,22 +42,10 @@
       ]
     },
     {
-      "source": "supplied: qits-configuration",
-      "url": "",
-      "answered": true,
-      "outcome": "1 configured entries over 1 image coordinates — what a launch would pull, which no deployment row names",
-      "readAt": "2026-01-01T00:00:00Z",
-      "tookMillis": 0,
-      "pinCount": 0,
-      "keeps": [
-        "qits/workspace:2026.904.160522"
-      ]
-    },
-    {
       "source": "supplied: qits-workspaces",
       "url": "",
       "answered": true,
-      "outcome": "1 launch images over 1 coordinates — what a workspace or editor start would pull TODAY, which the configured version only names after the next deploy",
+      "outcome": "1 launch images over 1 coordinates — what a workspace or editor start would pull TODAY",
       "readAt": "2026-01-01T00:00:00Z",
       "tookMillis": 0,
       "pinCount": 0,
@@ -69,7 +57,7 @@
       "source": "supplied: qits-projects",
       "url": "",
       "answered": true,
-      "outcome": "1 launch images over 1 coordinates — what an agent or refinement start would pull TODAY, which the configured version only names after the next deploy",
+      "outcome": "1 launch images over 1 coordinates — what an agent or refinement start would pull TODAY",
       "readAt": "2026-01-01T00:00:00Z",
       "tookMillis": 0,
       "pinCount": 0,

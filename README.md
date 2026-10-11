@@ -1254,7 +1254,7 @@ this platform. What each one condemns, in one line each — the sections below c
 
 | type | engine, window | identity that dies | what keeps it | liveness expression |
 |---|---|---|---|---|
-| `oci-images` | `own`, `P0D` | a sha tag, or a manifest no tag and no tagged manifest reaches | the last 2 calver releases; a coordinate qits-platform-deployments pins; an image a repository's Dockerfile references; an image qits-configuration would configure; an image qits-workspaces or qits-projects would launch today; the tag literally named `latest`; the newest release per image | manifest closure over surviving tags and manifests |
+| `oci-images` | `own`, `P0D` | a sha tag, or a manifest no tag and no tagged manifest reaches | the last 2 calver releases; a coordinate qits-platform-deployments pins; an image a repository's Dockerfile references; an image qits-workspaces or qits-projects would launch today; the tag literally named `latest`; the newest release per image | manifest closure over surviving tags and manifests |
 | `npm-packages` | `own`, `P0D` | a published version nothing kept reaches — a release or a prerelease | anything a repository's manifest or lockfile still resolves to (frontend submodule gitlinks included); **everything the kept set reaches** through dependency ranges and stored SBOMs; anything a dist-tag names; the last 2 releases per package — and **everything**, on a run whose closure could not be completed | `npm_version.tarball_blob_id` of survivors |
 | `maven-packages` | `own`, `P0D` | a **coordinate** — one version's whole file set: a release or a superseded snapshot set nothing kept reaches | anything a repository's pom still references; **everything the kept set reaches** through stored SBOMs, parent poms, imported BOMs and (with no SBOM) pom dependencies; the last 2 releases per artifact; the newest deployable set of every snapshot line; a path this layout cannot read — and **everything**, on a run whose closure could not be completed | `maven_artifact.blob_id`, sized from the row |
 | `daemon-binaries` | `own`, `P0D` | a `daemon_binary` row | the last 2 versions; both rungs qits-ci names; a binary a coordinate some repository's manifest references **carries**; a pinned digest's bytes | `daemon_binary.blob_id`, sized from the row |
@@ -1276,7 +1276,7 @@ otherwise read as a rule that ran and found nothing.
 
 ### Live pins, and the whole-run abort
 
-Six services hold references into this store that nothing here can derive, and all six are read
+Five services hold references into this store that nothing here can derive, and all five are read
 **once at the start of every plan and every sweep**, never cached:
 
 | source | what it pins | shape |
@@ -1284,15 +1284,13 @@ Six services hold references into this store that nothing here can derive, and a
 | `GET /deployments/api/pins` (qits-platform-deployments) | image coordinates: what is serving, and what a rollback would restore, unioned over every environment | `{"pins":[{"applicationName":…,"shas":[…]}]}` |
 | `GET /ci/api/daemon` (qits-ci) | the daemon ladder's top two rungs, which protect `daemon_binary` rows keyed `(name, version)` | `{daemonName, daemonVersion, previousDaemonVersion, source}` |
 | `GET /maintenance/api/pins` (qits-platform-maintenance) | the internal maven, npm and docker versions repositories' manifests still **reference** on `main` — what source still builds against, which no pull implies — plus the **daemon binaries** those versions carry | `{"generatedAt":…,"repositories":[…],"pins":[{"ecosystem","name","version","repository","manifestPath","via"}]}` |
-| `GET /configuration/api/pins` (qits-configuration) | the container images the platform is **configured** to launch — the version the NEXT deploy of a launching service will be handed | `{"generatedAt":…,"pins":[{"image","version","application","key"}]}` |
 | `GET /workspaces/api/pins` (qits-workspaces) | the workspace and editor images that service would pull **today**, out of the configuration it is actually running with | `{"generatedAt":…,"pins":[{"image","version","launches"}]}` |
 | `GET /projects/api/pins` (qits-projects) | the agent and refinement images, on the same terms | `{"generatedAt":…,"pins":[{"image","version","launches"}]}` |
 
-**The last four answer for consumption, and they are what a `P0D` window rests on.** The first two
-say what is running; these say what is referenced, what would be configured and what would actually
-be pulled. They join on a coordinate spelled exactly as the adapter spells its identities — `groupId:artifactId:version`,
+**The last three answer for consumption, and they are what a `P0D` window rests on.** The first two
+say what is running; these say what is referenced and what would actually be pulled. They join on a coordinate spelled exactly as the adapter spells its identities — `groupId:artifactId:version`,
 `name@version`, and for images the **full** name (`qits/workspace-base:2026.902.143920`, repository
-row plus image, which is what a Dockerfile and a configuration entry both write and what cd's
+row plus image, which is what a Dockerfile and a launch answer both write and what cd's
 `applicationName` does not carry). The maintenance answer's `repositories` array is the scan's
 freshness provenance: it is shape-checked and dropped, because deciding when an inventory is fresh
 enough to act on is maintenance's call, made as a `503` that arrives here as a failure like any
@@ -1323,16 +1321,15 @@ GC entirely. The supplied-pins path needs nothing of its own — `GcSuppliedPins
 runs the same `MaintenanceHttpDependencyPins.parse`, so the ecosystem is taught to both ways in at
 once.
 
-**The last two are the fourth source in a different TENSE, and they exist because it left a
-residual.** qits-configuration holds the version the *next* deploy of a launching service will be
-given; that service keeps launching whatever it was deployed with until the deploy happens. For as
-long as that gap lasts the configured coordinate names an image nobody pulls while the one every
-workspace start pulls is named by nothing — a live image held up by access alone, which is the
-inference the short windows gave up on. So the consumer that pulls answers for itself, and the two
-answers are kept as **separate keep-sets**: both services launch `qits/workspace`, possibly at
-different versions, and a report that folded them together could not say which of them saved a tag.
+**The last two are the launching services answering for themselves.** Image versions come from each
+service's own config, built from its pom, so the service that pulls is the only one that knows what
+its next start pulls. qits-configuration used to answer a third, configured version
+(`GET /configuration/api/pins`); it no longer holds image names, so that source was removed in
+qits-1176. The two answers are kept as **separate keep-sets**: both services launch
+`qits/workspace`, possibly at different versions, and a report that folded them together could not
+say which of them saved a tag.
 
-All six are folded into one `GcPins` for the run. Two details are load-bearing and neither is visible
+All five are folded into one `GcPins` for the run. Two details are load-bearing and neither is visible
 on the wire:
 
 - **A blank `daemonVersion` is an answer**, not an absence: it means this deployment has adopted or
@@ -1356,7 +1353,6 @@ The keep is reported under the pin's own name — `pinned by a qits-platform-dep
 `pinned by qits-ci daemon ladder`, `referenced by a repository manifest on main
 (qits-platform-maintenance dependency pins)`, `a daemon binary carried by a coordinate a repository
 manifest on main references (qits-platform-maintenance dependency pins)`,
-`a configured container image (qits-configuration)`,
 `the image qits-workspaces would launch today (effective pin)`, `the image qits-projects would launch
 today (effective pin)` — and both engines check it **before** the access rule, because a pin is the one fact no timestamp
 implies.
@@ -1365,13 +1361,12 @@ implies.
 
 `POST /artifacts/api/gc/plan` and both sweeps take an optional body — `{"pins": {"deployments": <the
 verbatim body of GET /deployments/api/pins>, "ciDaemon": <the verbatim body of GET
-/ci/api/daemon>, "dependencies": <GET /maintenance/api/pins>, "configuredImages": <GET
-/configuration/api/pins>, "workspaceLaunches": <GET /workspaces/api/pins>, "projectLaunches": <GET
-/projects/api/pins>}}` — and use those documents instead of the readers above. They are parsed by the
+/ci/api/daemon>, "dependencies": <GET /maintenance/api/pins>, "workspaceLaunches": <GET
+/workspaces/api/pins>, "projectLaunches": <GET /projects/api/pins>}}` — and use those documents instead of the readers above. They are parsed by the
 **same** code the readers use, so a keep-set does not change with the way the document travelled;
 only the provenance does, and the report says so: the sources read `supplied:
 qits-platform-deployments`, `supplied: qits-ci`, `supplied: qits-platform-maintenance`, `supplied:
-qits-configuration`, `supplied: qits-workspaces`, `supplied: qits-projects`, and carry no url,
+qits-workspaces`, `supplied: qits-projects`, and carry no url,
 because this service made no call. It is how qits-platform-orchestrator gives one platform-wide pin set — read once, at the start
 of a run — to every deleter that run touches, so two deleters can never work off two different
 truths. Nothing about the fail-closed rule softens: a member the caller left out is that source
@@ -1386,10 +1381,11 @@ puts it inside `AdminWriteGuard`, so once `qits.auth.machine.required` is on it 
 audience the sweep needs. Sending no body at all is unchanged in every respect, which
 is what the SPA and every operator recipe do, and the HTTP readers stay the fallback for them.
 **The envelope grew from two members to four on 2026-09-04 and to six on 2026-09-05, and that is why
-this service ships last in each of those rollouts**: an orchestrator still sending an older envelope
-supplies a partial keep-set, which is a source unanswered and a run that refuses. The order is the
-same shape both times — bring the answering services up (qits-platform-maintenance and
-qits-configuration, then qits-workspaces and qits-projects), then the orchestrator, then this.
+this service shipped last in each of those rollouts**: an orchestrator still sending an older
+envelope supplies a partial keep-set, which is a source unanswered and a run that refuses. **It
+shrank to five in qits-1176**, when `configuredImages` was dropped. Removing a member is the
+opposite order: this service ships first, because a member it does not read is ignored, so an
+orchestrator that still sends `configuredImages` keeps working.
 **Those readers send no credential**, so on an authenticated platform they get a `401` and every
 no-body run aborts; supplying pins is the way around that today, and fixing the readers is a
 separate piece of work that is deliberately not done here.
@@ -1503,7 +1499,7 @@ always stays, and everything else dies on the run that finds it.**
 | it is one of the last two releases | a tag shaped like a calver version (`2026.801.85448`), ranked by the version's own order — not by a row timestamp, so a release pulled last week is not thereby the newer release. There is no `-main.g<sha>` suffix in docker: the sha tag *is* the prerelease coordinate and a release adds a version tag beside it |
 | qits-platform-deployments pins it | any coordinate `GET /deployments/api/pins` names for that image — what is serving, and what a rollback would restore. **One rule, the deployer's**: this used to be two rules derived here from raw deployment rows, and the derivation was wrong (it read a `FAILED` attempt as the rollback target and dropped the sha that actually served) |
 | a repository's Dockerfile references it | any `image:tag` `GET /maintenance/api/pins` names in the `docker` ecosystem, joined on the **full** image name. A base image is pulled by the *builder*, so nothing here has an access row to show for it and no deployment names it |
-| the platform is configured to launch it | any `image:version` `GET /configuration/api/pins` names, joined the same way. A workspace or agent image is started on demand from a configuration entry, so the image a user's next click pulls can easily be one nobody has started for a week |
+| qits-workspaces or qits-projects would launch it | any `image:version` `GET /workspaces/api/pins` or `GET /projects/api/pins` names, joined the same way. A workspace or agent image is started on demand, so the image a user's next click pulls can easily be one nobody has started for a week |
 | it is the moving pointer | a tag literally named `latest`. CI step recipes pull `qits/build-images/*:latest` by name; `latest` is not a calver, so no release rule covers it, and the host-side keep-prefix suppresses exactly the pulls that would keep it access-warm. Deleting it `404`s a fresh host's first pull of a step image, and it costs nothing — `latest` shares the newest push's blobs |
 | the next deploy will pull it | the newest **calver** tag per image, ordered `BY_CALVER` — the version's own order. This is the whole safety net for an image cd has never deployed, and a deploy pulls a version coordinate, so the newest release is the coordinate it will ask for. It named the newest build sha until 2026-09-04, which stopped being the pull target when deployments moved to version coordinates |
 | — | there is no sixth row any more. Access was the *unclassified-means-keep* backstop's last home, and at `P0D` a coordinate nobody names is condemned on the run that finds it. What buys a just-pushed tag time is the six-hour grace on its bytes, which withholds the identity whole |
@@ -1765,21 +1761,14 @@ answer to them is an ops action, once, by hand.
       "outcome": "184 manifest references over 41 coordinates (23 maven, 12 npm, 6 docker) — what repositories on main still build against",
       "pinCount": 184,
       "keeps": ["@qits/ui-components@2026.902.204627", "eu.wohlben.qits:qits-blobstore:2026.903.85122", "qits/workspace-base:2026.902.143920"] },
-    { "source": "qits-configuration", "url": "http://qits-configuration:8080/configuration/api/pins",
-      "answered": true, "readAt": "2026-08-01T12:00:00Z", "tookMillis": 8,
-      "outcome": "4 configured entries over 3 image coordinates — what a launch would pull, which no deployment row names",
-      "pinCount": 4,
-      "keeps": ["qits/project-agent:2026.904.160152", "qits/workspace-editor:2026.904.100239", "qits/workspace:2026.904.160522"] },
     { "source": "qits-workspaces", "url": "http://qits-workspaces:8080/workspaces/api/pins",
       "answered": true, "readAt": "2026-08-01T12:00:00Z", "tookMillis": 7,
-      "outcome": "2 launch images over 2 coordinates — what a workspace or editor start would pull TODAY, which the configured version only names after the next deploy",
+      "outcome": "2 launch images over 2 coordinates — what a workspace or editor start would pull TODAY",
       "pinCount": 2,
-      // NOT 2026.904.160522: this service has not been redeployed since that entry moved, so the
-      // version it is actually pulling is the older one — which is the whole reason it is asked.
       "keeps": ["qits/workspace-editor:2026.904.100239", "qits/workspace:2026.903.120000"] },
     { "source": "qits-projects", "url": "http://qits-projects:8080/projects/api/pins",
       "answered": true, "readAt": "2026-08-01T12:00:00Z", "tookMillis": 9,
-      "outcome": "2 launch images over 2 coordinates — what an agent or refinement start would pull TODAY, which the configured version only names after the next deploy",
+      "outcome": "2 launch images over 2 coordinates — what an agent or refinement start would pull TODAY",
       "pinCount": 2,
       "keeps": ["qits/project-agent:2026.903.090000", "qits/workspace:2026.903.120000"] }
   ],
@@ -1894,8 +1883,6 @@ app's `application.properties` overrides them.
 | `qits.artifacts.gc.pins.ci-timeout` | `PT10S` | per-request timeout on that fetch |
 | `qits.artifacts.gc.pins.maintenance-base-url` | `http://qits-platform-maintenance:8080/maintenance/api` | where a run reads the manifest dependency pins (`GET /maintenance/api/pins`) |
 | `qits.artifacts.gc.pins.maintenance-timeout` | `PT10S` | per-request timeout on that fetch |
-| `qits.artifacts.gc.pins.configuration-base-url` | `http://qits-configuration:8080/configuration/api` | where a run reads the configured container images (`GET /configuration/api/pins`) |
-| `qits.artifacts.gc.pins.configuration-timeout` | `PT10S` | per-request timeout on that fetch |
 | `qits.artifacts.gc.pins.workspaces-base-url` | `http://qits-workspaces:8080/workspaces/api` | where a run reads the images a workspace or editor start would pull today (`GET /workspaces/api/pins`) |
 | `qits.artifacts.gc.pins.workspaces-timeout` | `PT10S` | per-request timeout on that fetch |
 | `qits.artifacts.gc.pins.projects-base-url` | `http://qits-projects:8080/projects/api` | where a run reads the images an agent or refinement start would pull today (`GET /projects/api/pins`) |

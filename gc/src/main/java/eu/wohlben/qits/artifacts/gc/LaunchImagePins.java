@@ -8,12 +8,10 @@ import java.util.List;
  * What a launching service would pull <b>today</b> — the effective image versions, answered by the
  * service that would do the pulling out of the configuration it is actually running with.
  *
- * <p><b>This is a different tense from {@link ConfigurationImagePins} and neither can stand in for
- * the other.</b> qits-configuration holds the version the <em>next</em> deploy of a launching service
- * will be given; a service keeps launching the version it was deployed with until that deploy
- * happens. So for as long as the gap lasts, the configured answer names an image nobody pulls while
- * the one everybody pulls is named by nothing — and under a P3D window that is a live image kept
- * alive by access alone, which is exactly the inference the short windows gave up on.
+ * <p><b>The launching service is the only source for these images.</b> Their versions come from
+ * the service's own config, built from its pom, so no other service holds them. Without this answer
+ * an image every start pulls is named by nothing, and under a P3D window it is kept alive by access
+ * alone, which is exactly the inference the short windows gave up on.
  *
  * <p><b>One interface, two ports, and the split is not cosmetic.</b> {@link WorkspacesLaunchPins}
  * and {@link ProjectsLaunchPins} are separate types because they are separate sources: two injection
@@ -82,9 +80,8 @@ public interface LaunchImagePins {
       String version = text(pin, "version");
       if (image == null || version == null) {
         // A row this cannot name pins nothing, and guessing is how a live image gets deleted.
-        // Refusing the whole answer is the honest response to a shape this does not know — the same
-        // rule ConfigurationHttpImagePins keeps, and for the sharper reason: this is the version
-        // that IS being pulled rather than the one that will be.
+        // Refusing the whole answer is the honest response to a shape this does not know: this is
+        // the version that IS being pulled.
         throw new IllegalStateException(service + " returned a pin with no image or no version");
       }
       rows.add(new LaunchPin(image, version, text(pin, "launches")));

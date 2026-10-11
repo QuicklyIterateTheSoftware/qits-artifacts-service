@@ -430,7 +430,6 @@ class NpmPackagesGcAdapterTest extends GcFixture {
         Set.of(),
         Set.of(coordinates),
         Set.of(),
-        Set.of(),
         List.of());
   }
 

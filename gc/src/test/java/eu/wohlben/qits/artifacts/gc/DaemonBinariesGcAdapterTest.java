@@ -173,7 +173,6 @@ class DaemonBinariesGcAdapterTest extends GcFixture {
                 Set.of(CI + "@2026.901.10"),
                 Set.of(),
                 Set.of(),
-                Set.of(),
                 List.of()));
 
     assertEquals(List.of(), plan.dead());
@@ -390,7 +389,6 @@ class DaemonBinariesGcAdapterTest extends GcFixture {
         Set.of(),
         Set.of(),
         Set.of(identities),
-        Set.of(),
         Set.of(),
         Set.of(),
         List.of());

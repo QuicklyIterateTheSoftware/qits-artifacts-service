@@ -4,7 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.Duration;
 
 /**
- * The six real pin readers, built outside CDI and pointed at a pact mock server, for the consumer
+ * The five real pin readers, built outside CDI and pointed at a pact mock server, for the consumer
  * pacts in {@code eu.wohlben.qits.artifacts.contracts.consumer} (qits-1149). Lives in the readers'
  * own package because their config fields are package-private; it sets only what a CDI container
  * would inject, so the reader under test is the production class unchanged.
@@ -38,14 +38,6 @@ public final class ContractPinReaders {
   public static MaintenanceHttpDependencyPins maintenance(String base, ObjectMapper mapper) {
     MaintenanceHttpDependencyPins reader = new MaintenanceHttpDependencyPins();
     reader.baseUrl = base + "/maintenance/api";
-    reader.timeout = TIMEOUT;
-    reader.objectMapper = mapper;
-    return reader;
-  }
-
-  public static ConfigurationHttpImagePins configuration(String base, ObjectMapper mapper) {
-    ConfigurationHttpImagePins reader = new ConfigurationHttpImagePins();
-    reader.baseUrl = base + "/configuration/api";
     reader.timeout = TIMEOUT;
     reader.objectMapper = mapper;
     return reader;

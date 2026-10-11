@@ -7,9 +7,9 @@ import java.util.List;
  * version named by a manifest on some repository's {@code main}, and every daemon binary one of
  * those versions carries.
  *
- * <p><b>Consumption, where the other three pin sources answer for execution.</b>
- * qits-platform-deployments names what is running, qits-ci names what a runner would launch,
- * qits-configuration names what the platform is configured to start — and none of them can answer
+ * <p><b>Consumption, where the other pin sources answer for execution.</b>
+ * qits-platform-deployments names what is running, qits-ci names what a runner would launch, the
+ * launching services name what they would start — and none of them can answer
  * "which library version does a repository still build against". That is a fact about source, and
  * qits-platform-maintenance already holds it: it scans every repository's manifests to raise the
  * bump requests, so the dependency graph is a by-product of work it does anyway. Deriving it here

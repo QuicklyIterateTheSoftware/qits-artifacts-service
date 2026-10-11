@@ -44,11 +44,10 @@ import org.junit.jupiter.api.Test;
  * it: a released-but-undeployed version is covered by the access rule's fold of {@code updated_at},
  * not by the pin and not by retention.
  *
- * <p><b>Three pin sources reach this type since 2026-09-04</b>, and they differ by tense: cd names
- * the images of containers that exist, qits-platform-maintenance names the images a repository's
- * Dockerfile still builds {@code FROM}, and qits-configuration names the images a service would
- * launch the next time somebody asks it to. The last two join on the FULL image name, cd on the
- * image half alone, and each has a case of its own below. The fourth belt, {@link
+ * <p><b>Four pin sources reach this type</b>: cd names the images of containers that exist,
+ * qits-platform-maintenance names the images a repository's Dockerfile still builds {@code FROM},
+ * and qits-workspaces and qits-projects name the images they would launch today. The last three
+ * join on the FULL image name, cd on the image half alone, and each has a case of its own below. The fourth belt, {@link
  * OciImagesGcAdapter#KEPT_LATEST}, is structural and reads no pin at all.
  *
  * <p>The pins are handed in as a value rather than fetched: what is under test is the keep-set, and
@@ -328,35 +327,10 @@ class OciImagesGcAdapterTest extends GcFixture {
   }
 
   @Test
-  void aConfiguredImageIsKeptAlthoughNoDeploymentAndNoManifestNamesIt() throws Exception {
-    // qits-configuration's half. The workspace image is launched on demand from a configuration
-    // entry, so there is no deployment row to pin it and no Dockerfile that references it — and the
-    // image a user's next click pulls can easily be one nobody has started for a week. It is kept
-    // under its own sentence, so a reviewer reading the report knows which service saved it.
-    repository();
-    String config = config();
-    tag("workspace", "2026.904.160522", image("workspace", config, 911), daysAgo(60));
-    tag("workspace", "2026.904.170000", image("workspace", config, 912), daysAgo(50));
-    tag("workspace", "2026.905.100000", image("workspace", config, 913), daysAgo(40));
-
-    GcStrategy.Plan plan =
-        strategy.plan(census.take(), configuring("qits/workspace:2026.904.160522"));
-
-    assertEquals(
-        GcPins.BY_CONFIGURATION, ruleFor(plan.kept(), "workspace:2026.904.160522"));
-    assertEquals(List.of(), plan.dead());
-    assertEquals(
-        List.of("workspace:2026.904.160522"),
-        identities(strategy.plan(census.take(), GcPins.none()).dead()),
-        "the third-newest release of a cold image, with nothing configured to launch it");
-  }
-
-  @Test
-  void theImageQitsWorkspacesWouldLaunchTodayIsKeptAlthoughItIsNotTheConfiguredOne() throws Exception {
-    // The residual the configured-image pin left, and the case is the gap itself: qits-configuration
-    // has already moved to 2026.905.100000, but qits-workspaces has not been redeployed and is still
-    // starting containers from 2026.904.160522. Under a P3D window the coordinate every workspace
-    // start actually pulls is a third-newest cold release named by nothing else on the platform.
+  void theImageQitsWorkspacesWouldLaunchTodayIsKeptAlthoughNothingElseNamesIt() throws Exception {
+    // The workspace image is launched on demand, so there is no deployment row to pin it and no
+    // Dockerfile that references it. qits-workspaces still starts containers from 2026.904.160522,
+    // a third-newest cold release named by nothing else on the platform.
     repository();
     String config = config();
     tag("workspace", "2026.904.160522", image("workspace", config, 921), daysAgo(60));
@@ -372,7 +346,7 @@ class OciImagesGcAdapterTest extends GcFixture {
     assertEquals(
         List.of("workspace:2026.904.160522"),
         identities(strategy.plan(census.take(), GcPins.none()).dead()),
-        "so the keep above is the effective pin and nothing in the fixture");
+        "so the keep above is the launch pin and nothing in the fixture");
   }
 
   @Test
@@ -395,7 +369,7 @@ class OciImagesGcAdapterTest extends GcFixture {
     assertEquals(
         List.of("project-agent:2026.903.090000"),
         identities(strategy.plan(census.take(), GcPins.none()).dead()),
-        "so the keep above is the effective pin and nothing in the fixture");
+        "so the keep above is the launch pin and nothing in the fixture");
   }
 
   @Test
@@ -672,31 +646,23 @@ class OciImagesGcAdapterTest extends GcFixture {
    */
   private static GcPins referencingImage(String... coordinates) {
     return new GcPins(
-        Map.of(), "", Set.of(), Set.of(), Set.of(), Set.of(), Set.of(coordinates), Set.of(),
-        List.of());
-  }
-
-  /** The same, for coordinates qits-configuration is configured to launch. */
-  private static GcPins configuring(String... coordinates) {
-    return new GcPins(
-        Map.of(), "", Set.of(), Set.of(), Set.of(), Set.of(), Set.of(), Set.of(coordinates),
-        List.of());
+        Map.of(), "", Set.of(), Set.of(), Set.of(), Set.of(), Set.of(coordinates), List.of());
   }
 
   /**
-   * The same, for the coordinates qits-workspaces would pull TODAY — with everything else empty,
-   * including the configured set, so a keep can only be the effective pin.
+   * The same, for the coordinates qits-workspaces would pull TODAY — with everything else empty, so
+   * a keep can only be the launch pin.
    */
   private static GcPins launchingFromWorkspaces(String... coordinates) {
     return new GcPins(
-        Map.of(), "", Set.of(), Set.of(), Set.of(), Set.of(), Set.of(), Set.of(),
-        Set.of(coordinates), Set.of(), List.of());
+        Map.of(), "", Set.of(), Set.of(), Set.of(), Set.of(), Set.of(), Set.of(coordinates),
+        Set.of(), List.of());
   }
 
   /** The same, for the coordinates qits-projects would pull today. */
   private static GcPins launchingFromProjects(String... coordinates) {
     return new GcPins(
-        Map.of(), "", Set.of(), Set.of(), Set.of(), Set.of(), Set.of(), Set.of(), Set.of(),
+        Map.of(), "", Set.of(), Set.of(), Set.of(), Set.of(), Set.of(), Set.of(),
         Set.of(coordinates), List.of());
   }
 
