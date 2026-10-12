@@ -65,7 +65,7 @@
              way quarkus-opentelemetry already does for the REST client. Published by
              libs/qits-integrations-quarkus, same publisher as qits-auth-core and qits-db-core
              above. -->
-        <qits.http-core.version>2026.1011.185745</qits.http-core.version>
+        <qits.http-core.version>2026.1012.153509</qits.http-core.version>
         <!-- The two shared libraries the byte plane was carved into. Published from their own
              repositories (libs/qits-blobstore, libs/qits-registries) and consumed here like any
              other artifact.
