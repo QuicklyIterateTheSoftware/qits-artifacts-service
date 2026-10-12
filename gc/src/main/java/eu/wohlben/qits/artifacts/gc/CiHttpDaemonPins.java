@@ -2,6 +2,7 @@ package eu.wohlben.qits.artifacts.gc;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import eu.wohlben.qits.http.QitsHttpClients;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import java.net.URI;
@@ -32,8 +33,12 @@ import org.eclipse.microprofile.config.inject.ConfigProperty;
 @ApplicationScoped
 public class CiHttpDaemonPins implements CiDaemonPins {
 
-  private final HttpClient client =
-      HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(2)).build();
+  /**
+   * Wrapped through {@link QitsHttpClients} so this call to qits-ci opens a CLIENT span and
+   * carries {@code X-Qits-Caller}. Built in the injecting constructor, not at field declaration —
+   * a container-managed field's initialiser runs before field injection does.
+   */
+  private final HttpClient client;
 
   @ConfigProperty(name = "qits.artifacts.gc.pins.ci-base-url")
   String baseUrl;
@@ -42,6 +47,16 @@ public class CiHttpDaemonPins implements CiDaemonPins {
   Duration timeout;
 
   @Inject ObjectMapper objectMapper;
+
+  /** For the client proxy ArC puts in front of this bean, and for nothing else. */
+  CiHttpDaemonPins() {
+    this.client = null;
+  }
+
+  @Inject
+  CiHttpDaemonPins(QitsHttpClients clients) {
+    this.client = clients.wrap(HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(2)).build());
+  }
 
   @Override
   public String url() {

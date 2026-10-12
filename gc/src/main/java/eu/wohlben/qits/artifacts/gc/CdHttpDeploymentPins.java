@@ -2,6 +2,7 @@ package eu.wohlben.qits.artifacts.gc;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import eu.wohlben.qits.http.QitsHttpClients;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import java.net.URI;
@@ -49,9 +50,14 @@ public class CdHttpDeploymentPins implements CdDeploymentPins {
    * out at length: a static {@code HttpClient} is built by the class initialiser, which under
    * GraalVM is image-build time, and native-image refuses an {@code HttpClientFacade} in the image
    * heap. The bean is {@code @ApplicationScoped}, so there is still one client per process.
+   *
+   * <p>Wrapped through {@link QitsHttpClients} so this outbound call to qits-cd opens a CLIENT
+   * span and carries {@code X-Qits-Caller}, same as every other internal client in this
+   * repository. Built in the injecting constructor rather than at field declaration, because the
+   * field initialiser of a container-managed field runs before field injection does — a wrap here
+   * would see an unset {@code clients}.
    */
-  private final HttpClient client =
-      HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(2)).build();
+  private final HttpClient client;
 
   @ConfigProperty(name = "qits.artifacts.gc.pins.cd-base-url")
   String baseUrl;
@@ -60,6 +66,16 @@ public class CdHttpDeploymentPins implements CdDeploymentPins {
   Duration timeout;
 
   @Inject ObjectMapper objectMapper;
+
+  /** For the client proxy ArC puts in front of this bean, and for nothing else. */
+  CdHttpDeploymentPins() {
+    this.client = null;
+  }
+
+  @Inject
+  CdHttpDeploymentPins(QitsHttpClients clients) {
+    this.client = clients.wrap(HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(2)).build());
+  }
 
   @Override
   public String url() {

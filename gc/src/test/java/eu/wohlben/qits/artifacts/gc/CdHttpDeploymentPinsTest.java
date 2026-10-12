@@ -5,6 +5,8 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import eu.wohlben.qits.http.QitsHttpClients;
+import io.opentelemetry.api.OpenTelemetry;
 import java.io.IOException;
 import java.time.Duration;
 import java.util.List;
@@ -91,7 +93,7 @@ class CdHttpDeploymentPinsTest {
 
   /** The adapter as CDI would build it: the two config values and the mapper. */
   private static CdHttpDeploymentPins adapter(String baseUrl) {
-    CdHttpDeploymentPins pins = new CdHttpDeploymentPins();
+    CdHttpDeploymentPins pins = new CdHttpDeploymentPins(QitsHttpClients.of(OpenTelemetry.noop(), null));
     pins.baseUrl = baseUrl;
     pins.timeout = Duration.ofSeconds(5);
     pins.objectMapper = new ObjectMapper();
