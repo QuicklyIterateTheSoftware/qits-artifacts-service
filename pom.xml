@@ -59,13 +59,13 @@
     </modules>
 
     <properties>
-        <qits.auth-core.version>2026.1002.70617</qits.auth-core.version>
+        <qits.auth-core.version>2026.1012.173247</qits.auth-core.version>
         <!-- qits-http-core: QitsHttpClients.wrap puts a CLIENT span and X-Qits-Caller on every
              outbound java.net.http.HttpClient this repo builds to another qits service, the same
              way quarkus-opentelemetry already does for the REST client. Published by
              libs/qits-integrations-quarkus, same publisher as qits-auth-core and qits-db-core
              above. -->
-        <qits.http-core.version>2026.1012.153509</qits.http-core.version>
+        <qits.http-core.version>2026.1013.64811</qits.http-core.version>
         <!-- The two shared libraries the byte plane was carved into. Published from their own
              repositories (libs/qits-blobstore, libs/qits-registries) and consumed here like any
              other artifact.
@@ -77,8 +77,8 @@
              reactor and ships on its version. The coordinate is unchanged, the config keys are
              unchanged, and the store's packages are eu.wohlben.qits.blobstore.* — so the pins
              cannot be moved one at a time. -->
-        <qits.blobstore.version>2026.1011.202808</qits.blobstore.version>
-        <qits.registries.version>2026.1011.202808</qits.registries.version>
+        <qits.blobstore.version>2026.1014.224111</qits.blobstore.version>
+        <qits.registries.version>2026.1014.224111</qits.registries.version>
         <!-- The platform's datasource resilience baseline: qits-db-core carries PatientPgDriver,
              which the datasource block in the artifacts jar's microprofile-config.properties names,
              and DbRetry. Published by libs/qits-integrations-quarkus, so it is one of the few
