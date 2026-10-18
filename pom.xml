@@ -126,7 +126,7 @@
              every other pin; do not hand-edit them to chase a release. -->
         <qits.deployments-golden-masters.version>2026.1010.145913</qits.deployments-golden-masters.version>
         <qits.ci-golden-masters.version>2026.1018.160604</qits.ci-golden-masters.version>
-        <qits.maintenance-golden-masters.version>2026.1011.122834</qits.maintenance-golden-masters.version>
+        <qits.maintenance-golden-masters.version>2026.1018.165353</qits.maintenance-golden-masters.version>
         <qits.workspaces-golden-masters.version>2026.1016.90656</qits.workspaces-golden-masters.version>
         <qits.projects-golden-masters.version>2026.1016.112931</qits.projects-golden-masters.version>
         <qits.idp-golden-masters.version>2026.1018.165736</qits.idp-golden-masters.version>
