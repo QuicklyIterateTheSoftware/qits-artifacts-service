@@ -1237,7 +1237,7 @@ components:
   securitySchemes:
     SecurityScheme:
       type: openIdConnect
-      openIdConnectUrl: http://dev-qits-platform-idp:8080/idp/.well-known/openid-configuration
+      openIdConnectUrl: http://dev-qits-idp:8080/idp/.well-known/openid-configuration
       description: Authentication
 info:
   title: qits-artifacts API
