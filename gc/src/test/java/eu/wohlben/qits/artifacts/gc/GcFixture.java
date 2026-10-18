@@ -1,5 +1,10 @@
 package eu.wohlben.qits.artifacts.gc;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
 import eu.wohlben.qits.blobstore.control.ArtifactRepositoryService;
 import eu.wohlben.qits.blobstore.control.BlobDiskIndex;
 import eu.wohlben.qits.blobstore.control.BlobStore;
@@ -94,6 +99,14 @@ abstract class GcFixture {
   @Inject BlobDiskIndex diskIndex;
 
   /**
+   * The two-phase sweep's own state (qits-1172). Named apart from the {@code executor} fields some
+   * suites declare for themselves, which it would otherwise hide.
+   */
+  @Inject GcCondemnations condemnations;
+
+  @Inject GcSweepExecutor sweeps;
+
+  /**
    * The blob tables live in the same database as everything else, so this is the SAME datasource the
    * Panache repositories above use. Reached as JDBC rather than through an entity because the blob
    * store has none — it speaks plain SQL, and so does anything that has to wipe or age its rows.
@@ -105,6 +118,9 @@ abstract class GcFixture {
   /** Wipes the blobs and every table before each test so every case starts empty. */
   @BeforeEach
   void reset() {
+    // The condemnations would go with their repositories (fk_gc_condemned_repository cascades), and
+    // are wiped by name anyway, so the reset says what it resets.
+    execute("delete from gc_condemned");
     QuarkusTransaction.requiringNew()
         .run(
             () -> {
@@ -157,6 +173,112 @@ abstract class GcFixture {
           statement.setObject(1, Instant.now().minus(age).atOffset(ZoneOffset.UTC));
           statement.setString(2, blobId);
         });
+  }
+
+  /**
+   * Ages every standing condemnation by the given span — the condemn grace's twin of {@link
+   * #backdate}, and for the same reason: a test's condemnations are seconds old, and moving them
+   * back exercises the comparison production runs instead of configuring the grace away. The suite
+   * runs on the shipped {@code P1D}.
+   */
+  void ageCondemnations(Duration age) {
+    update(
+        "update gc_condemned set condemned_at = condemned_at - ?::interval",
+        statement -> statement.setString(1, age.getSeconds() + " seconds"));
+  }
+
+  /** Ages every standing condemnation one minute past the configured condemn grace. */
+  void ageCondemnationsPastGrace() {
+    ageCondemnations(condemnations.gracePeriod().plusMinutes(1));
+  }
+
+  /**
+   * One run that condemns, the condemnations aged past the grace, and the run that purges — the
+   * second receipt.
+   *
+   * <p>What a single sweep used to do, now that deleting takes two (qits-1172). The cases written
+   * before the two-phase sweep assert on what a purge does — the tombstone, the unlink, the blob
+   * grace still withholding — and this is the shortest honest route to a purge: the same code
+   * production runs, over a condemnation that really is a day old.
+   */
+  eu.wohlben.qits.artifacts.gc.dto.GcSweepReport sweptPastCondemnation(
+      List<GcStrategy> strategies, GcPins pins) {
+    sweeps.execute(census.take(), strategies, pins);
+    ageCondemnationsPastGrace();
+    return sweeps.execute(census.take(), strategies, pins);
+  }
+
+  /** The scoped twin of {@link #sweptPastCondemnation(List, GcPins)}. */
+  eu.wohlben.qits.artifacts.gc.dto.GcRepositorySweepReport sweptPastCondemnation(
+      eu.wohlben.qits.blobstore.entity.ArtifactRepository row,
+      List<GcStrategy> strategies,
+      GcPins pins) {
+    sweeps.execute(row, census.take(), strategies, pins);
+    ageCondemnationsPastGrace();
+    return sweeps.execute(row, census.take(), strategies, pins);
+  }
+
+  /**
+   * The two-phase promise of qits-1172, asserted identically for every own type: the run that finds
+   * {@code identity} dead condemns it and deletes nothing of it — {@code stored} still answers true
+   * and not a byte is unlinked — and a run once the condemnation is past the grace purges it through
+   * the type's own delete path, unchanged.
+   *
+   * <p>One assertion body rather than one per suite, because the promise is the executor's and not
+   * any adapter's: no adapter changed for it, and a type that broke it would be breaking the
+   * executor's gate. Each suite supplies only its own fixture — a dead identity whose bytes are past
+   * the blob grace — and its own reading of "still stored".
+   *
+   * @param stored whether the identity's rows are still in the store; called with the persistence
+   *     context cleared by the caller's supplier
+   * @return the purging run's line for the type, for whatever the suite asserts beyond this
+   */
+  eu.wohlben.qits.artifacts.gc.dto.GcTypeSweepResult condemnedFirstThenPurged(
+      GcStrategy strategy, String identity, java.util.function.BooleanSupplier stored) {
+    eu.wohlben.qits.artifacts.gc.dto.GcSweepReport first =
+        sweeps.execute(census.take(), List.of(strategy), GcPins.none());
+    eu.wohlben.qits.artifacts.gc.dto.GcTypeSweepResult found = sweepLine(first, strategy.type());
+    assertNull(found.error());
+    assertTrue(
+        named(found.condemned()).contains(identity),
+        identity + " is condemned by the run that finds it dead: " + found.condemned());
+    assertEquals(List.of(), found.deleted(), "and nothing is deleted on that run");
+    assertTrue(
+        found.awaitingPurge().stream().anyMatch(waiting -> waiting.identity().equals(identity)),
+        "it waits out the condemn grace in plain sight");
+    assertEquals(0, first.sweep().blobsUnlinked(), "not a byte of a condemned identity goes");
+    assertTrue(stored.getAsBoolean(), "a condemned identity stays whole, so it stays served");
+
+    ageCondemnationsPastGrace();
+    eu.wohlben.qits.artifacts.gc.dto.GcSweepReport second =
+        sweeps.execute(census.take(), List.of(strategy), GcPins.none());
+    eu.wohlben.qits.artifacts.gc.dto.GcTypeSweepResult purged = sweepLine(second, strategy.type());
+    assertTrue(
+        named(purged.deleted()).contains(identity),
+        identity + " is purged once its condemnation is past the grace: " + purged);
+    assertFalse(stored.getAsBoolean(), "through the type's own delete path");
+    assertTrue(
+        condemnations.of(strategy.type(), null).keySet().stream()
+            .noneMatch(key -> key.identity().equals(identity)),
+        "and its condemnation goes with it");
+    return purged;
+  }
+
+  static eu.wohlben.qits.artifacts.gc.dto.GcTypeSweepResult sweepLine(
+      eu.wohlben.qits.artifacts.gc.dto.GcSweepReport report, String type) {
+    return report.types().stream()
+        .filter(line -> RepositoryTypeProfile.wireNameOf(type).equals(line.type()))
+        .findFirst()
+        .orElseThrow();
+  }
+
+  static List<String> named(List<eu.wohlben.qits.artifacts.gc.dto.GcIdentity> identities) {
+    return identities.stream().map(eu.wohlben.qits.artifacts.gc.dto.GcIdentity::identity).toList();
+  }
+
+  /** How many condemnations stand, all types. */
+  long condemnedCount() {
+    return count("select count(*) from gc_condemned");
   }
 
   /** How many staging areas exist — the assertion that replaces counting temp files. */

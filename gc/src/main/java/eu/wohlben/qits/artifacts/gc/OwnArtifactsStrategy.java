@@ -115,6 +115,7 @@ public final class OwnArtifactsStrategy {
     Set<String> released = new HashSet<>();
     Set<String> retained = new HashSet<>();
     Map<String, Set<String>> releasedByRepository = new HashMap<>();
+    Map<GcStrategy.IdentityKey, Set<String>> releasedByIdentity = new HashMap<>();
 
     for (GcCandidate candidate : candidates) {
       String pin = pins.pinnedBy(candidate);
@@ -130,6 +131,11 @@ public final class OwnArtifactsStrategy {
         releasedByRepository
             .computeIfAbsent(candidate.repository(), repository -> new HashSet<>())
             .addAll(candidate.blobs());
+        // And which identity, so a sweep that condemns this one without purging it yet can keep
+        // exactly its bytes on the retained side (GcStrategy.Plan#purging).
+        releasedByIdentity.put(
+            new GcStrategy.IdentityKey(candidate.repository(), candidate.identity()),
+            candidate.blobs());
       } else {
         keep(candidate, keptAccessed(window), kept, retained);
       }
@@ -139,7 +145,8 @@ public final class OwnArtifactsStrategy {
     kept.sort(BY_IDENTITY);
     return dead.isEmpty()
         ? GcStrategy.Plan.nothingDies(kept, retained)
-        : new GcStrategy.Plan(dead, kept, released, retained, releasedByRepository);
+        : new GcStrategy.Plan(
+            dead, kept, released, retained, releasedByRepository, releasedByIdentity);
   }
 
   /**

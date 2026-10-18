@@ -49,6 +49,11 @@ import org.junit.jupiter.api.Test;
  * which is "nothing is pinned and nothing is broken". The strategies are the real beans, because
  * {@code collect}'s tombstone-and-refusal mechanics are half of what is on trial.
  * The whole-run abort, which is what an incomplete aggregate causes, is {@code GcPinsTest}'s.
+ *
+ * <p><b>Deleting takes two runs since qits-1172</b>, so the deletion cases sweep through {@link
+ * #sweptPastCondemnation}: a run that condemns, the condemnations aged past the shipped grace, and
+ * the run that purges. What those cases assert is the purge — unchanged from the one-run sweep they
+ * were written against. The two-phase mechanism itself is {@code GcCondemnationTest}'s.
  */
 @QuarkusTest
 class GcSweepExecutorTest extends GcFixture {
@@ -82,7 +87,7 @@ class GcSweepExecutorTest extends GcFixture {
     versionRow(PKG, SUPERSEDED, supersededBlob, daysAgo(400));
     versionRow(PKG, NEWEST, newestBlob, Instant.now());
 
-    GcSweepReport report = executor.execute(census.take(), List.of(npmStrategy), GcPins.none());
+    GcSweepReport report = sweptPastCondemnation(List.of(npmStrategy), GcPins.none());
 
     assertFalse(report.dryRun());
     assertNotNull(report.executedAt());
@@ -128,7 +133,7 @@ class GcSweepExecutorTest extends GcFixture {
     versionRow(PKG, SUPERSEDED, supersededBlob, daysAgo(400));
     versionRow(PKG, RELEASE, releaseBlob, daysAgo(400));
 
-    GcSweepReport report = executor.execute(census.take(), List.of(npmStrategy), GcPins.none());
+    GcSweepReport report = sweptPastCondemnation(List.of(npmStrategy), GcPins.none());
 
     GcTypeSweepResult npm = typeResult(report, NpmPackagesProfile.KEY);
     assertEquals(List.of(), npm.deleted());
@@ -214,8 +219,7 @@ class GcSweepExecutorTest extends GcFixture {
     // The cross-type case: the npm registry serves the doomed layer's bytes as a release tarball.
     versionRow(PKG, RELEASE, layerDoomed, Instant.now());
 
-    GcSweepReport report =
-        executor.execute(census.take(), List.of(ociStrategy, npmStrategy), GcPins.none());
+    GcSweepReport report = sweptPastCondemnation(List.of(ociStrategy, npmStrategy), GcPins.none());
 
     GcTypeSweepResult oci = typeResult(report, OciImagesProfile.KEY);
     assertNull(oci.error());
@@ -325,8 +329,7 @@ class GcSweepExecutorTest extends GcFixture {
     versionRow("npm2", PKG, RELEASE, release2Blob, daysAgo(400));
     versionRow("npm2", PKG, SUPERSEDED, sharedBlob, daysAgo(400));
 
-    GcRepositorySweepReport report =
-        executor.execute(npm, census.take(), List.of(npmStrategy), GcPins.none());
+    GcRepositorySweepReport report = sweptPastCondemnation(npm, List.of(npmStrategy), GcPins.none());
 
     assertEquals("npm", report.repository());
     assertEquals("npm-packages", report.type());

@@ -5,6 +5,7 @@ import eu.wohlben.qits.artifacts.control.LiveBlobCensus;
 import eu.wohlben.qits.blobstore.entity.ArtifactRepository;
 import eu.wohlben.qits.blobstore.control.RepositoryTypeProfiles;
 import eu.wohlben.qits.blobstore.entity.RepositoryTypeProfile;
+import eu.wohlben.qits.artifacts.gc.dto.GcCondemnedIdentity;
 import eu.wohlben.qits.artifacts.gc.dto.GcPlanReport;
 import eu.wohlben.qits.artifacts.gc.dto.GcRepositoriesPlanResponse;
 import eu.wohlben.qits.artifacts.gc.dto.GcRepositoryPlanReport;
@@ -66,6 +67,7 @@ public class GcPlanner {
   @Inject GcTypeConfig config;
   @Inject GcPinSources pinSources;
   @Inject ArtifactRepositoryService repositories;
+  @Inject GcCondemnations condemnations;
 
   /**
    * Every repository type this deployment registers — what "every type appears in every report"
@@ -159,6 +161,24 @@ public class GcPlanner {
         sweep.untouchable(taken));
   }
 
+  /**
+   * The plan's dead identities that already carry a condemnation — read, never written: a dry-run
+   * that condemned would be a sweep with a misleading name.
+   */
+  private List<GcCondemnedIdentity> alreadyCondemned(String type, GcStrategy.Plan plan) {
+    if (plan.dead().isEmpty()) {
+      return List.of();
+    }
+    Map<GcStrategy.IdentityKey, GcCondemnations.Condemnation> standing =
+        condemnations.of(type, null);
+    Duration grace = condemnations.gracePeriod();
+    return plan.dead().stream()
+        .map(identity -> standing.get(GcStrategy.IdentityKey.of(identity)))
+        .filter(java.util.Objects::nonNull)
+        .map(condemnation -> condemnation.toWire(grace))
+        .toList();
+  }
+
   /** What CDI found. Empty is the shipped state and a supported one. */
   List<GcStrategy> registered() {
     return strategies.stream().toList();
@@ -178,7 +198,7 @@ public class GcPlanner {
             new GcTypePlan(
                 RepositoryTypeProfile.wireNameOf(type),
                 outcome.strategy(), outcome.note(), outcome.error(),
-                List.of(), List.of(), 0, 0, 0L));
+                List.of(), List.of(), 0, 0, 0L, List.of()));
         continue;
       }
       plans.put(type, plan);
@@ -193,7 +213,8 @@ public class GcPlanner {
               plan.kept(),
               plan.blobsReleased().size(),
               attributed.blobCount(),
-              attributed.reclaimableBytes()));
+              attributed.reclaimableBytes(),
+              alreadyCondemned(type, plan)));
     }
 
     // The configuration echo, beside the outcomes rather than instead of them: what each type is

@@ -188,6 +188,27 @@ class DocsGcAdapterTest extends GcFixture {
     assertEquals(0, metadataRows(), "fk_docs_site_metadata_site cascaded with the version");
   }
 
+  @Test
+  void aDeadVersionIsCondemnedByTheRunThatFindsItAndPurgedOnlyPastTheCondemnGrace()
+      throws Exception {
+    // qits-1172 for this type: the bundle keeps every file while it is condemned, so the site
+    // serves it unchanged; the purge past the grace is the docs funnel's.
+    repository();
+    String doomed = blob(61);
+    backdate(doomed, Duration.ofDays(30));
+    docsSite(DOCS_REPO, SITE, "a".repeat(40), daysAgo(200), null, Map.of(), doomed);
+    docsSite(DOCS_REPO, SITE, "2026.801.30", daysAgo(10), null, Map.of(), blob(62));
+
+    condemnedFirstThenPurged(
+        strategy,
+        SITE + "@" + "a".repeat(40),
+        () -> {
+          docsSites.getEntityManager().clear();
+          return docsSites.findOne(DOCS_REPO, SITE, "a".repeat(40)).isPresent();
+        });
+    assertFalse(blobStore.exists(doomed));
+  }
+
   // --- fixture ---------------------------------------------------------------------------------
 
   private void repository() {

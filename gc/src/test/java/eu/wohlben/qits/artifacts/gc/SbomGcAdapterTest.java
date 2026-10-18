@@ -324,6 +324,28 @@ class SbomGcAdapterTest extends GcFixture {
     assertEquals(SbomProfile.KEY, strategy.type());
   }
 
+  @Test
+  void aDeadDocumentIsCondemnedByTheRunThatFindsItAndPurgedOnlyPastTheCondemnGrace()
+      throws Exception {
+    // qits-1172 for this type: the document stays readable while it is condemned; the purge past
+    // the grace is SbomRegistryCollection's, unchanged.
+    repository();
+    String doomed = blob(71);
+    backdate(doomed, Duration.ofDays(30));
+    sbomRow(SBOM_REPO, "npm", NPM_NAME, "2026.601.10", doomed, daysAgo(400), null);
+    sbomRow(SBOM_REPO, "npm", NPM_NAME, "2026.701.20", blob(72), daysAgo(300), null);
+    sbomRow(SBOM_REPO, "npm", NPM_NAME, "2026.801.30", blob(73), daysAgo(200), null);
+
+    condemnedFirstThenPurged(
+        strategy,
+        "npm/" + NPM_NAME + "@2026.601.10",
+        () -> {
+          sbomDocuments.getEntityManager().clear();
+          return sbomDocuments.findOne(SBOM_REPO, "npm", NPM_NAME, "2026.601.10").isPresent();
+        });
+    assertFalse(blobStore.exists(doomed));
+  }
+
   // --- fixture ---------------------------------------------------------------------------------
 
   private void mavenRow(String path) throws IOException {

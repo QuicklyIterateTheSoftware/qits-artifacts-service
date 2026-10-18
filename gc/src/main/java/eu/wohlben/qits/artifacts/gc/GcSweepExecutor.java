@@ -6,6 +6,8 @@ import eu.wohlben.qits.artifacts.control.LiveBlobCensus;
 import eu.wohlben.qits.blobstore.entity.ArtifactRepository;
 import eu.wohlben.qits.blobstore.control.RepositoryTypeProfiles;
 import eu.wohlben.qits.blobstore.entity.RepositoryTypeProfile;
+import eu.wohlben.qits.artifacts.gc.dto.GcCondemnedIdentity;
+import eu.wohlben.qits.artifacts.gc.dto.GcIdentity;
 import eu.wohlben.qits.artifacts.gc.dto.GcRepositorySweepReport;
 import eu.wohlben.qits.artifacts.gc.dto.GcSweepOutcome;
 import eu.wohlben.qits.artifacts.gc.dto.GcSweepReport;
@@ -17,15 +19,21 @@ import jakarta.enterprise.inject.Instance;
 import jakarta.inject.Inject;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.TreeMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
 
 /**
- * The executed sweep: what the dry-run reports, done — plan, delete the identity rows, unlink the
- * blobs, and hand back the receipt.
+ * The executed sweep: what the dry-run reports, done — plan, condemn the dead, purge what an earlier
+ * run condemned long enough ago, unlink the blobs that frees, and hand back the receipt.
  *
  * <p>One run is one request, and that is a safety property rather than a convenience: every plan
  * this class applies was computed <b>in this run</b>, from a census taken at its start — the OCI
@@ -43,6 +51,24 @@ import java.util.Map;
  * expected first receipt on a young store is therefore zeros everywhere, and that no-op is the
  * proof the mechanism is safe.
  *
+ * <p><b>Two phases, since qits-1172: a run condemns, a later run purges.</b> An identity this run's
+ * plan finds dead is not deleted on the run that finds it — it is condemned ({@link
+ * GcCondemnations}), which touches nothing it owns: rows, blobs and reads stay as they were. A run
+ * deletes only what an earlier run condemned at least {@code qits.artifacts.gc.condemn-grace-period}
+ * ago <em>and</em> its own fresh plan still finds dead; what its plan keeps again has its
+ * condemnation lifted. So the delete path below is unchanged and simply reached later: the plan
+ * handed to {@code apply} and to the blob loop is {@link GcStrategy.Plan#purging} of the run's
+ * plan, holding only the ripe identities and retaining every still-condemned identity's blobs. The
+ * adapters needed no change for it, because their delete loops act on {@code plan.dead()} and
+ * nothing else. The blob grace still gates that purge, exactly as before.
+ *
+ * <p><b>Condemnation is per type and per scope, and it is fail-closed with the plan.</b> A type whose
+ * strategy refused, or whose condemnation step failed, changes no condemnation and purges nothing:
+ * its keep-set is unknown, so lifting a condemnation would be as unfounded as writing one. An aborted
+ * run changes none at all — it is over before any plan exists. A scoped run reads, writes and lifts
+ * the condemnations of its own repository only: another repository's condemnation was judged by a
+ * plan this run never applied, so it is not this run's to clear.
+ *
  * <p>Every run logs one line per type and one for the blob loop, so "what did GC ever do" stays a
  * question with an answer.
  */
@@ -56,6 +82,7 @@ public class GcSweepExecutor {
   @Inject GcPinSources pinSources;
   @Inject GcTypeConfig config;
   @Inject ArtifactRepositoryService repositories;
+  @Inject GcCondemnations condemnations;
 
   /** Every repository type this deployment registers — the receipt covers exactly these. */
   @Inject RepositoryTypeProfiles repositoryTypes;
@@ -163,7 +190,9 @@ public class GcSweepExecutor {
             "not computed: this run aborted before taking a census, and deleted nothing",
             0,
             0L,
-            List.of()));
+            List.of()),
+        newRunId(),
+        GcPlanner.iso(condemnations.gracePeriod()));
   }
 
   /**
@@ -194,7 +223,12 @@ public class GcSweepExecutor {
             "not computed: this run aborted before taking a census, and deleted nothing",
             0,
             0L,
-            List.of()));
+            List.of()),
+        newRunId(),
+        GcPlanner.iso(condemnations.gracePeriod()),
+        List.of(),
+        List.of(),
+        List.of());
   }
 
   GcRepositorySweepReport execute(
@@ -202,7 +236,8 @@ public class GcSweepExecutor {
       LiveBlobCensus.Census taken,
       Collection<GcStrategy> registered,
       GcPins pins) {
-    Instant executedAt = Instant.now();
+    Instant executedAt = startedAt();
+    String runId = newRunId();
     Duration window = sweep.graceWindow();
     GcStrategy.GraceWindow grace = graceSince(executedAt.minus(window));
     String type = row.type;
@@ -216,6 +251,7 @@ public class GcSweepExecutor {
           row,
           taken,
           executedAt,
+          runId,
           window,
           pins,
           null,
@@ -227,6 +263,7 @@ public class GcSweepExecutor {
           row,
           taken,
           executedAt,
+          runId,
           window,
           pins,
           names(claiming),
@@ -238,28 +275,37 @@ public class GcSweepExecutor {
     GcStrategy strategy = claiming.get(0);
     String name = GcPlanner.nameOf(strategy);
     GcStrategy.Plan scoped;
+    Verdict verdict;
     try {
       scoped = strategy.plan(taken, pins).scopedTo(row.name);
+      // Scoped to the repository here as well as in the plan: the condemnations this run reads,
+      // writes and lifts are this repository's and nobody else's.
+      verdict = condemn(type, row.name, scoped, executedAt, runId);
     } catch (RuntimeException refused) {
-      // Fail-closed, exactly as the whole-store run: no plan, so no row of this repository moves
-      // and the blob loop is never reached.
+      // Fail-closed, exactly as the whole-store run: no plan, so no row of this repository moves,
+      // no condemnation changes, and the blob loop is never reached.
       Log.infof("gc sweep of %s: refused — %s", row.name, message(refused));
-      return nothingRan(row, taken, executedAt, window, pins, name, null, message(refused));
+      return nothingRan(row, taken, executedAt, runId, window, pins, name, null, message(refused));
     }
 
-    GcStrategy.Applied applied = strategy.apply(scoped, grace);
+    GcStrategy.Applied applied = strategy.apply(verdict.purge(), grace);
+    purged(type, applied);
     Log.infof(
-        "gc sweep %s (%s): deleted %d identities, withheld %d by grace, %d errors",
+        "gc sweep %s (%s): condemned %d, cleared %d, purged %d identities, awaiting purge %d,"
+            + " withheld %d by grace, %d errors",
         row.name,
         RepositoryTypeProfile.wireNameOf(type),
+        verdict.condemned().size(),
+        verdict.cleared().size(),
         applied.deleted().size(),
+        verdict.awaitingPurge().size(),
         applied.withheldByGraceWindow().size(),
         applied.errors().size());
     // The blob loop runs over the whole store with only this repository's plan applied. Every other
     // type contributes its census live set, and every other repository of THIS type is inside the
     // scoped plan's retained set — so a shared blob is protected by the reconciliation before the
     // re-census and the store's own guard ever have to catch it.
-    GcSweepOutcome outcome = sweep.execute(taken, Map.of(type, scoped));
+    GcSweepOutcome outcome = sweep.execute(taken, Map.of(type, verdict.purge()));
     Log.infof(
         "gc sweep %s blobs: unlinked %d (%d bytes), withheld %d by grace (%d bytes), %d still"
             + " referenced, %d already gone",
@@ -285,14 +331,20 @@ public class GcSweepExecutor {
         applied.deleted(),
         applied.withheldByGraceWindow(),
         outcome,
-        sweep.untouchable(taken));
+        sweep.untouchable(taken),
+        runId,
+        GcPlanner.iso(condemnations.gracePeriod()),
+        verdict.condemned(),
+        verdict.cleared(),
+        verdict.awaitingPurge());
   }
 
-  /** A run that read the store, planned nothing, and therefore deleted nothing. */
+  /** A run that read the store, planned nothing, and therefore deleted and condemned nothing. */
   private GcRepositorySweepReport nothingRan(
       ArtifactRepository row,
       LiveBlobCensus.Census taken,
       Instant executedAt,
+      String runId,
       Duration window,
       GcPins pins,
       String strategy,
@@ -313,12 +365,18 @@ public class GcSweepExecutor {
         List.of(),
         new GcSweepOutcome(0, 0L, 0, 0L, 0, 0, List.of()),
         // A census WAS taken here, so the pool is a real reading rather than "not computed".
-        sweep.untouchable(taken));
+        sweep.untouchable(taken),
+        runId,
+        GcPlanner.iso(condemnations.gracePeriod()),
+        List.of(),
+        List.of(),
+        List.of());
   }
 
   GcSweepReport execute(
       LiveBlobCensus.Census taken, Collection<GcStrategy> registered, GcPins pins) {
-    Instant executedAt = Instant.now();
+    Instant executedAt = startedAt();
+    String runId = newRunId();
     Duration window = sweep.graceWindow();
     GcStrategy.GraceWindow grace = graceSince(executedAt.minus(window));
 
@@ -358,14 +416,22 @@ public class GcSweepExecutor {
       String name = GcPlanner.nameOf(strategy);
       try {
         GcStrategy.Plan plan = strategy.plan(taken, pins);
+        Verdict verdict = condemn(type, null, plan, executedAt, runId);
         // In the map before apply: even a partially applied type must contribute its released set
         // to the blob loop, or rows already deleted would leave their blobs unswept and stranded.
-        plans.put(type, plan);
-        GcStrategy.Applied applied = strategy.apply(plan, grace);
+        // The PURGE plan, not the run's plan: a condemned identity still standing keeps its blobs
+        // on the retained side, so they are never even a candidate.
+        plans.put(type, verdict.purge());
+        GcStrategy.Applied applied = strategy.apply(verdict.purge(), grace);
+        purged(type, applied);
         Log.infof(
-            "gc sweep %s: deleted %d identities, withheld %d by grace, %d errors",
+            "gc sweep %s: condemned %d, cleared %d, purged %d identities, awaiting purge %d,"
+                + " withheld %d by grace, %d errors",
             RepositoryTypeProfile.wireNameOf(type),
+            verdict.condemned().size(),
+            verdict.cleared().size(),
             applied.deleted().size(),
+            verdict.awaitingPurge().size(),
             applied.withheldByGraceWindow().size(),
             applied.errors().size());
         types.add(
@@ -375,7 +441,10 @@ public class GcSweepExecutor {
                 GcRules.note(config, type, strategy.note()),
                 applied.errors().isEmpty() ? null : String.join("; ", applied.errors()),
                 applied.deleted(),
-                applied.withheldByGraceWindow()));
+                applied.withheldByGraceWindow(),
+                verdict.condemned(),
+                verdict.cleared(),
+                verdict.awaitingPurge()));
       } catch (RuntimeException aborted) {
         // Fail-closed, exactly as the planner: an exception out of plan() (or a wholesale one out
         // of apply()) reports the type as failed. The blob loop is safe either way — a row that
@@ -408,7 +477,123 @@ public class GcSweepExecutor {
         // The pool as it stood before this run: a version row deleted moments ago leaves its
         // within-grace tarball row-less in a fresh census, and listing that as "untouchable" would
         // misname a blob the next run is going to sweep.
-        sweep.untouchable(taken));
+        sweep.untouchable(taken),
+        runId,
+        GcPlanner.iso(condemnations.gracePeriod()));
+  }
+
+  /** The rule a lifted condemnation names when the identity it was about is not in the store. */
+  static final String NO_LONGER_EXISTS =
+      "no longer exists: the identity is gone from the store, so its condemnation names nothing";
+
+  /**
+   * What the condemnation phase decided for one type's plan in one scope.
+   *
+   * @param purge the plan to apply now — {@link GcStrategy.Plan#purging} of the run's plan
+   * @param condemned the dead identities condemned by this run for the first time
+   * @param cleared the condemnations this run lifted, each naming the rule that saves it now
+   * @param awaitingPurge the dead identities left standing because their condemnation is younger
+   *     than the grace
+   */
+  private record Verdict(
+      GcStrategy.Plan purge,
+      List<GcIdentity> condemned,
+      List<GcIdentity> cleared,
+      List<GcCondemnedIdentity> awaitingPurge) {}
+
+  /**
+   * The first phase: reconcile the standing condemnations against this run's dead set, and say
+   * which dead identities are ripe.
+   *
+   * <p>Three moves, all inside {@code (type, scope)} and nowhere else. A standing condemnation whose
+   * identity this plan does not find dead is <b>lifted</b> — the keep-set names it again, or it is
+   * gone. A dead identity without one is <b>condemned</b> at this run's instant. A dead identity whose
+   * condemnation is at least the grace old is <b>ripe</b>, and only those reach {@code apply}. The
+   * comparison is "the grace has fully elapsed" ({@code purgeAt <= now}), so a deployment that sets
+   * the grace to zero gets the one-phase collector back, condemn and purge in the same run — the
+   * escape hatch, never the default.
+   *
+   * <p>The writes happen before anything is deleted, so a run that dies after this point leaves its
+   * condemnations recorded and nothing else changed. They are what a later run's purge rests on.
+   *
+   * @param scope null for the whole type; a repository name for a scoped run
+   */
+  private Verdict condemn(
+      String type, String scope, GcStrategy.Plan plan, Instant now, String runId) {
+    Duration condemnGrace = condemnations.gracePeriod();
+    Map<GcStrategy.IdentityKey, GcCondemnations.Condemnation> standing =
+        condemnations.of(type, scope);
+    Map<GcStrategy.IdentityKey, GcIdentity> dead = new LinkedHashMap<>();
+    plan.dead().forEach(identity -> dead.put(GcStrategy.IdentityKey.of(identity), identity));
+    Map<GcStrategy.IdentityKey, GcIdentity> kept = new HashMap<>();
+    plan.kept().forEach(identity -> kept.put(GcStrategy.IdentityKey.of(identity), identity));
+
+    List<GcStrategy.IdentityKey> lift = new ArrayList<>();
+    List<GcIdentity> cleared = new ArrayList<>();
+    for (GcStrategy.IdentityKey key : standing.keySet()) {
+      if (!dead.containsKey(key)) {
+        lift.add(key);
+        cleared.add(
+            kept.getOrDefault(key, new GcIdentity(key.repository(), key.identity(), NO_LONGER_EXISTS)));
+      }
+    }
+
+    List<GcStrategy.IdentityKey> fresh = new ArrayList<>();
+    List<GcIdentity> condemned = new ArrayList<>();
+    Set<GcStrategy.IdentityKey> ripe = new HashSet<>();
+    List<GcCondemnedIdentity> awaiting = new ArrayList<>();
+    for (Map.Entry<GcStrategy.IdentityKey, GcIdentity> entry : dead.entrySet()) {
+      GcCondemnations.Condemnation existing = standing.get(entry.getKey());
+      GcCondemnations.Condemnation condemnation = existing;
+      if (existing == null) {
+        fresh.add(entry.getKey());
+        condemned.add(entry.getValue());
+        condemnation =
+            new GcCondemnations.Condemnation(
+                type, entry.getKey().repository(), entry.getKey().identity(), now, runId);
+      }
+      if (condemnation.condemnedAt().plus(condemnGrace).isAfter(now)) {
+        awaiting.add(condemnation.toWire(condemnGrace));
+      } else {
+        ripe.add(entry.getKey());
+      }
+    }
+
+    condemnations.clear(type, lift);
+    condemnations.condemn(type, fresh, now, runId);
+    return new Verdict(plan.purging(ripe), condemned, cleared, awaiting);
+  }
+
+  /**
+   * The purge's bookkeeping: a deleted identity's condemnation goes with it.
+   *
+   * <p>Not fatal when it fails — the rows are already gone, and the next run lifts the stale
+   * condemnation by itself, because an identity that no longer exists is never in its dead set.
+   */
+  private void purged(String type, GcStrategy.Applied applied) {
+    try {
+      condemnations.clear(
+          type, applied.deleted().stream().map(GcStrategy.IdentityKey::of).toList());
+    } catch (RuntimeException failed) {
+      Log.warnf(
+          "gc sweep %s: purged identities' condemnations not lifted (the next run lifts them) — %s",
+          RepositoryTypeProfile.wireNameOf(type),
+          message(failed));
+    }
+  }
+
+  /**
+   * The run's one clock, at the database's resolution. A condemnation written at this instant is
+   * read back by the next run as exactly this instant, so a receipt's {@code executedAt}, the
+   * condemnation's {@code condemnedAt} and the purge arithmetic on it never disagree by a few
+   * nanoseconds {@code timestamptz} cannot hold.
+   */
+  private static Instant startedAt() {
+    return Instant.now().truncatedTo(ChronoUnit.MICROS);
+  }
+
+  private static String newRunId() {
+    return UUID.randomUUID().toString();
   }
 
   /**

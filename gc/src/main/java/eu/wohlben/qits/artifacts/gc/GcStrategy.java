@@ -171,13 +171,20 @@ public interface GcStrategy {
    *     row the dead identity that named them lives in. The union of its values is {@link
    *     #blobsReleased}; it exists so one repository's share of a type's plan can be read off
    *     ({@link #scopedTo}) without a second planning pass.
+   * @param releasedByIdentity the same released blobs once more, split by the dead identity that
+   *     named them. It exists for the two-phase sweep ({@link #purging}): a run that condemns an
+   *     identity without purging it must keep that identity's blobs on the retained side, and only
+   *     the engine knows which blobs those are. Empty for a plan that cannot say — a hand-built one —
+   *     and then the sweep's pre-unlink re-census, which sees the condemned identity's surviving
+   *     row, is what protects them.
    */
   record Plan(
       List<GcIdentity> dead,
       List<GcIdentity> kept,
       Set<String> blobsReleased,
       Set<String> blobsRetained,
-      Map<String, Set<String>> releasedByRepository) {
+      Map<String, Set<String>> releasedByRepository,
+      Map<IdentityKey, Set<String>> releasedByIdentity) {
 
     public Plan {
       dead = List.copyOf(dead);
@@ -185,6 +192,17 @@ public interface GcStrategy {
       blobsReleased = Set.copyOf(blobsReleased);
       blobsRetained = Set.copyOf(blobsRetained);
       releasedByRepository = copyOfSets(releasedByRepository);
+      releasedByIdentity = copyOfSets(releasedByIdentity);
+    }
+
+    /** A plan attributed per repository but not per identity — what it was before qits-1172. */
+    public Plan(
+        List<GcIdentity> dead,
+        List<GcIdentity> kept,
+        Set<String> blobsReleased,
+        Set<String> blobsRetained,
+        Map<String, Set<String>> releasedByRepository) {
+      this(dead, kept, blobsReleased, blobsRetained, releasedByRepository, Map.of());
     }
 
     /**
@@ -208,7 +226,52 @@ public interface GcStrategy {
 
     /** A strategy with nothing to do — the honest answer for a type whose rules exist but match no row. */
     public static Plan nothingDies(List<GcIdentity> kept, Set<String> live) {
-      return new Plan(List.of(), kept, Set.of(), live, Map.of());
+      return new Plan(List.of(), kept, Set.of(), live, Map.of(), Map.of());
+    }
+
+    /**
+     * This plan with only the given dead identities going — the purge half of a two-phase sweep.
+     *
+     * <p>Every other dead identity is <b>condemned and still standing</b>: its rows stay, so its
+     * blobs move to the retained side here, where the reconciliation sees them as live and they are
+     * never even a candidate. That move needs {@link #releasedByIdentity}; for a plan that cannot
+     * attribute a dead identity's blobs the released set is left whole rather than guessed at,
+     * because narrowing it could take a purged identity's blob off the candidate list and strand it
+     * row-less. The surviving rows are then protected one layer down instead: {@code
+     * BlobSweep.execute} re-takes the census after the deletions and skips every blob a row still
+     * names.
+     *
+     * <p>{@link #kept} is carried unchanged — it is the report half and says nothing about what is
+     * applied.
+     */
+    public Plan purging(Set<IdentityKey> purge) {
+      List<GcIdentity> going =
+          dead.stream().filter(identity -> purge.contains(IdentityKey.of(identity))).toList();
+      if (going.size() == dead.size()) {
+        return this;
+      }
+      boolean attributed =
+          dead.stream().allMatch(identity -> releasedByIdentity.containsKey(IdentityKey.of(identity)));
+      if (!attributed) {
+        return new Plan(
+            going, kept, blobsReleased, blobsRetained, releasedByRepository, releasedByIdentity);
+      }
+      Set<String> released = new HashSet<>();
+      Set<String> retained = new HashSet<>(blobsRetained);
+      Map<String, Set<String>> byRepository = new HashMap<>();
+      Map<IdentityKey, Set<String>> byIdentity = new HashMap<>();
+      for (GcIdentity identity : dead) {
+        IdentityKey key = IdentityKey.of(identity);
+        Set<String> blobs = releasedByIdentity.get(key);
+        if (purge.contains(key)) {
+          released.addAll(blobs);
+          byRepository.computeIfAbsent(identity.repository(), repository -> new HashSet<>()).addAll(blobs);
+          byIdentity.put(key, blobs);
+        } else {
+          retained.addAll(blobs);
+        }
+      }
+      return new Plan(going, kept, released, retained, byRepository, byIdentity);
     }
 
     /**
@@ -239,12 +302,20 @@ public interface GcStrategy {
           retained.addAll(entry.getValue());
         }
       }
+      Map<IdentityKey, Set<String>> byIdentity = new HashMap<>();
+      releasedByIdentity.forEach(
+          (key, blobs) -> {
+            if (key.repository().equals(repository)) {
+              byIdentity.put(key, blobs);
+            }
+          });
       return new Plan(
           in(dead, repository),
           in(kept, repository),
           released,
           retained,
-          released.isEmpty() ? Map.of() : Map.of(repository, released));
+          released.isEmpty() ? Map.of() : Map.of(repository, released),
+          byIdentity);
     }
 
     private static List<GcIdentity> in(List<GcIdentity> identities, String repository) {
@@ -263,10 +334,26 @@ public interface GcStrategy {
       return attributed;
     }
 
-    private static Map<String, Set<String>> copyOfSets(Map<String, Set<String>> byRepository) {
-      Map<String, Set<String>> copy = new HashMap<>();
-      byRepository.forEach((repository, blobs) -> copy.put(repository, Set.copyOf(blobs)));
+    private static <K> Map<K, Set<String>> copyOfSets(Map<K, Set<String>> byKey) {
+      Map<K, Set<String>> copy = new HashMap<>();
+      byKey.forEach((key, blobs) -> copy.put(key, Set.copyOf(blobs)));
       return Map.copyOf(copy);
+    }
+  }
+
+  /**
+   * Which identity, without the rule that judged it — the key a condemnation is stored and matched
+   * under.
+   *
+   * <p>The rule is left out on purpose: it is a sentence that may change between two runs (a window
+   * reconfigured, a keep-class renamed) while the identity it judged stays the same one, and a
+   * condemnation that failed to match its own identity on the next run would restart its grace for
+   * ever.
+   */
+  record IdentityKey(String repository, String identity) {
+
+    public static IdentityKey of(GcIdentity identity) {
+      return new IdentityKey(identity.repository(), identity.identity());
     }
   }
 }

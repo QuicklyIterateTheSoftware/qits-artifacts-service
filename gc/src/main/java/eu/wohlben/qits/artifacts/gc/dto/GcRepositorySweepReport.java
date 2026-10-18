@@ -43,6 +43,12 @@ import java.util.List;
  *     the window. Not lost: the next run past it takes rows and files together.
  * @param sweep the blob unlinks — what was freed, and every candidate that was not
  * @param untouchable the row-less pool as it stood before this run, restated
+ * @param runId this run's id, carried by every condemnation it wrote
+ * @param condemnGracePeriod how long a condemnation must stand before a sweep may purge, ISO-8601
+ * @param condemned this repository's dead identities this run condemned for the first time — and
+ *     only this repository's: a scoped run condemns, clears and purges inside its scope alone
+ * @param cleared this repository's condemnations lifted because the keep-set names them again
+ * @param awaitingPurge this repository's dead identities still inside their condemnation's grace
  */
 public record GcRepositorySweepReport(
     String repository,
@@ -58,4 +64,9 @@ public record GcRepositorySweepReport(
     List<GcIdentity> deleted,
     List<GcIdentity> withheldByGraceWindow,
     GcSweepOutcome sweep,
-    GcUntouchablePool untouchable) {}
+    GcUntouchablePool untouchable,
+    String runId,
+    String condemnGracePeriod,
+    List<GcIdentity> condemned,
+    List<GcIdentity> cleared,
+    List<GcCondemnedIdentity> awaitingPurge) {}

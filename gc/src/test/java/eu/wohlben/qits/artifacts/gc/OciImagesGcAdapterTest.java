@@ -633,6 +633,21 @@ class OciImagesGcAdapterTest extends GcFixture {
     assertEquals(2, ociManifests.count(), "the manifests are next run's candidates, not this one's");
   }
 
+  @Test
+  void aDeadTagIsCondemnedByTheRunThatFindsItAndPurgedOnlyPastTheCondemnGrace() throws Exception {
+    // qits-1172 for this type: the tag still resolves while it is condemned, so a pull of it is
+    // answered exactly as before; the purge past the grace is the registry's own collectTag.
+    seed();
+
+    condemnedFirstThenPurged(
+        strategy,
+        "alpha:v1",
+        () -> {
+          ociTags.getEntityManager().clear();
+          return ociTags.findOne("qits", "alpha", "v1").isPresent();
+        });
+  }
+
   // --- fixture ---------------------------------------------------------------------------------
 
   /** The aggregate a run would have read, with one image's shas pinned. */

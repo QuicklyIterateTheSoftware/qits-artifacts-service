@@ -1,6 +1,7 @@
 package eu.wohlben.qits.artifacts.gc;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import eu.wohlben.qits.artifacts.control.LiveBlobCensus;
@@ -412,6 +413,33 @@ class NpmPackagesGcAdapterTest extends GcFixture {
     assertEquals(List.of("@qits/thing@1.0.0", "@qits/thing@1.1.0"), identities(plan.kept()));
     assertEquals(taken.live(NpmPackagesProfile.KEY).keySet(), plan.blobsRetained());
     assertEquals(List.of(), planner.plan(taken, List.of(strategy), GcPins.none()).sweep().blobIds());
+  }
+
+  @Test
+  void aDeadVersionIsCondemnedByTheRunThatFindsItAndPurgedWithItsTombstoneOnlyPastTheGrace()
+      throws Exception {
+    // qits-1172 for this type: no tombstone on the condemning run — the version is still a version
+    // — and the purge goes through the tombstone-writing funnel exactly as before.
+    hosted();
+    String doomed = version(UI, "1.0.0-main.gab854a1", 81, daysAgo(400));
+    version(UI, "1.1.0", 82, daysAgo(390));
+    version(UI, "1.2.0", 83, daysAgo(380));
+
+    condemnedFirstThenPurged(
+        strategy,
+        UI + "@1.0.0-main.gab854a1",
+        () -> {
+          npmVersions.getEntityManager().clear();
+          boolean stored = npmVersions.findOne("npm", UI, "1.0.0-main.gab854a1").isPresent();
+          if (stored) {
+            assertTrue(
+                npmVersionTombstones.findOne("npm", UI, "1.0.0-main.gab854a1").isEmpty(),
+                "a condemned version carries no tombstone: it has not been collected");
+          }
+          return stored;
+        });
+    assertTrue(npmVersionTombstones.findOne("npm", UI, "1.0.0-main.gab854a1").isPresent());
+    assertFalse(blobStore.exists(doomed));
   }
 
   // --- fixture ---------------------------------------------------------------------------------

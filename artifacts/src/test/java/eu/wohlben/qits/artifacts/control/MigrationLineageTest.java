@@ -382,6 +382,40 @@ class MigrationLineageTest {
   }
 
   @Test
+  void theCondemnationTableIsKeyedByIdentityAndGoesWithItsRepository() throws SQLException {
+    // V5's table (qits-1172). One condemnation per (type, repository, identity), so a run cannot
+    // re-stamp an identity's clock by inserting a second row; an identity spelled with '@', '/' and
+    // ':' fits; and a repository removed takes its condemnations with it, because a condemnation of
+    // an identity in a repository that no longer exists names nothing.
+    insertRepository("sboms", "SBOMS");
+    String condemn =
+        "insert into gc_condemned (type, repository, identity, condemned_at, run_id) values"
+            + " ('SBOMS', 'sboms', 'npm/@qits/ui-components@2026.1.0', current_timestamp, 'r1')";
+    execute(condemn);
+    assertEquals(1, count("select count(*) from gc_condemned"));
+
+    SQLException duplicate = assertThrows(SQLException.class, () -> execute(condemn));
+    assertTrue(
+        duplicate.getMessage().toUpperCase(Locale.ROOT).contains("GC_CONDEMNED_PKEY"),
+        duplicate.getMessage());
+
+    SQLException orphan =
+        assertThrows(
+            SQLException.class,
+            () ->
+                execute(
+                    "insert into gc_condemned (type, repository, identity, condemned_at, run_id)"
+                        + " values ('MAVEN_PACKAGES', 'no-such-repo', 'g:a:1', current_timestamp,"
+                        + " 'r1')"));
+    assertTrue(
+        orphan.getMessage().toUpperCase(Locale.ROOT).contains("FK_GC_CONDEMNED_REPOSITORY"),
+        orphan.getMessage());
+
+    execute("delete from artifact_repository where name = 'sboms'");
+    assertEquals(0, count("select count(*) from gc_condemned"), "the cascade took it");
+  }
+
+  @Test
   void aDocsVersionIsTheUnitOfEvictionBecauseItsFilesCascade() throws SQLException {
     // The one foreign key in this schema that is load-bearing rather than hygienic: deleting a
     // docs_site row must take its files with it, or a sweep could leave a version that lists itself

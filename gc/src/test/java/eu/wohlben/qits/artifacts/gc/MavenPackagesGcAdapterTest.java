@@ -1,6 +1,7 @@
 package eu.wohlben.qits.artifacts.gc;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import eu.wohlben.qits.artifacts.control.LiveBlobCensus;
@@ -615,6 +616,32 @@ class MavenPackagesGcAdapterTest extends GcFixture {
     assertTrue(ledger.find("maven", MAVEN_REPO, name, "1.0.1-20260601.101010-1").isEmpty());
     assertTrue(ledger.find("maven", MAVEN_REPO, name, "1.0.1-20260802.123456-3").isPresent());
     assertTrue(ledger.find("maven", MAVEN_REPO, name, "1.0.0").isPresent());
+  }
+
+  @Test
+  void aDeadCoordinateIsCondemnedByTheRunThatFindsItAndPurgedOnlyPastTheCondemnGrace()
+      throws Exception {
+    // qits-1172 for this type: a coordinate nothing keeps is condemned whole, every file of it left
+    // standing, and the later run past the grace removes it whole through the same transaction.
+    maven();
+    String jar = release("1.0.0", "jar", 21, daysAgo(400));
+    String pom = release("1.0.0", "pom", 0, daysAgo(400));
+    backdate(jar, Duration.ofDays(30));
+    backdate(pom, Duration.ofDays(30));
+    release("2.0.0", "jar", 22, daysAgo(300));
+    release("2.0.0", "pom", 0, daysAgo(300));
+    release("3.0.0", "jar", 23, daysAgo(200));
+    release("3.0.0", "pom", 0, daysAgo(200));
+
+    condemnedFirstThenPurged(
+        strategy,
+        COORDINATE + "1.0.0",
+        () -> {
+          mavenArtifacts.getEntityManager().clear();
+          return mavenArtifacts.findOne(MAVEN_REPO, releasePath("1.0.0", "jar")).isPresent()
+              && mavenArtifacts.findOne(MAVEN_REPO, releasePath("1.0.0", "pom")).isPresent();
+        });
+    assertFalse(blobStore.exists(jar), "the purge unlinks what it frees, as the one-run sweep did");
   }
 
   // --- fixture ---------------------------------------------------------------------------------
