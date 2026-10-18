@@ -23,7 +23,6 @@ import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -37,47 +36,40 @@ import org.junit.jupiter.api.Test;
  * newline — and compares it to the committed file. {@code -Dgolden.update=true} (or {@code
  * QITS_GOLDEN_UPDATE=true}) rewrites it.
  *
- * <p>Every test is disabled for the reason {@link ConsumerPactTest} gives. Once a file exists,
- * add its provider under {@code contracts.pacts} in {@code .config/qits/release.yml} so the
- * platform publishes it as {@code eu.wohlben.qits:qits-artifacts-service-pacts-<provider>}. Not
- * before: the platform refuses to pack a declared provider with no file.
+ * <p>Every provider here has its file and is listed under {@code contracts.pacts} in {@code
+ * .config/qits/release.yml}, so the platform publishes it as {@code
+ * eu.wohlben.qits:qits-artifacts-service-pacts-<provider>}. A pending row is in no file.
  */
 class PactFileTest {
 
   private static final ObjectMapper MAPPER = new ObjectMapper();
 
   @Test
-  @Disabled("needs provider state 'deployments that pin images' for listDeploymentPins in qits-deployments-service")
   void deployments() {
     check(ConsumerContract.DEPLOYMENTS);
   }
 
   @Test
-  @Disabled("needs provider state 'a pinned daemon' for getDaemonPin in qits-ci-service")
   void ci() {
     check(ConsumerContract.CI);
   }
 
   @Test
-  @Disabled("needs provider state 'manifests that pin artifacts' for listDependencyPins in qits-maintenance-service")
   void maintenance() {
     check(ConsumerContract.MAINTENANCE);
   }
 
   @Test
-  @Disabled("needs provider state 'a configured workspace image' for listLaunchPins in qits-workspaces-service")
   void workspaces() {
     check(ConsumerContract.WORKSPACES);
   }
 
   @Test
-  @Disabled("needs provider state 'configured agent images' for listLaunchPins in qits-projects-service")
   void projects() {
     check(ConsumerContract.PROJECTS);
   }
 
   @Test
-  @Disabled("needs provider state 'a registered machine client' for issueToken in qits-idp-service")
   void idp() {
     check(ConsumerContract.IDP);
   }
@@ -113,11 +105,13 @@ class PactFileTest {
       strings(description, call, "app", "operationId");
       assertEquals(provider.repository(), call.path("app").asText(), description);
       JsonNode trigger = references.path("qits-trigger");
-      strings(description, trigger, "kind", "app", "operationId");
-      assertEquals("operation", trigger.path("kind").asText(), description);
+      String kind = trigger.path("kind").asText();
+      assertTrue(List.of("operation", "event").contains(kind), description + ": kind " + kind);
+      String key = "operation".equals(kind) ? "operationId" : "event";
+      strings(description, trigger, "kind", "app", key);
       assertEquals(ProviderGoldenMasters.CONSUMER, trigger.path("app").asText(), description);
       assertTrue(
-          description.startsWith(trigger.path("operationId").asText() + ": "),
+          description.startsWith(trigger.path(key).asText() + ": "),
           description + ": the description leads with the trigger");
       String state = interaction.path("providerStates").path(0).path("name").asText();
       assertTrue(unique.add(description + "\u0000" + state), "repeats: " + description);

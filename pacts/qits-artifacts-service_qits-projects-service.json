@@ -1,0 +1,117 @@
+{
+  "consumer": {
+    "name": "qits-artifacts-service"
+  },
+  "interactions": [
+    {
+      "comments": {
+        "references": {
+          "qits-call": {
+            "app": "qits-projects-service",
+            "operationId": "listLaunchPins"
+          },
+          "qits-trigger": {
+            "app": "qits-artifacts-service",
+            "kind": "operation",
+            "operationId": "getGcPlan"
+          }
+        }
+      },
+      "description": "getGcPlan: listLaunchPins",
+      "key": "351ff210",
+      "pending": false,
+      "providerStates": [
+        {
+          "name": "an agent launch image in use"
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "path": "/projects/api/pins"
+      },
+      "response": {
+        "body": {
+          "content": {
+            "pins": [
+              {
+                "image": "qits/project-agent",
+                "launches": "agent",
+                "version": "00000001"
+              },
+              {
+                "image": "qits/project-agent",
+                "launches": "agent",
+                "version": "00000001"
+              }
+            ]
+          },
+          "contentType": "application/json",
+          "encoded": false
+        },
+        "headers": {
+          "Content-Type": [
+            "application/json"
+          ]
+        },
+        "matchingRules": {
+          "body": {
+            "$.pins": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.pins[*].image": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.pins[*].launches": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.pins[*].version": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            }
+          },
+          "header": {
+            "Content-Type": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "application/json.*"
+                }
+              ]
+            }
+          }
+        },
+        "status": 200
+      },
+      "type": "Synchronous/HTTP"
+    }
+  ],
+  "metadata": {
+    "pactSpecification": {
+      "version": "4.0"
+    },
+    "plugins": []
+  },
+  "provider": {
+    "name": "qits-projects-service"
+  }
+}

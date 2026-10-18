@@ -19,11 +19,12 @@ import java.util.List;
 import org.junit.jupiter.api.Test;
 
 /**
- * <b>The consumer-pact machinery, run end to end against a fixture</b> (qits-1149): while no
- * provider has recorded the states {@link ConsumerContract} needs, this is what proves the reader,
- * the projection and the mock-server run work. The fixture under {@code
+ * <b>The consumer-pact machinery, run end to end against a fixture</b> (qits-1149): what proves
+ * the reader, the projection and the mock-server run work on cases no provider's recording happens
+ * to hold (an empty array, a path the recording lacks). The fixture under {@code
  * contracts-fixture/golden-masters/} is test data for this machinery only — it is never written
- * into a pact file.
+ * into a pact file. It also holds {@link ConsumerContract}'s table to the pinned recordings: every
+ * live row's (state, operation) is recorded, and every pending row's is not — yet.
  */
 class ProviderGoldenMastersTest {
 
@@ -126,9 +127,41 @@ class ProviderGoldenMastersTest {
     for (ConsumerContract.Row row : ConsumerContract.ROWS) {
       assertFalse(row.state().isBlank(), row.description());
       assertFalse(row.operationId().isBlank(), row.description());
-      assertFalse(row.consumes().isEmpty(), row.description());
       assertTrue(row.waitingFor().contains(row.provider().repository()), row.waitingFor());
+      if (row.isPending()) {
+        continue;
+      }
+      ProviderGoldenMasters masters =
+          ProviderGoldenMasters.of(row.provider().application(), row.provider().repository());
+      // A success is read; a refusal is a status, and binding its body would bind nothing read.
+      if (masters.operation(row.state(), row.operationId()).status() < 300) {
+        assertFalse(row.consumes().isEmpty(), row.description());
+      }
     }
-    assertEquals(6, ConsumerContract.ROWS.size());
+    assertEquals(8, ConsumerContract.ROWS.size());
+  }
+
+  /**
+   * A pending row waits for its provider to publish the state it names. The day the pinned golden
+   * masters record that (state, operation), this fails: switch the row on.
+   */
+  @Test
+  void aPendingRowWaitsOnAStateThePinnedRecordingLacks() {
+    for (ConsumerContract.Row row : ConsumerContract.pending()) {
+      ProviderGoldenMasters masters =
+          ProviderGoldenMasters.of(row.provider().application(), row.provider().repository());
+      boolean recorded;
+      try {
+        masters.operation(row.state(), row.operationId());
+        recorded = true;
+      } catch (IllegalArgumentException absent) {
+        recorded = false;
+      }
+      assertFalse(
+          recorded,
+          row.description() + " [" + row.state() + "] is pending on '" + row.pending()
+              + "', but the pinned " + row.provider().application()
+              + "-golden-masters record it now: switch the row on");
+    }
   }
 }

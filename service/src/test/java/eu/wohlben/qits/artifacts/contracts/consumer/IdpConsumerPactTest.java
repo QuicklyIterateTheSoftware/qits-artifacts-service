@@ -19,7 +19,6 @@ import java.io.UncheckedIOException;
 import java.net.ServerSocket;
 import java.util.List;
 import java.util.Map;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -34,15 +33,28 @@ import org.junit.jupiter.api.Test;
  */
 @QuarkusTest
 @TestProfile(IdpConsumerPactTest.MockIdp.class)
-@Disabled("needs provider state 'a registered machine client' for issueToken in qits-idp-service")
 class IdpConsumerPactTest {
 
   static {
     System.setProperty("pact_do_not_track", "true");
   }
 
-  /** The port the pact mock server listens on, chosen free once per JVM. */
-  static final int PORT = freePort();
+  /**
+   * The port the pact mock server listens on, chosen free once per JVM. Kept in a system property
+   * because the profile and the test instance load this class in two class loaders, and a plain
+   * static would pick two ports.
+   */
+  static final int PORT = sharedPort();
+
+  private static synchronized int sharedPort() {
+    String key = "qits.artifacts.test.mock-idp-port";
+    String chosen = System.getProperty(key);
+    if (chosen == null) {
+      chosen = String.valueOf(freePort());
+      System.setProperty(key, chosen);
+    }
+    return Integer.parseInt(chosen);
+  }
 
   /** The relay pointed at the mock server; nothing else changes. */
   public static class MockIdp implements QuarkusTestProfile {
@@ -59,6 +71,9 @@ class IdpConsumerPactTest {
     ProviderGoldenMasters masters =
         ProviderGoldenMasters.of(provider.application(), provider.repository());
     for (ConsumerContract.Row row : ConsumerContract.rows(provider)) {
+      if (row.read() != null) {
+        continue; // a plain reader's row (the key read): ConsumerPactTest runs it
+      }
       Map<String, String> params = masters.params(row.state());
       V4Pact pact = ConsumerContract.pact(provider, List.of(row));
       JsonNode recorded = ConsumerPactTest.answered(pact, row);
@@ -69,7 +84,7 @@ class IdpConsumerPactTest {
               (mockServer, context) -> {
                 Response answer =
                     given()
-                        .header("Authorization", "Basic " + params.get("basicCredential"))
+                        .header("Authorization", params.get("authorization"))
                         .when()
                         .get("/artifacts/token");
                 assertEquals(200, answer.statusCode(), answer.asString());

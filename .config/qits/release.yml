@@ -5,13 +5,21 @@ artifacts:
 # `eu.wohlben.qits:qits-artifacts-golden-masters` and `@qits/artifacts-golden-masters`, each
 # published only when its content changed. `GoldenMasterRecordingTest` records them.
 #
-# No `pacts:` entry yet. This service's consumer pacts (contracts/consumer) wait on provider states
-# the seven providers have not recorded, so no `pacts/*.json` exists, and the platform refuses to
-# pack a declared provider with no file. Add `<provider-repository>: { packages: [maven] }` here
-# with the first file for that provider.
+# The pacts: this service's consumer pacts (contracts/consumer/ConsumerContract), flat in `pacts/`
+# as `qits-artifacts-service_<provider-repository>.json` — the five GC pin sources and qits-idp (the
+# docker-login token relay and quarkus-oidc's JWKS read). qits-ci packs each into
+# eu.wohlben.qits:qits-artifacts-service-pacts-<provider-repository> and publishes it only when it
+# changed. A provider is listed here only with its file: the platform refuses to pack one without.
 contracts:
   application: qits-artifacts
   golden-masters: { from: golden-masters/, packages: [maven, npm] }
+  pacts:
+    qits-deployments-service: { packages: [maven] }
+    qits-ci-service: { packages: [maven] }
+    qits-maintenance-service: { packages: [maven] }
+    qits-workspaces-service: { packages: [maven] }
+    qits-projects-service: { packages: [maven] }
+    qits-idp-service: { packages: [maven] }
 userflows: qits-artifacts
 
 # THE VERIFY HERE RUNS WITH QUINOA ON, which is the opposite of every sibling and of the recipe.

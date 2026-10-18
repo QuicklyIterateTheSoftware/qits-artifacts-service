@@ -15,7 +15,6 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.util.ArrayList;
 import java.util.List;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -29,10 +28,8 @@ import org.junit.jupiter.api.Test;
  * qits-maintenance-service's {@code ProjectsConsumerPactTest}: the readers use the JDK's {@code
  * HttpClient} and need no CDI.
  *
- * <p><b>Every test is disabled until its provider records the state it names.</b> The reason on
- * each says which state, operation and repository. To enable one: pin the provider's
- * {@code eu.wohlben.qits:<app>-golden-masters} as a test dependency, drop the {@code @Disabled}
- * here and in {@link PactFileTest}, and write the pact file with {@code -Dgolden.update=true}.
+ * <p>Each provider's rows run against its pinned {@code eu.wohlben.qits:<app>-golden-masters};
+ * a pending row ({@link ConsumerContract.Row#pending()}) is not run until its state is published.
  */
 class ConsumerPactTest {
 
@@ -44,38 +41,40 @@ class ConsumerPactTest {
   private static final ObjectMapper MAPPER = new ObjectMapper();
 
   @Test
-  @Disabled("needs provider state 'deployments that pin images' for listDeploymentPins in qits-deployments-service")
   void deployments() {
     verify(ConsumerContract.DEPLOYMENTS);
   }
 
   @Test
-  @Disabled("needs provider state 'a pinned daemon' for getDaemonPin in qits-ci-service")
   void ci() {
     verify(ConsumerContract.CI);
   }
 
   @Test
-  @Disabled("needs provider state 'manifests that pin artifacts' for listDependencyPins in qits-maintenance-service")
   void maintenance() {
     verify(ConsumerContract.MAINTENANCE);
   }
 
   @Test
-  @Disabled("needs provider state 'a configured workspace image' for listLaunchPins in qits-workspaces-service")
   void workspaces() {
     verify(ConsumerContract.WORKSPACES);
   }
 
   @Test
-  @Disabled("needs provider state 'configured agent images' for listLaunchPins in qits-projects-service")
   void projects() {
     verify(ConsumerContract.PROJECTS);
   }
 
+  /** The idp rows a plain reader can make: the key read. The token relay is IdpConsumerPactTest's. */
+  @Test
+  void idp() {
+    verify(ConsumerContract.IDP);
+  }
+
   /** Every row against {@code provider}, each on its own mock server. */
   static void verify(ConsumerContract.Provider provider) {
-    List<ConsumerContract.Row> rows = ConsumerContract.rows(provider);
+    List<ConsumerContract.Row> rows =
+        ConsumerContract.rows(provider).stream().filter(r -> r.read() != null).toList();
     assertFalse(rows.isEmpty(), "no row against " + provider.repository());
     List<String> failures = new ArrayList<>();
     for (ConsumerContract.Row row : rows) {
