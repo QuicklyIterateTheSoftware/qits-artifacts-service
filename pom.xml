@@ -119,17 +119,17 @@
              scope, EXACT, never a range; qits-maintenance bumps the pin when the consumer releases
              a changed pact. -->
         <qits.docs-service-pacts-qits-artifacts-service.version>2026.1010.143012</qits.docs-service-pacts-qits-artifacts-service.version>
-        <qits.ci-service-pacts-qits-artifacts-service.version>2026.1018.160604</qits.ci-service-pacts-qits-artifacts-service.version>
+        <qits.ci-service-pacts-qits-artifacts-service.version>2026.1018.180637</qits.ci-service-pacts-qits-artifacts-service.version>
         <!-- THE PROVIDERS' GOLDEN MASTERS this service's OWN consumer pacts read (contracts/consumer,
              qits-1149): what each pin source and the idp record for their provider states. Test
              scope, read off the classpath by ProviderGoldenMasters. Moved by qits-maintenance like
              every other pin; do not hand-edit them to chase a release. -->
         <qits.deployments-golden-masters.version>2026.1010.145913</qits.deployments-golden-masters.version>
-        <qits.ci-golden-masters.version>2026.1018.160604</qits.ci-golden-masters.version>
+        <qits.ci-golden-masters.version>2026.1018.180637</qits.ci-golden-masters.version>
         <qits.maintenance-golden-masters.version>2026.1018.165353</qits.maintenance-golden-masters.version>
         <qits.workspaces-golden-masters.version>2026.1016.90656</qits.workspaces-golden-masters.version>
         <qits.projects-golden-masters.version>2026.1016.112931</qits.projects-golden-masters.version>
-        <qits.idp-golden-masters.version>2026.1018.165736</qits.idp-golden-masters.version>
+        <qits.idp-golden-masters.version>2026.1018.175524</qits.idp-golden-masters.version>
         <qits.maven.repository.url>https://registry.qits.wohlben.eu/artifacts/maven/maven</qits.maven.repository.url>
         <maven.compiler.release>25</maven.compiler.release>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
