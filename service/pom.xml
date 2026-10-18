@@ -256,6 +256,11 @@
             <scope>test</scope>
         </dependency>
         <dependency>
+            <groupId>${project.groupId}</groupId>
+            <artifactId>qits-ci-service-pacts-qits-artifacts-service</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
             <!-- The providers' recordings the consumer pacts (contracts/consumer) are built from:
                  the five GC pin sources and the idp. -->
             <groupId>${project.groupId}</groupId>

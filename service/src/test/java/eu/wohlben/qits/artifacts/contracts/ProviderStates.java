@@ -73,6 +73,12 @@ public class ProviderStates {
   public static final String NO_NPM_PACKAGE = "no npm package with the given name";
   public static final String AN_IMAGE = "an image pushed under a tag";
   public static final String NO_IMAGE = "no image with the given name";
+  // round 2: what the qits CLI, the bootstrap and qits-orchestrator asked for besides
+  public static final String A_MAVEN_JAR = "a maven jar published at a version";
+  public static final String NO_MAVEN_JAR = "no maven jar published at the version";
+  public static final String AN_NPM_CONTENT_HASH = "a content hash recorded for an npm package";
+  public static final String THE_CLI_AS_A_DAEMON = "the qits CLI published as a daemon";
+  public static final String AN_UNFILEABLE_PIN = "a registry handed a pin it cannot file";
 
   /** The daemon repository every deployment carries, and the one consumers name. */
   static final String DAEMONS = ArtifactsRepositorySeeder.DAEMONS;
@@ -85,6 +91,16 @@ public class ProviderStates {
 
   /** The version a publish into the empty daemon creates. */
   static final String NEW_DAEMON_VERSION = "2026.3.0";
+
+  /**
+   * The name {@code qits update} reads its own releases under ({@code ArtifactsReleases.DAEMON_NAME}
+   * in qits-platform-access-cli). Not a contract-only name: {@link #cleanUp()} deletes its rows in
+   * this suite's database, which no other suite here relies on keeping across tests.
+   */
+  static final String CLI_DAEMON = "qits-platform-access-cli";
+
+  /** The CLI's published release: a version {@code qits update} accepts as one (digits and dots). */
+  static final String CLI_VERSION = "2100.1.0";
 
   /** The bytes a daemon publish sends — a stand-in for a binary, fixed so the digest is too. */
   public static final String DAEMON_BYTES = "contract-daemon 2026.3.0\n";
@@ -154,6 +170,12 @@ public class ProviderStates {
   static final String MAVEN_ARTIFACT = "contract-maven";
   static final String MAVEN_VERSION = "2100.1.0";
 
+  /**
+   * The bytes a jar deploy sends: a stand-in, since the repository stores a file's bytes without
+   * reading them. Text, so the index can carry it as the request body a consumer replays.
+   */
+  public static final String MAVEN_JAR_BYTES = "contract jar 2100.1.0\n";
+
   /** The coordinate nothing deploys, except the recorded publish into it (cleaned up after). */
   static final String MAVEN_ABSENT_ARTIFACT = "contract-absent";
 
@@ -188,6 +210,13 @@ public class ProviderStates {
           + "\"pins\":[{\"image\":\"qits/project-agent\",\"version\":\"2026.903.090000\",\"launches\":\"agent\"}]}"
           + "}}";
 
+  /**
+   * {@link #GC_PINS} with qits-maintenance's one pin spelled for an ecosystem this store hosts no
+   * repository for ({@code cargo}): the store cannot file it, so the sweep refuses the whole run.
+   */
+  public static final String GC_PINS_UNFILEABLE =
+      GC_PINS.replace("\"ecosystem\":\"maven\"", "\"ecosystem\":\"cargo\"");
+
   /** What a state hands back: its parameters, keys sorted, and its unique tokens (none here). */
   public record Setup(Map<String, String> params, List<String> uniqueTokens) {}
 
@@ -218,6 +247,11 @@ public class ProviderStates {
     states.put(NO_NPM_PACKAGE, this::noNpmPackage);
     states.put(AN_IMAGE, this::anImage);
     states.put(NO_IMAGE, this::noImage);
+    states.put(A_MAVEN_JAR, this::aMavenJar);
+    states.put(NO_MAVEN_JAR, this::noMavenJar);
+    states.put(AN_NPM_CONTENT_HASH, this::anNpmContentHash);
+    states.put(THE_CLI_AS_A_DAEMON, this::theCliAsADaemon);
+    states.put(AN_UNFILEABLE_PIN, this::anUnfileablePin);
   }
 
   /** Every state name this provider answers for. */
@@ -243,7 +277,7 @@ public class ProviderStates {
   }
 
   /**
-   * Deletes every row on the contract coordinates: the daemon's versions, the sbom, the docs sites
+   * Deletes every row on the contract coordinates: the daemon's versions (and the CLI's), the sbom, the docs sites
    * (their files and metadata cascade), the {@code contract-maven} and {@code contract-absent} maven
    * files with their content hashes, the npm packages' versions and tags, and the contract images'
    * tags and manifests. The wires have no delete for most of these, so it is SQL on their own
@@ -255,8 +289,9 @@ public class ProviderStates {
     QuarkusTransaction.requiringNew()
         .run(
             () -> {
-              daemonBinaries.list("repository = ?1 and name = ?2", DAEMONS, DAEMON).forEach(
-                  daemonBinaries::delete);
+              daemonBinaries
+                  .list("repository = ?1 and name in ?2", DAEMONS, List.of(DAEMON, CLI_DAEMON))
+                  .forEach(daemonBinaries::delete);
               sboms
                   .list(
                       "repository = ?1 and packageType = ?2 and packageName = ?3",
@@ -359,12 +394,35 @@ public class ProviderStates {
     return params;
   }
 
+  /**
+   * One release of the qits CLI in the daemon repository, under the name {@code qits update} reads:
+   * the listing names it as the newest, a HEAD says its length and digest, a GET serves its bytes.
+   */
+  private Setup theCliAsADaemon() {
+    DaemonBinary row =
+        daemonRow(
+            CLI_DAEMON,
+            CLI_VERSION,
+            CLI_DAEMON + " " + CLI_VERSION + "\n",
+            Instant.parse("2100-01-01T00:00:00Z"));
+    QuarkusTransaction.requiringNew().run(() -> daemonBinaries.persist(row));
+    Map<String, String> params = new TreeMap<>();
+    params.put("daemon", CLI_DAEMON);
+    params.put("repository", DAEMONS);
+    params.put("version", CLI_VERSION);
+    return new Setup(params, List.of());
+  }
+
   private DaemonBinary daemonRow(String version, String content, Instant publishedAt) {
+    return daemonRow(DAEMON, version, content, publishedAt);
+  }
+
+  private DaemonBinary daemonRow(String name, String version, String content, Instant publishedAt) {
     byte[] bytes = content.getBytes(StandardCharsets.UTF_8);
     String blobId = store(bytes);
     DaemonBinary row = new DaemonBinary();
     row.repository = DAEMONS;
-    row.name = DAEMON;
+    row.name = name;
     row.version = version;
     row.blobId = blobId;
     row.sizeBytes = bytes.length;
@@ -522,6 +580,28 @@ public class ProviderStates {
     return new Setup(params, List.of());
   }
 
+  /**
+   * One npm version published with a content hash, as {@code qits artifacts publish npm} sends it
+   * ({@code X-Artifacts-Content-Hash} on the publish document's PUT). It is the package's only
+   * version, so it is also the newest.
+   */
+  private Setup anNpmContentHash() {
+    expect(
+        201,
+        given()
+            .urlEncodingEnabled(false)
+            .contentType("application/json")
+            .header("X-Artifacts-Content-Hash", CONTENT_HASH)
+            .body(npmPublishDocument(NPM_PACKAGE).getBytes(StandardCharsets.UTF_8))
+            .put("/artifacts/npm/" + ArtifactsRepositorySeeder.NPM + "/" + NPM_PACKAGE),
+        "the npm publish with a content hash");
+    Map<String, String> params = new TreeMap<>();
+    params.put("name", NPM_PACKAGE);
+    params.put("type", "npm");
+    params.put("version", NPM_VERSION);
+    return new Setup(params, List.of());
+  }
+
   // --- the store and its GC --------------------------------------------------------------------
 
   /** A docs site, an sbom and a daemon with two versions, so every figure has something behind it. */
@@ -538,6 +618,14 @@ public class ProviderStates {
    */
   private Setup unpinnedIdentities() {
     seedTwoDaemonVersions();
+    return new Setup(new TreeMap<>(), List.of());
+  }
+
+  /**
+   * Nothing to seed: a sweep handed {@link #GC_PINS_UNFILEABLE} refuses before its census, so the
+   * receipt is the same whatever the store holds — {@code aborted} names the pin, nothing is deleted.
+   */
+  private Setup anUnfileablePin() {
     return new Setup(new TreeMap<>(), List.of());
   }
 
@@ -565,6 +653,27 @@ public class ProviderStates {
     return new Setup(mavenParams(MAVEN_ABSENT_ARTIFACT), List.of());
   }
 
+  /**
+   * One maven version deployed whole, as a release deploys it: its jar, then its pom (the version's
+   * "published" marker). The jar is what the bootstrap asks for.
+   */
+  private Setup aMavenJar() {
+    expect(
+        201,
+        given()
+            .urlEncodingEnabled(false)
+            .contentType("application/java-archive")
+            .body(MAVEN_JAR_BYTES.getBytes(StandardCharsets.UTF_8))
+            .put(mavenFilePath(MAVEN_ARTIFACT, ".jar")),
+        "the maven jar deploy");
+    return aMavenArtifact();
+  }
+
+  /** {@link #noMavenArtifact()}: no jar either, the one a publish PUTs before its pom. */
+  private Setup noMavenJar() {
+    return noMavenArtifact();
+  }
+
   /** The pom a deploy of {@code artifactId} at {@link #MAVEN_VERSION} sends. */
   public static String mavenPom(String artifactId) {
     return "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<project>\n"
@@ -576,9 +685,13 @@ public class ProviderStates {
   }
 
   private static String mavenPomPath(String artifactId) {
+    return mavenFilePath(artifactId, ".pom");
+  }
+
+  private static String mavenFilePath(String artifactId, String extension) {
     return "/artifacts/maven/" + ArtifactsRepositorySeeder.MAVEN + "/"
         + MAVEN_GROUP.replace('.', '/') + "/" + artifactId + "/" + MAVEN_VERSION + "/"
-        + artifactId + "-" + MAVEN_VERSION + ".pom";
+        + artifactId + "-" + MAVEN_VERSION + extension;
   }
 
   private static Map<String, String> mavenParams(String artifactId) {
@@ -641,8 +754,13 @@ public class ProviderStates {
         + tarball.length + "}}}";
   }
 
+  /**
+   * The npm states' params. {@code name} repeats {@code package}: qits-ci's and qits-maintenance's
+   * presence and latest-version rows read a package by {@code name}, as they read every ecosystem.
+   */
   private static Map<String, String> npmParams(String name) {
     Map<String, String> params = new TreeMap<>();
+    params.put("name", name);
     params.put("package", name);
     params.put("tag", NPM_TAG);
     params.put("tarball", name + "-" + NPM_VERSION + ".tgz");

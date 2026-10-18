@@ -261,6 +261,8 @@ class GoldenMasterRecordingTest {
   private static final String DAEMONS = "/artifacts/api/repositories/{repository}/daemons";
   private static final String MAVEN_POM =
       "/artifacts/maven/maven/{groupPath}/{artifact}/{version}/{artifact}-{version}.pom";
+  private static final String MAVEN_JAR =
+      "/artifacts/maven/maven/{groupPath}/{artifact}/{version}/{artifact}-{version}.jar";
   private static final String MAVEN_METADATA =
       "/artifacts/maven/maven/{groupPath}/{artifact}/maven-metadata.xml";
   private static final String NPM_PACKUMENT = "/artifacts/npm/npm/{package}";
@@ -301,6 +303,18 @@ class GoldenMasterRecordingTest {
               .build(),
           op(ProviderStates.A_DAEMON_WITH_TWO_VERSIONS, "putDaemon", "PUT", DAEMON, 409)
               .text("application/octet-stream", ProviderStates.DAEMON_BYTES)
+              .build(),
+          // the qits CLI's update (ArtifactsReleases): its own name's newest release, then the
+          // HEAD that says the length and digest, then the download
+          op(ProviderStates.THE_CLI_AS_A_DAEMON, "listDaemons", "GET", DAEMONS, 200)
+              .filtered("$.daemons", "daemon")
+              .build(),
+          op(ProviderStates.THE_CLI_AS_A_DAEMON, "headDaemon", "HEAD", DAEMON, 200)
+              .headers(DIGEST_HEADERS)
+              .build(),
+          op(ProviderStates.THE_CLI_AS_A_DAEMON, "getDaemon", "GET", DAEMON, 200)
+              .raw()
+              .headers("Content-Length")
               .build(),
           op(ProviderStates.A_DAEMON_NOTHING_PUBLISHED, "listDaemonVersions", "GET", DAEMON_VERSIONS, 200)
               .build(),
@@ -356,6 +370,10 @@ class GoldenMasterRecordingTest {
           op(ProviderStates.A_CONTENT_HASH, "getContentHash", "GET", CONTENT_HASH, 200).build(),
           op(ProviderStates.A_CONTENT_HASH, "getNewestContentHash", "GET", NEWEST_CONTENT_HASH, 200)
               .build(),
+          // the npm publish's if-changed decision
+          op(ProviderStates.AN_NPM_CONTENT_HASH, "getContentHash", "GET", CONTENT_HASH, 200).build(),
+          op(ProviderStates.AN_NPM_CONTENT_HASH, "getNewestContentHash", "GET", NEWEST_CONTENT_HASH, 200)
+              .build(),
           // --- maven: qits-ci (HttpArtifactPresence), qits-maintenance (LatestResolver,
           // ArtifactPresence), the bootstrap's probes, the qits CLI's deploy and pom reads
           op(ProviderStates.A_MAVEN_ARTIFACT, "getMavenFile", "GET", MAVEN_POM, 200)
@@ -376,6 +394,16 @@ class GoldenMasterRecordingTest {
               .text("application/xml", ProviderStates.mavenPom(ProviderStates.MAVEN_ABSENT_ARTIFACT))
               .raw()
               .build(),
+          // the jar: the bootstrap's presence probe, and the CLI's deploy, which PUTs it before the pom
+          op(ProviderStates.A_MAVEN_JAR, "getMavenFile", "GET", MAVEN_JAR, 200)
+              .raw()
+              .headers("Content-Length")
+              .build(),
+          op(ProviderStates.NO_MAVEN_JAR, "getMavenFile", "GET", MAVEN_JAR, 404).build(),
+          op(ProviderStates.NO_MAVEN_JAR, "putMavenFile", "PUT", MAVEN_JAR, 201)
+              .text("application/java-archive", ProviderStates.MAVEN_JAR_BYTES)
+              .raw()
+              .build(),
           // --- npm: qits-ci (HttpArtifactPresence), qits-maintenance (LatestResolver,
           // ArtifactPresence), the bootstrap's tarball probe, the qits CLI's publish and plan
           // dist.tarball is an absolute URL on whatever origin answered: the test server's port.
@@ -385,8 +413,11 @@ class GoldenMasterRecordingTest {
           op(ProviderStates.AN_NPM_PACKAGE, "headNpmTarball", "HEAD", NPM_TARBALL, 200)
               .headers("Content-Length")
               .build(),
+          // The body is the JSON string npm and the qits CLI send, quotes included, recorded as its
+          // text: a consumer replays the text verbatim, and an unquoted version (which the door also
+          // takes, for a hand-written curl) is not what either client sends.
           op(ProviderStates.AN_NPM_PACKAGE, "putNpmDistTag", "PUT", NPM_DIST_TAG, 200)
-              .json("application/json", "\"" + ProviderStates.NPM_VERSION + "\"")
+              .text("application/json", "\"" + ProviderStates.NPM_VERSION + "\"")
               .build(),
           op(ProviderStates.NO_NPM_PACKAGE, "getNpmPackument", "GET", NPM_PACKUMENT, 404).build(),
           op(ProviderStates.NO_NPM_PACKAGE, "headNpmTarball", "HEAD", NPM_TARBALL, 404).build(),
@@ -426,6 +457,12 @@ class GoldenMasterRecordingTest {
               .build(),
           op(ProviderStates.UNPINNED_IDENTITIES, "sweepGc", "POST", "/artifacts/api/gc/sweep", 200)
               .json("application/json", ProviderStates.GC_PINS)
+              .drop(STORE_WIDE_LISTS)
+              .zeroNumbers()
+              .build(),
+          // a pin the store cannot file refuses the whole run: aborted, nothing deleted
+          op(ProviderStates.AN_UNFILEABLE_PIN, "sweepGc", "POST", "/artifacts/api/gc/sweep", 200)
+              .json("application/json", ProviderStates.GC_PINS_UNFILEABLE)
               .drop(STORE_WIDE_LISTS)
               .zeroNumbers()
               .build());

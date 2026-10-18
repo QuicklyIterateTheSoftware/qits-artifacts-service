@@ -3,6 +3,44 @@
   "provider": "qits-artifacts",
   "states": [
     {
+      "name": "a content hash recorded for an npm package",
+      "slug": "a-content-hash-recorded-for-an-npm-package",
+      "params": {
+        "name": "contract-package",
+        "type": "npm",
+        "version": "2100.1.0"
+      },
+      "dependsOn": [],
+      "operations": [
+        {
+          "operationId": "getContentHash",
+          "method": "GET",
+          "path": "/artifacts/content-hashes/{type}/{name}/-/{version}",
+          "status": 200,
+          "file": "a-content-hash-recorded-for-an-npm-package/getContentHash.json",
+          "frozen": {
+            "ids": [],
+            "instants": [],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        },
+        {
+          "operationId": "getNewestContentHash",
+          "method": "GET",
+          "path": "/artifacts/content-hashes/{type}/{name}/-/newest",
+          "status": 200,
+          "file": "a-content-hash-recorded-for-an-npm-package/getNewestContentHash.json",
+          "frozen": {
+            "ids": [],
+            "instants": [],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        }
+      ]
+    },
+    {
       "name": "a content hash recorded for the coordinate",
       "slug": "a-content-hash-recorded-for-the-coordinate",
       "params": {
@@ -256,6 +294,35 @@
       ]
     },
     {
+      "name": "a maven jar published at a version",
+      "slug": "a-maven-jar-published-at-a-version",
+      "params": {
+        "artifact": "contract-maven",
+        "groupPath": "eu/wohlben/qits",
+        "name": "eu.wohlben.qits:contract-maven",
+        "type": "maven",
+        "version": "2100.1.0"
+      },
+      "dependsOn": [],
+      "operations": [
+        {
+          "operationId": "getMavenFile",
+          "method": "GET",
+          "path": "/artifacts/maven/maven/{groupPath}/{artifact}/{version}/{artifact}-{version}.jar",
+          "status": 200,
+          "headers": {
+            "Content-Length": "22"
+          },
+          "frozen": {
+            "ids": [],
+            "instants": [],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        }
+      ]
+    },
+    {
       "name": "a published docs site",
       "slug": "a-published-docs-site",
       "params": {
@@ -338,6 +405,102 @@
             "ids": [],
             "instants": [],
             "strings": [],
+            "listFilteredTo": null
+          }
+        }
+      ]
+    },
+    {
+      "name": "a registry handed a pin it cannot file",
+      "slug": "a-registry-handed-a-pin-it-cannot-file",
+      "params": {},
+      "dependsOn": [],
+      "operations": [
+        {
+          "operationId": "sweepGc",
+          "method": "POST",
+          "path": "/artifacts/api/gc/sweep",
+          "contentType": "application/json",
+          "body": {
+            "pins": {
+              "deployments": {
+                "pins": [
+                  {
+                    "applicationName": "qits-artifacts",
+                    "shas": [
+                      "aaaa",
+                      "bbbb"
+                    ]
+                  }
+                ]
+              },
+              "ciDaemon": {
+                "daemonName": "qits-ci-daemon",
+                "daemonVersion": "2026.805.1",
+                "previousDaemonVersion": "",
+                "source": "adopted"
+              },
+              "dependencies": {
+                "generatedAt": "2026-09-04T20:00:00Z",
+                "repositories": [
+                  {
+                    "name": "qits-githost-service",
+                    "status": "OK"
+                  }
+                ],
+                "pins": [
+                  {
+                    "ecosystem": "cargo",
+                    "name": "eu.wohlben.qits:qits-blobstore",
+                    "version": "2026.903.85122",
+                    "repository": "qits-githost-service",
+                    "manifestPath": "pom.xml"
+                  }
+                ]
+              },
+              "workspaceLaunches": {
+                "generatedAt": "2026-09-05T06:00:00Z",
+                "pins": [
+                  {
+                    "image": "qits/workspace",
+                    "version": "2026.903.120000",
+                    "launches": "workspace"
+                  }
+                ]
+              },
+              "projectLaunches": {
+                "generatedAt": "2026-09-05T06:00:00Z",
+                "pins": [
+                  {
+                    "image": "qits/project-agent",
+                    "version": "2026.903.090000",
+                    "launches": "agent"
+                  }
+                ]
+              }
+            }
+          },
+          "status": 200,
+          "file": "a-registry-handed-a-pin-it-cannot-file/sweepGc.json",
+          "frozen": {
+            "ids": [
+              "$.runId"
+            ],
+            "instants": [
+              "$.executedAt",
+              "$.pins[*].readAt"
+            ],
+            "strings": [],
+            "volatile": [
+              "$.pins[*].tookMillis",
+              "$.pins[*].pinCount",
+              "$.sweep.blobsUnlinked",
+              "$.sweep.bytesReclaimed",
+              "$.sweep.withheldByGraceWindow",
+              "$.sweep.withheldBytes",
+              "$.sweep.stillReferenced",
+              "$.sweep.alreadyGone"
+            ],
             "listFilteredTo": null
           }
         }
@@ -702,6 +865,7 @@
       "name": "an npm package published at a version",
       "slug": "an-npm-package-published-at-a-version",
       "params": {
+        "name": "contract-package",
         "package": "contract-package",
         "tag": "main",
         "tarball": "contract-package-2100.1.0.tgz",
@@ -745,7 +909,7 @@
           "method": "PUT",
           "path": "/artifacts/npm/npm/-/package/{package}/dist-tags/{tag}",
           "contentType": "application/json",
-          "body": "2100.1.0",
+          "body": "\"2100.1.0\"",
           "status": 200,
           "file": "an-npm-package-published-at-a-version/putNpmDistTag.json",
           "frozen": {
@@ -1062,9 +1226,50 @@
       ]
     },
     {
+      "name": "no maven jar published at the version",
+      "slug": "no-maven-jar-published-at-the-version",
+      "params": {
+        "artifact": "contract-absent",
+        "groupPath": "eu/wohlben/qits",
+        "name": "eu.wohlben.qits:contract-absent",
+        "type": "maven",
+        "version": "2100.1.0"
+      },
+      "dependsOn": [],
+      "operations": [
+        {
+          "operationId": "getMavenFile",
+          "method": "GET",
+          "path": "/artifacts/maven/maven/{groupPath}/{artifact}/{version}/{artifact}-{version}.jar",
+          "status": 404,
+          "frozen": {
+            "ids": [],
+            "instants": [],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        },
+        {
+          "operationId": "putMavenFile",
+          "method": "PUT",
+          "path": "/artifacts/maven/maven/{groupPath}/{artifact}/{version}/{artifact}-{version}.jar",
+          "contentType": "application/java-archive",
+          "body": "contract jar 2100.1.0\n",
+          "status": 201,
+          "frozen": {
+            "ids": [],
+            "instants": [],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        }
+      ]
+    },
+    {
       "name": "no npm package with the given name",
       "slug": "no-npm-package-with-the-given-name",
       "params": {
+        "name": "contract-absent-package",
         "package": "contract-absent-package",
         "tag": "main",
         "tarball": "contract-absent-package-2100.1.0.tgz",
@@ -1237,6 +1442,65 @@
             ],
             "strings": [],
             "listFilteredTo": null
+          }
+        }
+      ]
+    },
+    {
+      "name": "the qits CLI published as a daemon",
+      "slug": "the-qits-cli-published-as-a-daemon",
+      "params": {
+        "daemon": "qits-platform-access-cli",
+        "repository": "daemons",
+        "version": "2100.1.0"
+      },
+      "dependsOn": [],
+      "operations": [
+        {
+          "operationId": "getDaemon",
+          "method": "GET",
+          "path": "/artifacts/daemons/{daemon}/{version}",
+          "status": 200,
+          "headers": {
+            "Content-Length": "34"
+          },
+          "frozen": {
+            "ids": [],
+            "instants": [],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        },
+        {
+          "operationId": "headDaemon",
+          "method": "HEAD",
+          "path": "/artifacts/daemons/{daemon}/{version}",
+          "status": 200,
+          "headers": {
+            "Content-Length": "34",
+            "Docker-Content-Digest": "sha256:a5d7dd70867a55a0ff5a50214d5688e5598b07268b2597a651dc7b1de1ba371e",
+            "ETag": "\"a5d7dd70867a55a0ff5a50214d5688e5598b07268b2597a651dc7b1de1ba371e\""
+          },
+          "frozen": {
+            "ids": [],
+            "instants": [],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        },
+        {
+          "operationId": "listDaemons",
+          "method": "GET",
+          "path": "/artifacts/api/repositories/{repository}/daemons",
+          "status": 200,
+          "file": "the-qits-cli-published-as-a-daemon/listDaemons.json",
+          "frozen": {
+            "ids": [],
+            "instants": [
+              "$.daemons[*].latestPublishedAt"
+            ],
+            "strings": [],
+            "listFilteredTo": "$.daemons"
           }
         }
       ]

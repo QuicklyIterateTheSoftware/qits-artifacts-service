@@ -119,6 +119,7 @@
              scope, EXACT, never a range; qits-maintenance bumps the pin when the consumer releases
              a changed pact. -->
         <qits.docs-service-pacts-qits-artifacts-service.version>2026.1010.143012</qits.docs-service-pacts-qits-artifacts-service.version>
+        <qits.ci-service-pacts-qits-artifacts-service.version>2026.1018.160604</qits.ci-service-pacts-qits-artifacts-service.version>
         <!-- THE PROVIDERS' GOLDEN MASTERS this service's OWN consumer pacts read (contracts/consumer,
              qits-1149): what each pin source and the idp record for their provider states. Test
              scope, read off the classpath by ProviderGoldenMasters. Moved by qits-maintenance like
@@ -308,6 +309,13 @@
                 <groupId>${project.groupId}</groupId>
                 <artifactId>qits-docs-service-pacts-qits-artifacts-service</artifactId>
                 <version>${qits.docs-service-pacts-qits-artifacts-service.version}</version>
+            </dependency>
+            <dependency>
+                <!-- Test scope at every declaration site: a consumer's pact, verified by
+                     ConsumerPactVerificationTest. -->
+                <groupId>${project.groupId}</groupId>
+                <artifactId>qits-ci-service-pacts-qits-artifacts-service</artifactId>
+                <version>${qits.ci-service-pacts-qits-artifacts-service.version}</version>
             </dependency>
             <dependency>
                 <!-- Test scope at every declaration site: recordings a test reads, never code. -->

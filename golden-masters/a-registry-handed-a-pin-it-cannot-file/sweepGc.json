@@ -1,0 +1,78 @@
+{
+  "executedAt": "2026-01-01T00:00:00Z",
+  "dryRun": false,
+  "graceWindow": "PT6H",
+  "aborted": "the run was aborted before anything was deleted: supplied: qits-platform-maintenance dependency pins: IllegalStateException: qits-platform-maintenance returned a pin for an ecosystem this store cannot file: cargo",
+  "pins": [
+    {
+      "source": "supplied: qits-platform-deployments",
+      "url": "",
+      "answered": true,
+      "outcome": "1 application pins over 2 image shas — what is serving, and what a rollback would restore",
+      "readAt": "2026-01-01T00:00:00Z",
+      "tookMillis": 0,
+      "pinCount": 0,
+      "keeps": [
+        "qits-artifacts:aaaa",
+        "qits-artifacts:bbbb"
+      ]
+    },
+    {
+      "source": "supplied: qits-ci",
+      "url": "",
+      "answered": true,
+      "outcome": "daemon qits-ci-daemon, 1 ladder rungs pinned (source: adopted)",
+      "readAt": "2026-01-01T00:00:00Z",
+      "tookMillis": 0,
+      "pinCount": 0,
+      "keeps": [
+        "qits-ci-daemon@2026.805.1"
+      ]
+    },
+    {
+      "source": "supplied: qits-platform-maintenance",
+      "url": "",
+      "answered": false,
+      "outcome": "supplied: qits-platform-maintenance dependency pins: IllegalStateException: qits-platform-maintenance returned a pin for an ecosystem this store cannot file: cargo",
+      "readAt": "2026-01-01T00:00:00Z",
+      "tookMillis": 0,
+      "pinCount": 0,
+      "keeps": []
+    },
+    {
+      "source": "supplied: qits-workspaces",
+      "url": "",
+      "answered": true,
+      "outcome": "1 launch images over 1 coordinates — what a workspace or editor start would pull TODAY",
+      "readAt": "2026-01-01T00:00:00Z",
+      "tookMillis": 0,
+      "pinCount": 0,
+      "keeps": [
+        "qits/workspace:2026.903.120000"
+      ]
+    },
+    {
+      "source": "supplied: qits-projects",
+      "url": "",
+      "answered": true,
+      "outcome": "1 launch images over 1 coordinates — what an agent or refinement start would pull TODAY",
+      "readAt": "2026-01-01T00:00:00Z",
+      "tookMillis": 0,
+      "pinCount": 0,
+      "keeps": [
+        "qits/project-agent:2026.903.090000"
+      ]
+    }
+  ],
+  "sweep": {
+    "blobsUnlinked": 0,
+    "bytesReclaimed": 0,
+    "withheldByGraceWindow": 0,
+    "withheldBytes": 0,
+    "stillReferenced": 0,
+    "alreadyGone": 0,
+    "unlinkedBlobIds": []
+  },
+  "runId": "00000000-0000-4000-8000-000000000001",
+  "condemnGracePeriod": "P1D"
+}

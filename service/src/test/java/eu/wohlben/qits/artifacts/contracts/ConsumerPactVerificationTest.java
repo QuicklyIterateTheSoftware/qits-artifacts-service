@@ -34,7 +34,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
  * a changed pact. {@link ClasspathPactLoader} finds them all.
  *
  * <p><b>The pinned pacts</b> are in {@code service/pom.xml}: qits-docs-service's (its {@code
- * DocsUpstream} reads of the docs sites). {@link ClasspathPactLoader#REQUIRED} is true, so a
+ * DocsUpstream} reads of the docs sites) and qits-ci-service's ({@code HttpArtifactPresence}'s
+ * newest-content-hash read of a release). {@link ClasspathPactLoader#REQUIRED} is true, so a
  * classpath that lost them fails rather than verifying nothing. A newly published consumer pact
  * against this provider is pinned there the same way.
  *
@@ -218,5 +219,30 @@ class ConsumerPactVerificationTest {
   @State(ProviderStates.NO_IMAGE)
   Map<String, String> noImage() {
     return states.params(ProviderStates.NO_IMAGE);
+  }
+
+  @State(ProviderStates.A_MAVEN_JAR)
+  Map<String, String> aMavenJar() {
+    return states.params(ProviderStates.A_MAVEN_JAR);
+  }
+
+  @State(ProviderStates.NO_MAVEN_JAR)
+  Map<String, String> noMavenJar() {
+    return states.params(ProviderStates.NO_MAVEN_JAR);
+  }
+
+  @State(ProviderStates.AN_NPM_CONTENT_HASH)
+  Map<String, String> anNpmContentHash() {
+    return states.params(ProviderStates.AN_NPM_CONTENT_HASH);
+  }
+
+  @State(ProviderStates.THE_CLI_AS_A_DAEMON)
+  Map<String, String> theCliAsADaemon() {
+    return states.params(ProviderStates.THE_CLI_AS_A_DAEMON);
+  }
+
+  @State(ProviderStates.AN_UNFILEABLE_PIN)
+  Map<String, String> anUnfileablePin() {
+    return states.params(ProviderStates.AN_UNFILEABLE_PIN);
   }
 }
