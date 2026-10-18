@@ -2,11 +2,17 @@
 #
 # These routes are Vert.x, not JAX-RS, so no annotation can describe them. SmallRye merges this file
 # into the served document at /artifacts/q/openapi. It names each door a consumer's pact cites, so
-# the golden masters and the pacts share one operationId per door. The registry protocols (/v2,
-# /artifacts/npm, /artifacts/maven) stay out: their clients speak a protocol, not this API.
+# the golden masters and the pacts share one operationId per door.
 #
-# A {site} or {packageName} may hold slashes (@changelog/<repository>, @scope/name), which an
-# OpenAPI path parameter cannot express; the routes accept them all the same.
+# The registry protocols (/v2, /artifacts/npm, /artifacts/maven) are named here too, but only the
+# doors another qits repository calls: qits-ci's presence and pin probes, qits-maintenance's
+# version listings, the qits CLI's and the bootstrap's publishes and probes. Their full grammar is
+# the protocol's own (OCI distribution, the npm registry API, the maven repository layout), and the
+# docker, npm and maven clients that speak it are not qits callers.
+#
+# A {site}, {packageName}, {name} or {path} may hold slashes (@changelog/<repository>, @scope/name,
+# qits/<image>, a maven group path), which an OpenAPI path parameter cannot express; the routes
+# accept them all the same.
 openapi: 3.1.0
 paths:
   /artifacts/docs/{repository}:
@@ -100,6 +106,15 @@ paths:
         "201": { description: "The receipt, {packageType, packageName, version, digest, sizeBytes, specVersion, createdAt}." }
         "200": { description: "A document was already published; the receipt of the stored one, with alreadyPublished: true." }
   /artifacts/daemons/{daemon}/{version}:
+    get:
+      operationId: getDaemon
+      summary: One daemon version's bytes, application/octet-stream.
+      parameters:
+        - { name: daemon, in: path, required: true, schema: { type: string } }
+        - { name: version, in: path, required: true, schema: { type: string } }
+      responses:
+        "200": { description: "The binary." }
+        "404": { description: "Not published." }
     head:
       operationId: headDaemon
       summary: Whether one daemon version is published; its digest in Docker-Content-Digest and ETag.
@@ -143,3 +158,121 @@ paths:
       responses:
         "200": { description: "{ecosystem, name, version, contentHash}." }
         "404": { description: "No version of the package exists." }
+  /artifacts/maven/{repository}/{groupPath}/{artifact}/maven-metadata.xml:
+    get:
+      operationId: getMavenMetadata
+      summary: The maven-metadata.xml derived from the versions deployed under one groupId/artifactId.
+      parameters:
+        - { name: repository, in: path, required: true, schema: { type: string } }
+        - { name: groupPath, in: path, required: true, schema: { type: string } }
+        - { name: artifact, in: path, required: true, schema: { type: string } }
+      responses:
+        "200": { description: "The document, application/xml; versioning.versions lists every deployed version." }
+        "404": { description: "Nothing is deployed under the artifact." }
+  /artifacts/maven/{repository}/{groupPath}/{artifact}/{version}/{file}:
+    get:
+      operationId: getMavenFile
+      summary: One deployed file of a maven version (a pom, a jar), as stored.
+      parameters:
+        - { name: repository, in: path, required: true, schema: { type: string } }
+        - { name: groupPath, in: path, required: true, schema: { type: string } }
+        - { name: artifact, in: path, required: true, schema: { type: string } }
+        - { name: version, in: path, required: true, schema: { type: string } }
+        - { name: file, in: path, required: true, schema: { type: string } }
+      responses:
+        "200": { description: "The file's bytes." }
+        "404": { description: "Not deployed." }
+    put:
+      operationId: putMavenFile
+      summary: Deploys one file of a maven version. X-Artifacts-Content-Hash on the pom records the version's content hash.
+      parameters:
+        - { name: repository, in: path, required: true, schema: { type: string } }
+        - { name: groupPath, in: path, required: true, schema: { type: string } }
+        - { name: artifact, in: path, required: true, schema: { type: string } }
+        - { name: version, in: path, required: true, schema: { type: string } }
+        - { name: file, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          "*/*": { schema: { type: string, format: binary } }
+      responses:
+        "201": { description: "Deployed, or the same bytes were already deployed." }
+        "403": { description: "Different bytes are already deployed at the path; releases are immutable." }
+  /artifacts/npm/{repository}/{package}:
+    get:
+      operationId: getNpmPackument
+      summary: The packument of one package, with every version's manifest under versions and the dist-tags.
+      parameters:
+        - { name: repository, in: path, required: true, schema: { type: string } }
+        - { name: package, in: path, required: true, schema: { type: string } }
+      responses:
+        "200": { description: "{_id, name, dist-tags, versions:{<version>:{name, version, dist}}, time}." }
+        "404": { description: "No such package." }
+    put:
+      operationId: putNpmPackage
+      summary: Publishes one version of a package, as npm publish sends it (the tarball base64 under _attachments).
+      parameters:
+        - { name: repository, in: path, required: true, schema: { type: string } }
+        - { name: package, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json: { schema: { type: object } }
+      responses:
+        "201": { description: "Published." }
+        "403": { description: "The version exists; versions are immutable." }
+  /artifacts/npm/{repository}/{package}/-/{tarball}:
+    head:
+      operationId: headNpmTarball
+      summary: Whether one version's tarball is published.
+      parameters:
+        - { name: repository, in: path, required: true, schema: { type: string } }
+        - { name: package, in: path, required: true, schema: { type: string } }
+        - { name: tarball, in: path, required: true, schema: { type: string } }
+      responses:
+        "200": { description: "Published." }
+        "404": { description: "Not published." }
+  /artifacts/npm/{repository}/-/package/{package}/dist-tags/{tag}:
+    put:
+      operationId: putNpmDistTag
+      summary: Points one dist-tag of a package at a published version; the body is the version as a JSON string.
+      parameters:
+        - { name: repository, in: path, required: true, schema: { type: string } }
+        - { name: package, in: path, required: true, schema: { type: string } }
+        - { name: tag, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json: { schema: { type: string } }
+      responses:
+        "200": { description: "The tag moved." }
+        "404": { description: "No such package or version." }
+  /v2/{name}/manifests/{reference}:
+    get:
+      operationId: getImageManifest
+      summary: The manifest an image tag or digest names, in the media type it was pushed with.
+      parameters:
+        - { name: name, in: path, required: true, schema: { type: string } }
+        - { name: reference, in: path, required: true, schema: { type: string } }
+      responses:
+        "200": { description: "The manifest; its digest in Docker-Content-Digest." }
+        "404": { description: "MANIFEST_UNKNOWN or NAME_UNKNOWN." }
+    head:
+      operationId: headImageManifest
+      summary: Whether an image tag or digest resolves; its digest in Docker-Content-Digest.
+      parameters:
+        - { name: name, in: path, required: true, schema: { type: string } }
+        - { name: reference, in: path, required: true, schema: { type: string } }
+      responses:
+        "200": { description: "Resolves." }
+        "404": { description: "MANIFEST_UNKNOWN or NAME_UNKNOWN." }
+  /v2/{name}/tags/list:
+    get:
+      operationId: listImageTags
+      summary: The tags of one image, paged by n and last.
+      parameters:
+        - { name: name, in: path, required: true, schema: { type: string } }
+        - { name: "n", in: query, schema: { type: integer } }
+        - { name: last, in: query, schema: { type: string } }
+      responses:
+        "200": { description: "{name, tags:[tag]}; an empty list for a name nothing was pushed under." }

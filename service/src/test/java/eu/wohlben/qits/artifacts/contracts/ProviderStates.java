@@ -67,6 +67,12 @@ public class ProviderStates {
   public static final String A_CONTENT_HASH = "a content hash recorded for the coordinate";
   public static final String A_STORE_WITH_CONTENT = "a registry store with content";
   public static final String UNPINNED_IDENTITIES = "a registry with unpinned identities";
+  public static final String A_MAVEN_ARTIFACT = "a maven artifact published at a version";
+  public static final String NO_MAVEN_ARTIFACT = "no maven artifact published at the version";
+  public static final String AN_NPM_PACKAGE = "an npm package published at a version";
+  public static final String NO_NPM_PACKAGE = "no npm package with the given name";
+  public static final String AN_IMAGE = "an image pushed under a tag";
+  public static final String NO_IMAGE = "no image with the given name";
 
   /** The daemon repository every deployment carries, and the one consumers name. */
   static final String DAEMONS = ArtifactsRepositorySeeder.DAEMONS;
@@ -143,6 +149,25 @@ public class ProviderStates {
   static final String HASH_VERSION = "2100.1.0";
   static final String CONTENT_HASH = "v1:sha256:" + "c".repeat(64);
 
+  /** The maven coordinate the published-artifact state deploys: a pom, as a release's marker. */
+  static final String MAVEN_GROUP = "eu.wohlben.qits";
+  static final String MAVEN_ARTIFACT = "contract-maven";
+  static final String MAVEN_VERSION = "2100.1.0";
+
+  /** The coordinate nothing deploys, except the recorded publish into it (cleaned up after). */
+  static final String MAVEN_ABSENT_ARTIFACT = "contract-absent";
+
+  /** The npm package the published-package state publishes, unscoped so its path is one segment. */
+  static final String NPM_PACKAGE = "contract-package";
+  static final String NPM_ABSENT_PACKAGE = "contract-absent-package";
+  static final String NPM_VERSION = "2100.1.0";
+  static final String NPM_TAG = "main";
+
+  /** The image the pushed-image state pushes, in the {@code qits} images repository. */
+  static final String IMAGE = "contract-image";
+  static final String ABSENT_IMAGE = "contract-absent-image";
+  static final String IMAGE_TAG = "2100.1.0";
+
   /**
    * The six pin documents qits-orchestrator supplies to the plan and the sweep, each in its
    * source's own shape. None of them names the contract daemon, so its versions are unpinned.
@@ -187,6 +212,12 @@ public class ProviderStates {
     states.put(A_CONTENT_HASH, this::aContentHash);
     states.put(A_STORE_WITH_CONTENT, this::aStoreWithContent);
     states.put(UNPINNED_IDENTITIES, this::unpinnedIdentities);
+    states.put(A_MAVEN_ARTIFACT, this::aMavenArtifact);
+    states.put(NO_MAVEN_ARTIFACT, this::noMavenArtifact);
+    states.put(AN_NPM_PACKAGE, this::anNpmPackage);
+    states.put(NO_NPM_PACKAGE, this::noNpmPackage);
+    states.put(AN_IMAGE, this::anImage);
+    states.put(NO_IMAGE, this::noImage);
   }
 
   /** Every state name this provider answers for. */
@@ -212,10 +243,13 @@ public class ProviderStates {
   }
 
   /**
-   * Deletes every row on the contract coordinates: the daemon's versions, the sbom, and the docs
-   * sites (their files and metadata cascade). Blobs stay — they are content-addressed, the next run
-   * writes the same ones, and the GC owns them. The content-hash pom stays too: the maven wire has
-   * no delete, and re-publishing the same pom with the same hash is a green no-op.
+   * Deletes every row on the contract coordinates: the daemon's versions, the sbom, the docs sites
+   * (their files and metadata cascade), the {@code contract-maven} and {@code contract-absent} maven
+   * files with their content hashes, the npm packages' versions and tags, and the contract images'
+   * tags and manifests. The wires have no delete for most of these, so it is SQL on their own
+   * tables. Blobs stay — they are content-addressed, the next run writes the same ones, and the GC
+   * owns them. The content-hash pom of {@code contract-artifact} stays too: re-publishing the same
+   * pom with the same hash is a green no-op.
    */
   public void cleanUp() {
     QuarkusTransaction.requiringNew()
@@ -236,6 +270,50 @@ public class ProviderStates {
                       DOCS,
                       List.of(DOCS_SITE, CHANGELOG_SITE))
                   .forEach(docsSites::delete);
+              // The registries' tables live in the same persistence unit as the daemon rows.
+              var entityManager = daemonBinaries.getEntityManager();
+              String group = MAVEN_GROUP.replace('.', '/') + "/";
+              entityManager
+                  .createNativeQuery(
+                      "delete from maven_artifact where repository = ?1 and (path like ?2 or path"
+                          + " like ?3)")
+                  .setParameter(1, ArtifactsRepositorySeeder.MAVEN)
+                  .setParameter(2, group + MAVEN_ARTIFACT + "/%")
+                  .setParameter(3, group + MAVEN_ABSENT_ARTIFACT + "/%")
+                  .executeUpdate();
+              entityManager
+                  .createNativeQuery(
+                      "delete from content_hash where repository = ?1 and package_name in (?2, ?3)")
+                  .setParameter(1, ArtifactsRepositorySeeder.MAVEN)
+                  .setParameter(2, MAVEN_GROUP + ":" + MAVEN_ARTIFACT)
+                  .setParameter(3, MAVEN_GROUP + ":" + MAVEN_ABSENT_ARTIFACT)
+                  .executeUpdate();
+              for (String table :
+                  List.of("npm_dist_tag", "npm_version", "npm_version_tombstone")) {
+                entityManager
+                    .createNativeQuery(
+                        "delete from " + table + " where repository = ?1 and package_name in (?2, ?3)")
+                    .setParameter(1, ArtifactsRepositorySeeder.NPM)
+                    .setParameter(2, NPM_PACKAGE)
+                    .setParameter(3, NPM_ABSENT_PACKAGE)
+                    .executeUpdate();
+              }
+              entityManager
+                  .createNativeQuery(
+                      "delete from content_hash where repository = ?1 and package_name in (?2, ?3)")
+                  .setParameter(1, ArtifactsRepositorySeeder.NPM)
+                  .setParameter(2, NPM_PACKAGE)
+                  .setParameter(3, NPM_ABSENT_PACKAGE)
+                  .executeUpdate();
+              for (String table : List.of("oci_tag", "oci_manifest")) {
+                entityManager
+                    .createNativeQuery(
+                        "delete from " + table + " where repository = ?1 and image_name in (?2, ?3)")
+                    .setParameter(1, ArtifactsRepositorySeeder.IMAGES)
+                    .setParameter(2, IMAGE)
+                    .setParameter(3, ABSENT_IMAGE)
+                    .executeUpdate();
+              }
             });
   }
 
@@ -463,6 +541,171 @@ public class ProviderStates {
     return new Setup(new TreeMap<>(), List.of());
   }
 
+  // --- the registry protocols: maven, npm, OCI --------------------------------------------------
+
+  /**
+   * One maven version deployed: its pom, the file every presence probe asks for. The repository
+   * derives {@code maven-metadata.xml} from the deployed rows, so the version listing has this one
+   * version in it.
+   */
+  private Setup aMavenArtifact() {
+    expect(
+        201,
+        given()
+            .urlEncodingEnabled(false)
+            .contentType("application/xml")
+            .body(mavenPom(MAVEN_ARTIFACT).getBytes(StandardCharsets.UTF_8))
+            .put(mavenPomPath(MAVEN_ARTIFACT)),
+        "the maven pom deploy");
+    return new Setup(mavenParams(MAVEN_ARTIFACT), List.of());
+  }
+
+  /** Nothing is deployed under the coordinate, at any version, and no content hash names it. */
+  private Setup noMavenArtifact() {
+    return new Setup(mavenParams(MAVEN_ABSENT_ARTIFACT), List.of());
+  }
+
+  /** The pom a deploy of {@code artifactId} at {@link #MAVEN_VERSION} sends. */
+  public static String mavenPom(String artifactId) {
+    return "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<project>\n"
+        + "  <modelVersion>4.0.0</modelVersion>\n"
+        + "  <groupId>" + MAVEN_GROUP + "</groupId>\n"
+        + "  <artifactId>" + artifactId + "</artifactId>\n"
+        + "  <version>" + MAVEN_VERSION + "</version>\n"
+        + "</project>\n";
+  }
+
+  private static String mavenPomPath(String artifactId) {
+    return "/artifacts/maven/" + ArtifactsRepositorySeeder.MAVEN + "/"
+        + MAVEN_GROUP.replace('.', '/') + "/" + artifactId + "/" + MAVEN_VERSION + "/"
+        + artifactId + "-" + MAVEN_VERSION + ".pom";
+  }
+
+  private static Map<String, String> mavenParams(String artifactId) {
+    Map<String, String> params = new TreeMap<>();
+    params.put("artifact", artifactId);
+    params.put("groupPath", MAVEN_GROUP.replace('.', '/'));
+    params.put("name", MAVEN_GROUP + ":" + artifactId);
+    params.put("type", "maven");
+    params.put("version", MAVEN_VERSION);
+    return params;
+  }
+
+  /**
+   * One npm version published, as {@code npm publish} sends it, with {@code latest} on it. The
+   * tarball is packed byte-stable, so its shasum and integrity in the packument are too.
+   */
+  private Setup anNpmPackage() {
+    expect(
+        201,
+        given()
+            .urlEncodingEnabled(false)
+            .contentType("application/json")
+            .body(npmPublishDocument(NPM_PACKAGE).getBytes(StandardCharsets.UTF_8))
+            .put("/artifacts/npm/" + ArtifactsRepositorySeeder.NPM + "/" + NPM_PACKAGE),
+        "the npm publish");
+    return new Setup(npmParams(NPM_PACKAGE), List.of());
+  }
+
+  /** No version of the package was ever published. */
+  private Setup noNpmPackage() {
+    return new Setup(npmParams(NPM_ABSENT_PACKAGE), List.of());
+  }
+
+  /** The tarball of {@code name} at {@link #NPM_VERSION}: {@code package/package.json}, packed byte-stable. */
+  static byte[] npmTarball(String name) {
+    return tarGz(Map.of("package/package.json", npmManifest(name) + "\n"));
+  }
+
+  private static String npmManifest(String name) {
+    return "{\"name\":\"" + name + "\",\"version\":\"" + NPM_VERSION
+        + "\",\"description\":\"a contract package\",\"license\":\"MIT\"}";
+  }
+
+  /** The document {@code npm publish} PUTs for {@code name}: manifest, dist-tag and attachment. */
+  public static String npmPublishDocument(String name) {
+    byte[] tarball = npmTarball(name);
+    String manifest = npmManifest(name);
+    String version =
+        manifest.substring(0, manifest.length() - 1)
+            + ",\"_id\":\"" + name + "@" + NPM_VERSION + "\",\"dist\":{\"shasum\":\""
+            + hex("SHA-1", tarball) + "\",\"integrity\":\"sha512-"
+            + java.util.Base64.getEncoder().encodeToString(digest("SHA-512", tarball)) + "\"}}";
+    return "{\"_id\":\"" + name + "\",\"name\":\"" + name + "\","
+        + "\"dist-tags\":{\"latest\":\"" + NPM_VERSION + "\"},"
+        + "\"versions\":{\"" + NPM_VERSION + "\":" + version + "},"
+        + "\"access\":\"public\","
+        + "\"_attachments\":{\"" + name + "-" + NPM_VERSION + ".tgz\":{"
+        + "\"content_type\":\"application/octet-stream\",\"data\":\""
+        + java.util.Base64.getEncoder().encodeToString(tarball) + "\",\"length\":"
+        + tarball.length + "}}}";
+  }
+
+  private static Map<String, String> npmParams(String name) {
+    Map<String, String> params = new TreeMap<>();
+    params.put("package", name);
+    params.put("tag", NPM_TAG);
+    params.put("tarball", name + "-" + NPM_VERSION + ".tgz");
+    params.put("version", NPM_VERSION);
+    return params;
+  }
+
+  /**
+   * One single-architecture image pushed under {@link #IMAGE_TAG}, as a client pushes it: the
+   * config and layer blobs, then the manifest naming both. The layer is packed byte-stable, so the
+   * manifest's digest — what {@code Docker-Content-Digest} answers — is the same on every machine.
+   */
+  private Setup anImage() {
+    String name = ArtifactsRepositorySeeder.IMAGES + "/" + IMAGE;
+    byte[] layerTar = tar(Map.of("contract.txt", "a contract image\n"));
+    byte[] layer = storedGzip(layerTar);
+    byte[] config =
+        ("{\"architecture\":\"amd64\",\"os\":\"linux\",\"config\":{},"
+                + "\"rootfs\":{\"type\":\"layers\",\"diff_ids\":[\"sha256:" + sha256(layerTar)
+                + "\"]}}")
+            .getBytes(StandardCharsets.UTF_8);
+    for (byte[] blob : List.of(config, layer)) {
+      expect(
+          201,
+          given()
+              .urlEncodingEnabled(false)
+              .contentType("application/octet-stream")
+              .body(blob)
+              .post("/v2/" + name + "/blobs/uploads/?digest=sha256:" + sha256(blob)),
+          "the blob upload");
+    }
+    String manifest =
+        "{\"schemaVersion\":2,\"mediaType\":\"" + OCI_MANIFEST + "\","
+            + "\"config\":{\"mediaType\":\"application/vnd.oci.image.config.v1+json\","
+            + "\"digest\":\"sha256:" + sha256(config) + "\",\"size\":" + config.length + "},"
+            + "\"layers\":[{\"mediaType\":\"application/vnd.oci.image.layer.v1.tar+gzip\","
+            + "\"digest\":\"sha256:" + sha256(layer) + "\",\"size\":" + layer.length + "}]}";
+    expect(
+        201,
+        given()
+            .urlEncodingEnabled(false)
+            .contentType(OCI_MANIFEST)
+            .body(manifest.getBytes(StandardCharsets.UTF_8))
+            .put("/v2/" + name + "/manifests/" + IMAGE_TAG),
+        "the manifest push");
+    return new Setup(imageParams(IMAGE), List.of());
+  }
+
+  /** The images repository exists; no image of the name was ever pushed. */
+  private Setup noImage() {
+    return new Setup(imageParams(ABSENT_IMAGE), List.of());
+  }
+
+  /** The media type the pushed manifest carries. */
+  static final String OCI_MANIFEST = "application/vnd.oci.image.manifest.v1+json";
+
+  private static Map<String, String> imageParams(String image) {
+    Map<String, String> params = new TreeMap<>();
+    params.put("name", ArtifactsRepositorySeeder.IMAGES + "/" + image);
+    params.put("tag", IMAGE_TAG);
+    return params;
+  }
+
   // --- helpers ---------------------------------------------------------------------------------
 
   private static void expect(int status, Response response, String what) {
@@ -479,6 +722,11 @@ public class ProviderStates {
    * on every machine.
    */
   static byte[] tarGz(Map<String, String> files) {
+    return storedGzip(tar(files));
+  }
+
+  /** The tar {@link #tarGz} gzips: fixed entry order, mtime, owner and mode. */
+  static byte[] tar(Map<String, String> files) {
     ByteArrayOutputStream out = new ByteArrayOutputStream();
     try (TarArchiveOutputStream tar = new TarArchiveOutputStream(out)) {
       for (Map.Entry<String, String> file : new TreeMap<>(files).entrySet()) {
@@ -498,7 +746,7 @@ public class ProviderStates {
     } catch (IOException e) {
       throw new IllegalStateException("could not build the bundle", e);
     }
-    return storedGzip(out.toByteArray());
+    return out.toByteArray();
   }
 
   /**
@@ -536,8 +784,16 @@ public class ProviderStates {
   }
 
   private static String sha256(byte[] bytes) {
+    return hex("SHA-256", bytes);
+  }
+
+  private static String hex(String algorithm, byte[] bytes) {
+    return HexFormat.of().formatHex(digest(algorithm, bytes));
+  }
+
+  private static byte[] digest(String algorithm, byte[] bytes) {
     try {
-      return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes));
+      return MessageDigest.getInstance(algorithm).digest(bytes);
     } catch (NoSuchAlgorithmException e) {
       throw new IllegalStateException(e);
     }

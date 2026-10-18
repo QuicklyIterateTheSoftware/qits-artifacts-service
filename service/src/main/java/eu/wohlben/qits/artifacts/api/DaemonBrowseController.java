@@ -41,8 +41,9 @@ import org.eclipse.microprofile.openapi.annotations.Operation;
  * <p>Reads, so unguarded by {@code AdminWriteGuard}, which covers write methods only — but open to
  * people, agents, platform services and CI runs like every browse surface. A CI run reads it: the
  * composed release prelude resolves the latest {@code qits} CLI from this listing with the run's
- * {@code qits:ci-run} credential before it downloads the binary. Hidden from the OpenAPI document
- * like every operation this service ships; the contract is written out in the README.
+ * {@code qits:ci-run} credential before it downloads the binary. Both listings are in the OpenAPI
+ * document under the operationIds the golden masters record (qits-1149); the contract is written
+ * out in the README.
  */
 @Path("/repositories/{repo}/daemons")
 @Produces(MediaType.APPLICATION_JSON)
@@ -55,7 +56,9 @@ public class DaemonBrowseController {
 
   /** 404 for an unknown repository, 400 for one that is not a daemon repository. */
   @GET
-  @Operation(hidden = true)
+  // Named: golden-masters/ records it under this operationId (qits-1149); the qits CLI's update
+  // resolves the newest qits-platform-access-cli from it.
+  @Operation(operationId = "listDaemons")
   public ListDaemonsResponse daemons(@PathParam("repo") String repo) {
     return new ListDaemonsResponse(explorer.listDaemons(repo));
   }

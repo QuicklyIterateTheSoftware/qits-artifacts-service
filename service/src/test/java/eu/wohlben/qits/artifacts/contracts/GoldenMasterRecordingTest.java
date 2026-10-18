@@ -87,6 +87,8 @@ class GoldenMasterRecordingTest {
    *
    * @param listFilteredTo the array (a {@code $.a.b} path) reduced to the entries the state created,
    *     or null — the index's {@code frozen.listFilteredTo}
+   * @param filteredOn the one param whose value marks an entry the state created, or null for any
+   *     of them — needed where another param's value (a version) is common in the shared store
    * @param sortedBy for an array the provider answers in no guaranteed order: {@code
    *     <$.path-to-array>:<field.path in each entry>}, sorted by that field's value before freezing.
    *     Null when the order is the provider's own.
@@ -109,6 +111,7 @@ class GoldenMasterRecordingTest {
       boolean recordsAnswer,
       List<String> headers,
       String listFilteredTo,
+      String filteredOn,
       String sortedBy,
       List<String> dropped,
       boolean zeroNumbers,
@@ -134,6 +137,7 @@ class GoldenMasterRecordingTest {
     private boolean recordsAnswer;
     private final List<String> headers = new ArrayList<>();
     private String listFilteredTo;
+    private String filteredOn;
     private final List<String> dropped = new ArrayList<>();
     private boolean zeroNumbers;
     private final List<String> blanked = new ArrayList<>();
@@ -191,6 +195,13 @@ class GoldenMasterRecordingTest {
       return this;
     }
 
+    /** {@link #filtered(String)}, keeping the entries that mention the {@code param}'s value. */
+    Op filtered(String array, String param) {
+      listFilteredTo = array;
+      filteredOn = param;
+      return this;
+    }
+
     Op drop(String... members) {
       dropped.addAll(List.of(members));
       return this;
@@ -221,6 +232,7 @@ class GoldenMasterRecordingTest {
           recordsAnswer,
           List.copyOf(headers),
           listFilteredTo,
+          filteredOn,
           null,
           List.copyOf(dropped),
           zeroNumbers,
@@ -246,6 +258,16 @@ class GoldenMasterRecordingTest {
   private static final String CONTENT_HASH = "/artifacts/content-hashes/{type}/{name}/-/{version}";
   private static final String NEWEST_CONTENT_HASH =
       "/artifacts/content-hashes/{type}/{name}/-/newest";
+  private static final String DAEMONS = "/artifacts/api/repositories/{repository}/daemons";
+  private static final String MAVEN_POM =
+      "/artifacts/maven/maven/{groupPath}/{artifact}/{version}/{artifact}-{version}.pom";
+  private static final String MAVEN_METADATA =
+      "/artifacts/maven/maven/{groupPath}/{artifact}/maven-metadata.xml";
+  private static final String NPM_PACKUMENT = "/artifacts/npm/npm/{package}";
+  private static final String NPM_TARBALL = "/artifacts/npm/npm/{package}/-/{tarball}";
+  private static final String NPM_DIST_TAG = "/artifacts/npm/npm/-/package/{package}/dist-tags/{tag}";
+  private static final String IMAGE_MANIFEST = "/v2/{name}/manifests/{tag}";
+  private static final String IMAGE_TAGS = "/v2/{name}/tags/list";
 
   /** The headers a stored binary answers with, which the CLI and the bootstrap read. */
   private static final String[] DIGEST_HEADERS = {
@@ -268,6 +290,17 @@ class GoldenMasterRecordingTest {
               .build(),
           op(ProviderStates.A_DAEMON_WITH_TWO_VERSIONS, "headDaemon", "HEAD", DAEMON, 200)
               .headers(DIGEST_HEADERS)
+              .build(),
+          // the qits CLI's update: the repository listing, the download, and a re-publish's 409
+          op(ProviderStates.A_DAEMON_WITH_TWO_VERSIONS, "listDaemons", "GET", DAEMONS, 200)
+              .filtered("$.daemons", "daemon")
+              .build(),
+          op(ProviderStates.A_DAEMON_WITH_TWO_VERSIONS, "getDaemon", "GET", DAEMON, 200)
+              .raw()
+              .headers("Content-Length")
+              .build(),
+          op(ProviderStates.A_DAEMON_WITH_TWO_VERSIONS, "putDaemon", "PUT", DAEMON, 409)
+              .text("application/octet-stream", ProviderStates.DAEMON_BYTES)
               .build(),
           op(ProviderStates.A_DAEMON_NOTHING_PUBLISHED, "listDaemonVersions", "GET", DAEMON_VERSIONS, 200)
               .build(),
@@ -295,6 +328,10 @@ class GoldenMasterRecordingTest {
           op(ProviderStates.NO_DOCS, "listDocsVersions", "GET", DOCS_SITE, 404).build(),
           op(ProviderStates.NO_DOCS, "getDocsVersion", "GET", DOCS_VERSION, 404).build(),
           op(ProviderStates.NO_DOCS, "getDocsFile", "GET", DOCS_FILE, 404).build(),
+          // the qits CLI's docs publish of a version that exists
+          op(ProviderStates.A_DOCS_SITE, "putDocs", "PUT", DOCS_VERSION, 409)
+              .binary("application/gzip", ProviderStates.DOCS_BUNDLE)
+              .build(),
           op(ProviderStates.A_DOCS_SITE, "listDocsSites", "GET", DOCS_SITES, 200)
               .filtered("$.sites")
               .build(),
@@ -314,9 +351,67 @@ class GoldenMasterRecordingTest {
               .headers("Content-Length", "Content-Type", "ETag")
               .build(),
           op(ProviderStates.NO_CHANGELOG, "listDocsVersions", "GET", CHANGELOG_SITE, 404).build(),
+          op(ProviderStates.NO_CHANGELOG, "getDocsFile", "GET", CHANGELOG_FILE, 404).build(),
           // --- content hashes: the qits CLI
           op(ProviderStates.A_CONTENT_HASH, "getContentHash", "GET", CONTENT_HASH, 200).build(),
           op(ProviderStates.A_CONTENT_HASH, "getNewestContentHash", "GET", NEWEST_CONTENT_HASH, 200)
+              .build(),
+          // --- maven: qits-ci (HttpArtifactPresence), qits-maintenance (LatestResolver,
+          // ArtifactPresence), the bootstrap's probes, the qits CLI's deploy and pom reads
+          op(ProviderStates.A_MAVEN_ARTIFACT, "getMavenFile", "GET", MAVEN_POM, 200)
+              .raw()
+              .headers("Content-Length")
+              .build(),
+          op(ProviderStates.A_MAVEN_ARTIFACT, "getMavenMetadata", "GET", MAVEN_METADATA, 200)
+              .raw()
+              .headers("Content-Type")
+              .build(),
+          op(ProviderStates.NO_MAVEN_ARTIFACT, "getMavenFile", "GET", MAVEN_POM, 404).build(),
+          op(ProviderStates.NO_MAVEN_ARTIFACT, "getMavenMetadata", "GET", MAVEN_METADATA, 404)
+              .build(),
+          op(ProviderStates.NO_MAVEN_ARTIFACT, "getContentHash", "GET", CONTENT_HASH, 404).build(),
+          op(ProviderStates.NO_MAVEN_ARTIFACT, "getNewestContentHash", "GET", NEWEST_CONTENT_HASH, 404)
+              .build(),
+          op(ProviderStates.NO_MAVEN_ARTIFACT, "putMavenFile", "PUT", MAVEN_POM, 201)
+              .text("application/xml", ProviderStates.mavenPom(ProviderStates.MAVEN_ABSENT_ARTIFACT))
+              .raw()
+              .build(),
+          // --- npm: qits-ci (HttpArtifactPresence), qits-maintenance (LatestResolver,
+          // ArtifactPresence), the bootstrap's tarball probe, the qits CLI's publish and plan
+          // dist.tarball is an absolute URL on whatever origin answered: the test server's port.
+          op(ProviderStates.AN_NPM_PACKAGE, "getNpmPackument", "GET", NPM_PACKUMENT, 200)
+              .blank("$.versions[*].dist.tarball")
+              .build(),
+          op(ProviderStates.AN_NPM_PACKAGE, "headNpmTarball", "HEAD", NPM_TARBALL, 200)
+              .headers("Content-Length")
+              .build(),
+          op(ProviderStates.AN_NPM_PACKAGE, "putNpmDistTag", "PUT", NPM_DIST_TAG, 200)
+              .json("application/json", "\"" + ProviderStates.NPM_VERSION + "\"")
+              .build(),
+          op(ProviderStates.NO_NPM_PACKAGE, "getNpmPackument", "GET", NPM_PACKUMENT, 404).build(),
+          op(ProviderStates.NO_NPM_PACKAGE, "headNpmTarball", "HEAD", NPM_TARBALL, 404).build(),
+          op(ProviderStates.NO_NPM_PACKAGE, "putNpmPackage", "PUT", NPM_PACKUMENT, 201)
+              .json(
+                  "application/json",
+                  ProviderStates.npmPublishDocument(ProviderStates.NPM_ABSENT_PACKAGE))
+              .build(),
+          // --- OCI: qits-ci (HttpImagePins), qits-maintenance (LatestResolver, ArtifactPresence),
+          // the bootstrap's image probes
+          op(ProviderStates.AN_IMAGE, "headImageManifest", "HEAD", IMAGE_MANIFEST, 200)
+              .headers("Docker-Content-Digest")
+              .build(),
+          op(ProviderStates.AN_IMAGE, "getImageManifest", "GET", IMAGE_MANIFEST, 200)
+              .raw()
+              .headers("Content-Type", "Docker-Content-Digest")
+              .build(),
+          op(ProviderStates.AN_IMAGE, "listImageTags", "GET", IMAGE_TAGS, 200)
+              .query("n", "1000")
+              .build(),
+          op(ProviderStates.NO_IMAGE, "headImageManifest", "HEAD", IMAGE_MANIFEST, 404).build(),
+          op(ProviderStates.NO_IMAGE, "getImageManifest", "GET", IMAGE_MANIFEST, 404).build(),
+          // An image name nothing was pushed under lists no tags rather than answering 404.
+          op(ProviderStates.NO_IMAGE, "listImageTags", "GET", IMAGE_TAGS, 200)
+              .query("n", "1000")
               .build(),
           // --- the store and its GC: qits-orchestrator
           op(ProviderStates.A_STORE_WITH_CONTENT, "getStoreSummary", "GET", "/artifacts/api/store/summary", 200)
@@ -591,7 +686,14 @@ class GoldenMasterRecordingTest {
     if (body.isObject()) {
       interaction.dropped().forEach(((ObjectNode) body)::remove);
     }
-    body = recordable(body, interaction, params.values(), setup.uniqueTokens());
+    body =
+        recordable(
+            body,
+            interaction,
+            interaction.filteredOn() == null
+                ? params.values()
+                : List.of(params.get(interaction.filteredOn())),
+            setup.uniqueTokens());
     List<String> volatilePaths = new ArrayList<>();
     body = storeIndependent(body, interaction, volatilePaths);
     return new Recorded(freezer.freeze(body), frozenParams, freezer, headers, volatilePaths);
@@ -670,7 +772,8 @@ class GoldenMasterRecordingTest {
 
   /**
    * Sets the strings at {@code segments} (from {@code at} on) to {@code ""}; a segment ending in
-   * {@code [*]} names every element of that array. Answers how many it set.
+   * {@code [*]} names every element of that array, or every member of that object (an npm
+   * packument's {@code versions}, keyed by version). Answers how many it set.
    */
   private static int blank(JsonNode node, String[] segments, int at) {
     String segment = segments[at];
@@ -690,6 +793,20 @@ class GoldenMasterRecordingTest {
       }
       object.set(key, TextNode.valueOf(""));
       return 1;
+    }
+    if (child instanceof ObjectNode members) {
+      int count = 0;
+      Iterator<Map.Entry<String, JsonNode>> fields = members.fields();
+      while (fields.hasNext()) {
+        Map.Entry<String, JsonNode> member = fields.next();
+        if (!last) {
+          count += blank(member.getValue(), segments, at + 1);
+        } else if (member.getValue().isTextual()) {
+          member.setValue(TextNode.valueOf(""));
+          count++;
+        }
+      }
+      return count;
     }
     if (!(child instanceof ArrayNode array)) {
       return 0;

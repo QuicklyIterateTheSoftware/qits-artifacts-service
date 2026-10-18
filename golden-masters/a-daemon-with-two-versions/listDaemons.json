@@ -1,0 +1,11 @@
+{
+  "daemons": [
+    {
+      "name": "contract-daemon",
+      "versionCount": 2,
+      "latestVersion": "2026.2.0",
+      "latestPublishedAt": "2026-01-01T00:00:00Z",
+      "sizeBytes": 48
+    }
+  ]
+}

@@ -105,6 +105,21 @@
       "dependsOn": [],
       "operations": [
         {
+          "operationId": "getDaemon",
+          "method": "GET",
+          "path": "/artifacts/daemons/{daemon}/{version}",
+          "status": 200,
+          "headers": {
+            "Content-Length": "24"
+          },
+          "frozen": {
+            "ids": [],
+            "instants": [],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        },
+        {
           "operationId": "headDaemon",
           "method": "HEAD",
           "path": "/artifacts/daemons/{daemon}/{version}",
@@ -135,6 +150,35 @@
             "strings": [],
             "listFilteredTo": null
           }
+        },
+        {
+          "operationId": "listDaemons",
+          "method": "GET",
+          "path": "/artifacts/api/repositories/{repository}/daemons",
+          "status": 200,
+          "file": "a-daemon-with-two-versions/listDaemons.json",
+          "frozen": {
+            "ids": [],
+            "instants": [
+              "$.daemons[*].latestPublishedAt"
+            ],
+            "strings": [],
+            "listFilteredTo": "$.daemons"
+          }
+        },
+        {
+          "operationId": "putDaemon",
+          "method": "PUT",
+          "path": "/artifacts/daemons/{daemon}/{version}",
+          "contentType": "application/octet-stream",
+          "body": "contract-daemon 2026.3.0\n",
+          "status": 409,
+          "frozen": {
+            "ids": [],
+            "instants": [],
+            "strings": [],
+            "listFilteredTo": null
+          }
         }
       ]
     },
@@ -161,6 +205,50 @@
             "instants": [
               "$.versions[*].publishedAt"
             ],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        }
+      ]
+    },
+    {
+      "name": "a maven artifact published at a version",
+      "slug": "a-maven-artifact-published-at-a-version",
+      "params": {
+        "artifact": "contract-maven",
+        "groupPath": "eu/wohlben/qits",
+        "name": "eu.wohlben.qits:contract-maven",
+        "type": "maven",
+        "version": "2100.1.0"
+      },
+      "dependsOn": [],
+      "operations": [
+        {
+          "operationId": "getMavenFile",
+          "method": "GET",
+          "path": "/artifacts/maven/maven/{groupPath}/{artifact}/{version}/{artifact}-{version}.pom",
+          "status": 200,
+          "headers": {
+            "Content-Length": "206"
+          },
+          "frozen": {
+            "ids": [],
+            "instants": [],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        },
+        {
+          "operationId": "getMavenMetadata",
+          "method": "GET",
+          "path": "/artifacts/maven/maven/{groupPath}/{artifact}/maven-metadata.xml",
+          "status": 200,
+          "headers": {
+            "Content-Type": "application/xml; charset=utf-8"
+          },
+          "frozen": {
+            "ids": [],
+            "instants": [],
             "strings": [],
             "listFilteredTo": null
           }
@@ -235,6 +323,20 @@
             "instants": [
               "$.versions[*].publishedAt"
             ],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        },
+        {
+          "operationId": "putDocs",
+          "method": "PUT",
+          "path": "/artifacts/docs/docs/{site}/-/{version}",
+          "contentType": "application/gzip",
+          "bodyBase64": "H4sIAAAAAAAA/wEACP/3aW5kZXguaHRtbAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADAwMDA2NDQgMDAwMDAwMCAwMDAwMDAwIDAwMDAwMDAwMDU0IDAwMDAwMDAwMDAwIDAxMTU0MQAgMAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB1c3RhcgAwMAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAwMDAwMDAwIDAwMDAwMDAgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA8IWRvY3R5cGUgaHRtbD48dGl0bGU+Y29udHJhY3QgZG9jczwvdGl0bGU+CgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAC8TqLQAAgAAA==",
+          "status": 409,
+          "frozen": {
+            "ids": [],
+            "instants": [],
             "strings": [],
             "listFilteredTo": null
           }
@@ -470,6 +572,18 @@
       "dependsOn": [],
       "operations": [
         {
+          "operationId": "getDocsFile",
+          "method": "GET",
+          "path": "/artifacts/docs/docs/@changelog/{repository}/-/{version}/CHANGELOG.md",
+          "status": 404,
+          "frozen": {
+            "ids": [],
+            "instants": [],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        },
+        {
           "operationId": "listDocsVersions",
           "method": "GET",
           "path": "/artifacts/docs/docs/@changelog/{repository}",
@@ -520,6 +634,123 @@
             "instants": [
               "$.versions[*].publishedAt"
             ],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        }
+      ]
+    },
+    {
+      "name": "an image pushed under a tag",
+      "slug": "an-image-pushed-under-a-tag",
+      "params": {
+        "name": "qits/contract-image",
+        "tag": "2100.1.0"
+      },
+      "dependsOn": [],
+      "operations": [
+        {
+          "operationId": "getImageManifest",
+          "method": "GET",
+          "path": "/v2/{name}/manifests/{tag}",
+          "status": 200,
+          "headers": {
+            "Content-Type": "application/vnd.oci.image.manifest.v1+json",
+            "Docker-Content-Digest": "sha256:1b91a3dfff59dad5c1d9c7e557ca94e67e96aabad34050385263cffe926ed7a2"
+          },
+          "frozen": {
+            "ids": [],
+            "instants": [],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        },
+        {
+          "operationId": "headImageManifest",
+          "method": "HEAD",
+          "path": "/v2/{name}/manifests/{tag}",
+          "status": 200,
+          "headers": {
+            "Docker-Content-Digest": "sha256:1b91a3dfff59dad5c1d9c7e557ca94e67e96aabad34050385263cffe926ed7a2"
+          },
+          "frozen": {
+            "ids": [],
+            "instants": [],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        },
+        {
+          "operationId": "listImageTags",
+          "method": "GET",
+          "path": "/v2/{name}/tags/list",
+          "query": {
+            "n": "1000"
+          },
+          "status": 200,
+          "file": "an-image-pushed-under-a-tag/listImageTags.json",
+          "frozen": {
+            "ids": [],
+            "instants": [],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        }
+      ]
+    },
+    {
+      "name": "an npm package published at a version",
+      "slug": "an-npm-package-published-at-a-version",
+      "params": {
+        "package": "contract-package",
+        "tag": "main",
+        "tarball": "contract-package-2100.1.0.tgz",
+        "version": "2100.1.0"
+      },
+      "dependsOn": [],
+      "operations": [
+        {
+          "operationId": "getNpmPackument",
+          "method": "GET",
+          "path": "/artifacts/npm/npm/{package}",
+          "status": 200,
+          "file": "an-npm-package-published-at-a-version/getNpmPackument.json",
+          "frozen": {
+            "ids": [],
+            "instants": [],
+            "strings": [],
+            "volatile": [
+              "$.versions[*].dist.tarball"
+            ],
+            "listFilteredTo": null
+          }
+        },
+        {
+          "operationId": "headNpmTarball",
+          "method": "HEAD",
+          "path": "/artifacts/npm/npm/{package}/-/{tarball}",
+          "status": 200,
+          "headers": {
+            "Content-Length": "2071"
+          },
+          "frozen": {
+            "ids": [],
+            "instants": [],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        },
+        {
+          "operationId": "putNpmDistTag",
+          "method": "PUT",
+          "path": "/artifacts/npm/npm/-/package/{package}/dist-tags/{tag}",
+          "contentType": "application/json",
+          "body": "2100.1.0",
+          "status": 200,
+          "file": "an-npm-package-published-at-a-version/putNpmDistTag.json",
+          "frozen": {
+            "ids": [],
+            "instants": [],
             "strings": [],
             "listFilteredTo": null
           }
@@ -697,6 +928,212 @@
             "instants": [
               "$.publishedAt"
             ],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        }
+      ]
+    },
+    {
+      "name": "no image with the given name",
+      "slug": "no-image-with-the-given-name",
+      "params": {
+        "name": "qits/contract-absent-image",
+        "tag": "2100.1.0"
+      },
+      "dependsOn": [],
+      "operations": [
+        {
+          "operationId": "getImageManifest",
+          "method": "GET",
+          "path": "/v2/{name}/manifests/{tag}",
+          "status": 404,
+          "frozen": {
+            "ids": [],
+            "instants": [],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        },
+        {
+          "operationId": "headImageManifest",
+          "method": "HEAD",
+          "path": "/v2/{name}/manifests/{tag}",
+          "status": 404,
+          "frozen": {
+            "ids": [],
+            "instants": [],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        },
+        {
+          "operationId": "listImageTags",
+          "method": "GET",
+          "path": "/v2/{name}/tags/list",
+          "query": {
+            "n": "1000"
+          },
+          "status": 200,
+          "file": "no-image-with-the-given-name/listImageTags.json",
+          "frozen": {
+            "ids": [],
+            "instants": [],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        }
+      ]
+    },
+    {
+      "name": "no maven artifact published at the version",
+      "slug": "no-maven-artifact-published-at-the-version",
+      "params": {
+        "artifact": "contract-absent",
+        "groupPath": "eu/wohlben/qits",
+        "name": "eu.wohlben.qits:contract-absent",
+        "type": "maven",
+        "version": "2100.1.0"
+      },
+      "dependsOn": [],
+      "operations": [
+        {
+          "operationId": "getContentHash",
+          "method": "GET",
+          "path": "/artifacts/content-hashes/{type}/{name}/-/{version}",
+          "status": 404,
+          "frozen": {
+            "ids": [],
+            "instants": [],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        },
+        {
+          "operationId": "getMavenFile",
+          "method": "GET",
+          "path": "/artifacts/maven/maven/{groupPath}/{artifact}/{version}/{artifact}-{version}.pom",
+          "status": 404,
+          "frozen": {
+            "ids": [],
+            "instants": [],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        },
+        {
+          "operationId": "getMavenMetadata",
+          "method": "GET",
+          "path": "/artifacts/maven/maven/{groupPath}/{artifact}/maven-metadata.xml",
+          "status": 404,
+          "frozen": {
+            "ids": [],
+            "instants": [],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        },
+        {
+          "operationId": "getNewestContentHash",
+          "method": "GET",
+          "path": "/artifacts/content-hashes/{type}/{name}/-/newest",
+          "status": 404,
+          "frozen": {
+            "ids": [],
+            "instants": [],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        },
+        {
+          "operationId": "putMavenFile",
+          "method": "PUT",
+          "path": "/artifacts/maven/maven/{groupPath}/{artifact}/{version}/{artifact}-{version}.pom",
+          "contentType": "application/xml",
+          "body": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<project>\n  <modelVersion>4.0.0</modelVersion>\n  <groupId>eu.wohlben.qits</groupId>\n  <artifactId>contract-absent</artifactId>\n  <version>2100.1.0</version>\n</project>\n",
+          "status": 201,
+          "frozen": {
+            "ids": [],
+            "instants": [],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        }
+      ]
+    },
+    {
+      "name": "no npm package with the given name",
+      "slug": "no-npm-package-with-the-given-name",
+      "params": {
+        "package": "contract-absent-package",
+        "tag": "main",
+        "tarball": "contract-absent-package-2100.1.0.tgz",
+        "version": "2100.1.0"
+      },
+      "dependsOn": [],
+      "operations": [
+        {
+          "operationId": "getNpmPackument",
+          "method": "GET",
+          "path": "/artifacts/npm/npm/{package}",
+          "status": 404,
+          "frozen": {
+            "ids": [],
+            "instants": [],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        },
+        {
+          "operationId": "headNpmTarball",
+          "method": "HEAD",
+          "path": "/artifacts/npm/npm/{package}/-/{tarball}",
+          "status": 404,
+          "frozen": {
+            "ids": [],
+            "instants": [],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        },
+        {
+          "operationId": "putNpmPackage",
+          "method": "PUT",
+          "path": "/artifacts/npm/npm/{package}",
+          "contentType": "application/json",
+          "body": {
+            "_id": "contract-absent-package",
+            "name": "contract-absent-package",
+            "dist-tags": {
+              "latest": "2100.1.0"
+            },
+            "versions": {
+              "2100.1.0": {
+                "name": "contract-absent-package",
+                "version": "2100.1.0",
+                "description": "a contract package",
+                "license": "MIT",
+                "_id": "contract-absent-package@2100.1.0",
+                "dist": {
+                  "shasum": "a841ef4daa82da6ecbd16864a10adce71dcf6340",
+                  "integrity": "sha512-XhRx4Ne033r5JxXNn3m9byelXyZnzjc4nzjGCIExFRkVRKaFwiyNkzGSK5aS+oHsvzExfHEaf38dl1laVkwB+g=="
+                }
+              }
+            },
+            "access": "public",
+            "_attachments": {
+              "contract-absent-package-2100.1.0.tgz": {
+                "content_type": "application/octet-stream",
+                "data": "H4sIAAAAAAAA/wEACP/3cGFja2FnZS9wYWNrYWdlLmpzb24AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADAwMDA2NDQgMDAwMDAwMCAwMDAwMDAwIDAwMDAwMDAwMTUzIDAwMDAwMDAwMDAwIDAxMzQyNQAgMAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB1c3RhcgAwMAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAwMDAwMDAwIDAwMDAwMDAgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB7Im5hbWUiOiJjb250cmFjdC1hYnNlbnQtcGFja2FnZSIsInZlcnNpb24iOiIyMTAwLjEuMCIsImRlc2NyaXB0aW9uIjoiYSBjb250cmFjdCBwYWNrYWdlIiwibGljZW5zZSI6Ik1JVCJ9CgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAoW4tyAAgAAA==",
+                "length": 2071
+              }
+            }
+          },
+          "status": 201,
+          "file": "no-npm-package-with-the-given-name/putNpmPackage.json",
+          "frozen": {
+            "ids": [],
+            "instants": [],
             "strings": [],
             "listFilteredTo": null
           }

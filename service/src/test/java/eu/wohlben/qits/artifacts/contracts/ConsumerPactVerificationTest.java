@@ -9,7 +9,6 @@ import au.com.dius.pact.provider.ProviderResponse;
 import au.com.dius.pact.provider.junit5.HttpTestTarget;
 import au.com.dius.pact.provider.junit5.PactVerificationContext;
 import au.com.dius.pact.provider.junit5.PactVerificationInvocationContextProvider;
-import au.com.dius.pact.provider.junitsupport.IgnoreNoPactsToVerify;
 import au.com.dius.pact.provider.junitsupport.Provider;
 import au.com.dius.pact.provider.junitsupport.State;
 import au.com.dius.pact.provider.junitsupport.loader.PactSource;
@@ -34,9 +33,10 @@ import org.junit.jupiter.api.extension.ExtendWith;
  * pins that jar as a test dependency, and qits-maintenance bumps the pin when the consumer releases
  * a changed pact. {@link ClasspathPactLoader} finds them all.
  *
- * <p><b>No consumer pins a pact yet</b>, so {@code @IgnoreNoPactsToVerify} lets an empty classpath
- * pass and the loader logs that nothing was verified. When the first consumer's pact jar is pinned,
- * drop the annotation and set {@link ClasspathPactLoader#REQUIRED} to true.
+ * <p><b>The pinned pacts</b> are in {@code service/pom.xml}: qits-docs-service's (its {@code
+ * DocsUpstream} reads of the docs sites). {@link ClasspathPactLoader#REQUIRED} is true, so a
+ * classpath that lost them fails rather than verifying nothing. A newly published consumer pact
+ * against this provider is pinned there the same way.
  *
  * <p>Each interaction runs against this {@code @QuarkusTest} application over real HTTP, as the
  * {@code %test} synthetic user — exactly as {@link GoldenMasterRecordingTest}'s calls run. Every
@@ -46,7 +46,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 @QuarkusTest
 @Provider(ConsumerPactVerificationTest.PROVIDER)
 @PactSource(ClasspathPactLoader.class)
-@IgnoreNoPactsToVerify
 class ConsumerPactVerificationTest {
 
   /** The provider's name in a pact: the repository name, not the application name. */
@@ -64,9 +63,6 @@ class ConsumerPactVerificationTest {
 
   @BeforeEach
   void target(PactVerificationContext context, Pact pact, Interaction interaction) {
-    if (context == null) {
-      return; // no pact to verify: @IgnoreNoPactsToVerify's single empty run
-    }
     String consumer = pact.getConsumer().getName();
     for (ProviderState state : interaction.getProviderStates()) {
       if (!states.names().contains(state.getName())) {
@@ -99,9 +95,7 @@ class ConsumerPactVerificationTest {
   @TestTemplate
   @ExtendWith(PactVerificationInvocationContextProvider.class)
   void consumerPactHolds(PactVerificationContext context) {
-    if (context != null) {
-      context.verifyInteraction();
-    }
+    context.verifyInteraction();
   }
 
   /**
@@ -194,5 +188,35 @@ class ConsumerPactVerificationTest {
   @State(ProviderStates.UNPINNED_IDENTITIES)
   Map<String, String> unpinnedIdentities() {
     return states.params(ProviderStates.UNPINNED_IDENTITIES);
+  }
+
+  @State(ProviderStates.A_MAVEN_ARTIFACT)
+  Map<String, String> aMavenArtifact() {
+    return states.params(ProviderStates.A_MAVEN_ARTIFACT);
+  }
+
+  @State(ProviderStates.NO_MAVEN_ARTIFACT)
+  Map<String, String> noMavenArtifact() {
+    return states.params(ProviderStates.NO_MAVEN_ARTIFACT);
+  }
+
+  @State(ProviderStates.AN_NPM_PACKAGE)
+  Map<String, String> anNpmPackage() {
+    return states.params(ProviderStates.AN_NPM_PACKAGE);
+  }
+
+  @State(ProviderStates.NO_NPM_PACKAGE)
+  Map<String, String> noNpmPackage() {
+    return states.params(ProviderStates.NO_NPM_PACKAGE);
+  }
+
+  @State(ProviderStates.AN_IMAGE)
+  Map<String, String> anImage() {
+    return states.params(ProviderStates.AN_IMAGE);
+  }
+
+  @State(ProviderStates.NO_IMAGE)
+  Map<String, String> noImage() {
+    return states.params(ProviderStates.NO_IMAGE);
   }
 }

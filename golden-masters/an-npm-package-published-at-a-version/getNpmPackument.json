@@ -1,0 +1,21 @@
+{
+  "_id": "contract-package",
+  "name": "contract-package",
+  "dist-tags": {
+    "latest": "2100.1.0"
+  },
+  "versions": {
+    "2100.1.0": {
+      "name": "contract-package",
+      "version": "2100.1.0",
+      "description": "a contract package",
+      "license": "MIT",
+      "_id": "contract-package@2100.1.0",
+      "dist": {
+        "shasum": "0be49e285beabad5e2e218d1b358c2736fbe229b",
+        "integrity": "sha512-nLg9gmADv09Ex/pGJNEuVqAD4kxOnnPbJQ5SaoXj6W9OwVvux9HxNxEV/FiTC3QFdMFmrZ8OdUyDEbP1V23mMA==",
+        "tarball": ""
+      }
+    }
+  }
+}
