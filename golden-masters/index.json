@@ -437,7 +437,9 @@
           "status": 200,
           "file": "a-registry-with-unpinned-identities/sweepGc.json",
           "frozen": {
-            "ids": [],
+            "ids": [
+              "$.runId"
+            ],
             "instants": [
               "$.executedAt",
               "$.pins[*].readAt"

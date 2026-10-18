@@ -1075,7 +1075,41 @@ first, the user reviewed it, and only then did the execute route land. Nothing e
 GET  /artifacts/api/gc/plan     what every type's strategy would delete, and what a sweep would unlink
 POST /artifacts/api/gc/plan     the same report, over pins supplied in the body
 POST /artifacts/api/gc/sweep    execute exactly that, once, and answer with the receipt
+GET  /artifacts/api/gc/condemned                              what sweeps have condemned and not yet purged
+POST /artifacts/api/gc/condemned/{type}/{identity}/restore    lift one condemnation (?repository= narrows it)
 ```
+
+**A sweep condemns before it deletes (qits-1172).** What a run's plan finds dead is not deleted on
+that run: it is *condemned* — one row in `gc_condemned` (type, repository, identity, `condemned_at`,
+`run_id`), nothing of the identity touched, every read and download answering as before, its blobs
+kept on the retained side of the reconciliation. A later run *purges* it — the delete path below,
+unchanged — only once the condemnation is older than `qits.artifacts.gc.condemn-grace-period`
+(`P1D`) **and** that run's own plan still finds it dead; the blob grace still applies on top. A run
+whose keep-set names a condemned identity again lifts the condemnation by itself (`cleared` on the
+receipt). Before this, the only clock was the blob grace — the age of the *bytes* — so an old
+version left out of one run's keep-set by a wrong pin answer went in one run, unrecoverably.
+
+- Condemnation is **per type and per scope**: a scoped sweep reads, writes and lifts its own
+  repository's condemnations only. A type whose strategy refused changes none, and an **aborted**
+  run changes none at all — it ends before any plan exists.
+- `GET /gc/condemned` lists every standing condemnation with `type`, `repository`, `identity`,
+  `condemnedAt`, `runId` (the receipt's `runId`) and `purgeAt` (= `condemnedAt` + grace). The dry-run
+  marks the dead identities already condemned in each type's `condemned`; the rest of `dead` would
+  merely be condemned by a sweep now.
+- The restore takes the identity as the **rest of the path** up to the literal `/restore`, decoded,
+  so `npm/@qits/x@2026.1.0` and `g:a:v` may be sent raw or percent-encoded (`%2F`, `%40`). Without
+  `?repository=` it lifts the identity in every repository of the type — the one direction a missing
+  parameter may widen a GC call, because a restore deletes nothing. `qits:system`, like the sweep;
+  `404` when nothing is condemned under that name.
+- **A restore buys time, not retention.** If the next sweep still finds the identity dead it is
+  condemned again with a fresh clock — a full grace before any purge, and back on the list — and
+  the receipt's `note` says so. What makes it stay is the pin source that should have named it.
+- Each sweep's log line per type reads `condemned N, cleared C, purged P identities, awaiting purge
+  A, withheld W by grace, E errors`. The receipt keeps `deleted` (= purged) and
+  `withheldByGraceWindow` as they were and adds `runId`, `condemnGracePeriod` and, per type,
+  `condemned`, `cleared` and `awaitingPurge`.
+- `PT0S` gives back the one-phase collector (condemn and purge in one run) — an escape hatch for a
+  disk emergency, never a default.
 
 The sweep computes its own plan inside the request — there is no way to submit one, because a
 stored plan is a plan on stale facts, and a plan on stale facts deletes a running image (the OCI
@@ -1876,6 +1910,7 @@ app's `application.properties` overrides them.
 | Key | Default | What |
 |---|---|---|
 | `qits.artifacts.blobs-dir` | `~/.qits/data/artifacts/blobs` | content-addressed blob bytes |
+| `qits.artifacts.gc.condemn-grace-period` | `P1D` | how long a sweep's condemnation of a dead identity must stand before a later sweep may purge it (qits-1172) — the time a wrong keep-set answer stays reversible. In the `gc` jar, beside the code that reads it; see "Garbage collection" |
 | `qits.artifacts.gc.blob-grace-period` | `PT6H` | how long a blob file must sit untouched before the sweep may unlink it — see "Garbage collection". With the access windows at zero this is the only clock left, and it is race safety for a just-pushed artifact rather than retention: it gates identity rows as well as blob unlinks |
 | `qits.artifacts.gc.pins.cd-base-url` | `http://qits-cd:8080/cd/api` | where a run reads the image shas deployments pin (`GET /cd/api/pins`). **Renamed** from `qits.artifacts.gc.oci.cd-base-url` |
 | `qits.artifacts.gc.pins.cd-timeout` | `PT10S` | per-request timeout on that fetch. **Renamed** from `qits.artifacts.gc.oci.cd-timeout` |

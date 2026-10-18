@@ -74,5 +74,7 @@
     "stillReferenced": 0,
     "alreadyGone": 0,
     "unlinkedBlobIds": []
-  }
+  },
+  "runId": "00000000-0000-4000-8000-000000000001",
+  "condemnGracePeriod": "P1D"
 }

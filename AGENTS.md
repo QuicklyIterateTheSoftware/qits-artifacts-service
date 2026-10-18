@@ -382,6 +382,20 @@ collection" section is the contract; these are the rules that get "helpfully" re
   `POST /artifacts/api/gc/sweep`) applies only plans it computed in the same request, and on a
   store younger than the window a sweep provably deletes nothing.
 
+- **A sweep condemns, a later sweep purges (qits-1172), and the gate is the executor's, not an
+  adapter's.** `GcSweepExecutor.condemn` reconciles `gc_condemned` (V5, plain JDBC in
+  `GcCondemnations` — no entity, because the persistence unit's packages are the `artifacts` jar's
+  to name) against the run's dead set per `(type, scope)`: lift what is no longer dead, condemn what
+  is newly dead, and hand `apply` and `BlobSweep` only `Plan.purging(ripe)` — the identities
+  condemned at least `qits.artifacts.gc.condemn-grace-period` (`P1D`) ago, with every
+  still-condemned identity's blobs moved to the retained side via the engine's
+  `releasedByIdentity`. No adapter changed, because every delete loop acts on `plan.dead()` alone;
+  do not push condemnation down into an adapter. A table rather than a column per type table,
+  because most identities are not one row (a maven coordinate, an OCI tag, a docs version) and most
+  of those tables are mapped by the `qits-registries-*` jars. The suites cross the day by ageing
+  the rows (`GcFixture.ageCondemnationsPastGrace`), as they cross the blob grace by `backdate`;
+  `sweptPastCondemnation` is the shortest honest route to a purge for a case that is about the
+  purge.
 - **Live pins are read once per run, and a source that cannot answer aborts the whole run.**
   `GcPinSources` reads five sources at the start of every plan and every sweep, never cached, and
   folds them into one `GcPins`: qits-platform-deployments (`GET /deployments/api/pins`,
