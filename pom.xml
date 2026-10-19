@@ -119,7 +119,7 @@
              scope, EXACT, never a range; qits-maintenance bumps the pin when the consumer releases
              a changed pact. -->
         <qits.docs-service-pacts-qits-artifacts-service.version>2026.1010.143012</qits.docs-service-pacts-qits-artifacts-service.version>
-        <qits.ci-service-pacts-qits-artifacts-service.version>2026.1018.180637</qits.ci-service-pacts-qits-artifacts-service.version>
+        <qits.ci-service-pacts-qits-artifacts-service.version>2026.1019.100328</qits.ci-service-pacts-qits-artifacts-service.version>
         <qits.bootstrap-cli-pacts-qits-artifacts-service.version>2026.1019.84610</qits.bootstrap-cli-pacts-qits-artifacts-service.version>
         <qits.maintenance-service-pacts-qits-artifacts-service.version>2026.1019.73752</qits.maintenance-service-pacts-qits-artifacts-service.version>
         <qits.orchestrator-service-pacts-qits-artifacts-service.version>2026.1019.92500</qits.orchestrator-service-pacts-qits-artifacts-service.version>
@@ -133,7 +133,7 @@
         <qits.maintenance-golden-masters.version>2026.1018.165353</qits.maintenance-golden-masters.version>
         <qits.workspaces-golden-masters.version>2026.1019.95426</qits.workspaces-golden-masters.version>
         <qits.projects-golden-masters.version>2026.1018.195756</qits.projects-golden-masters.version>
-        <qits.idp-golden-masters.version>2026.1018.175524</qits.idp-golden-masters.version>
+        <qits.idp-golden-masters.version>2026.1019.100619</qits.idp-golden-masters.version>
         <qits.maven.repository.url>https://registry.qits.wohlben.eu/artifacts/maven/maven</qits.maven.repository.url>
         <maven.compiler.release>25</maven.compiler.release>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
