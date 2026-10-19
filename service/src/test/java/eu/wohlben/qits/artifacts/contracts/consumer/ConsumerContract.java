@@ -267,9 +267,8 @@ public final class ConsumerContract {
               Request.NONE,
               base -> SigningKeys.read(base + "/idp/jwks"),
               "$.keys"),
-          // A refused credential: the relay answers the docker client's 401 challenge and mints
-          // nothing. Recorded by qits-idp-service on ticket/qits-1149 (qits-idp-service-rr-71),
-          // not yet in a published qits-idp-golden-masters.
+          // A refused credential: idp answers 401, and the relay hands the docker client a 401 of
+          // its own and mints nothing. A status, so it reads no body.
           new Row(
               IDP,
               REGISTRY_TOKEN,
@@ -278,8 +277,7 @@ public final class ConsumerContract {
               List.of(),
               IDP_TOKEN_REQUEST,
               null,
-              "$",
-              "qits-idp-golden-masters newer than 2026.1012.180836 (qits-idp-service-rr-71)"));
+              "$"));
 
   private ConsumerContract() {}
 
