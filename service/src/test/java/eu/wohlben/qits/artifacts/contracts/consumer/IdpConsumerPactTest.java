@@ -76,7 +76,9 @@ class IdpConsumerPactTest {
       }
       Map<String, String> params = masters.params(row.state());
       V4Pact pact = ConsumerContract.pact(provider, List.of(row));
-      JsonNode recorded = ConsumerPactTest.answered(pact, row);
+      // A refusal is a status and carries no body the relay reads: it must answer 401, mint nothing.
+      boolean refused = masters.operation(row.state(), row.operationId()).status() >= 300;
+      JsonNode recorded = refused ? null : ConsumerPactTest.answered(pact, row);
       PactVerificationResult result =
           ConsumerPactRunnerKt.runConsumerTest(
               pact,
@@ -87,6 +89,13 @@ class IdpConsumerPactTest {
                         .header("Authorization", params.get("authorization"))
                         .when()
                         .get("/artifacts/token");
+                if (refused) {
+                  assertEquals(401, answer.statusCode(), answer.asString());
+                  assertEquals(
+                      "the identity provider refused these credentials",
+                      answer.path("errors[0].message"));
+                  return null;
+                }
                 assertEquals(200, answer.statusCode(), answer.asString());
                 assertEquals(recorded.path("access_token").asText(), answer.path("token"));
                 assertEquals(

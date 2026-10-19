@@ -144,6 +144,89 @@
         }
       },
       "description": "getRegistryToken: issueToken",
+      "key": "99f4f985",
+      "pending": false,
+      "providerStates": [
+        {
+          "name": "a service client presenting a wrong secret",
+          "params": {
+            "audience": "qits-platform",
+            "authorization": "Basic dGVzdC1icm9hZDpub3QtdGVzdC1icm9hZC1zZWNyZXQ=",
+            "callerClientId": "test-broad"
+          }
+        }
+      ],
+      "request": {
+        "body": {
+          "content": "grant_type=client_credentials",
+          "contentType": "application/x-www-form-urlencoded",
+          "contentTypeHint": "DEFAULT",
+          "encoded": false
+        },
+        "generators": {
+          "header": {
+            "Authorization": {
+              "dataType": "RAW",
+              "expression": "${authorization}",
+              "type": "ProviderState"
+            }
+          }
+        },
+        "headers": {
+          "Accept": [
+            "application/json"
+          ],
+          "Authorization": [
+            "Basic dGVzdC1icm9hZDpub3QtdGVzdC1icm9hZC1zZWNyZXQ="
+          ],
+          "Content-Type": [
+            "application/x-www-form-urlencoded"
+          ],
+          "content-type": [
+            "application/x-www-form-urlencoded"
+          ]
+        },
+        "method": "POST",
+        "path": "/idp/token"
+      },
+      "response": {
+        "headers": {
+          "Content-Type": [
+            "application/json"
+          ]
+        },
+        "matchingRules": {
+          "header": {
+            "Content-Type": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "application/json.*"
+                }
+              ]
+            }
+          }
+        },
+        "status": 401
+      },
+      "type": "Synchronous/HTTP"
+    },
+    {
+      "comments": {
+        "references": {
+          "qits-call": {
+            "app": "qits-idp-service",
+            "operationId": "issueToken"
+          },
+          "qits-trigger": {
+            "app": "qits-artifacts-service",
+            "kind": "operation",
+            "operationId": "getRegistryToken"
+          }
+        }
+      },
+      "description": "getRegistryToken: issueToken",
       "key": "f4d1dd0a",
       "pending": false,
       "providerStates": [
