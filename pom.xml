@@ -120,8 +120,8 @@
              a changed pact. -->
         <qits.docs-service-pacts-qits-artifacts-service.version>2026.1010.143012</qits.docs-service-pacts-qits-artifacts-service.version>
         <qits.ci-service-pacts-qits-artifacts-service.version>2026.1018.180637</qits.ci-service-pacts-qits-artifacts-service.version>
-        <qits.bootstrap-cli-pacts-qits-artifacts-service.version>2026.1019.73740</qits.bootstrap-cli-pacts-qits-artifacts-service.version>
-        <qits.maintenance-service-pacts-qits-artifacts-service.version>2026.1018.165353</qits.maintenance-service-pacts-qits-artifacts-service.version>
+        <qits.bootstrap-cli-pacts-qits-artifacts-service.version>2026.1019.84610</qits.bootstrap-cli-pacts-qits-artifacts-service.version>
+        <qits.maintenance-service-pacts-qits-artifacts-service.version>2026.1019.73752</qits.maintenance-service-pacts-qits-artifacts-service.version>
         <qits.orchestrator-service-pacts-qits-artifacts-service.version>2026.1018.172917</qits.orchestrator-service-pacts-qits-artifacts-service.version>
         <qits.platform-access-cli-pacts-qits-artifacts-service.version>2026.1019.65035</qits.platform-access-cli-pacts-qits-artifacts-service.version>
         <!-- THE PROVIDERS' GOLDEN MASTERS this service's OWN consumer pacts read (contracts/consumer,
