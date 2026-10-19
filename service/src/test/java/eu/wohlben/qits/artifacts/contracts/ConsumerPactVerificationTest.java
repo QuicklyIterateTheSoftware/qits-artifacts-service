@@ -79,22 +79,8 @@ class ConsumerPactVerificationTest {
     }
   }
 
-  private static final String SBOM_AS_PLAIN_JSON =
-      "the pact expects Content-Type application/json and a body of that type, but the golden"
-          + " master it was built from (state 'an sbom published for the coordinate') answers"
-          + " application/vnd.cyclonedx+json; version=1.6 — qits-pact-consumer before"
-          + " 2026.1018.164604 writes every JSON body as application/json. The fix comes as a new"
-          + " qits-maintenance-service-pacts-qits-artifacts-service version built on that helper"
-          + " (ticket qits-1149)";
-
-  static final List<KnownWrong> KNOWN_WRONG =
-      List.of(
-          new KnownWrong(
-              "qits-maintenance-service",
-              "2026.1018.165353",
-              "SoftwareRelease: getSbom",
-              ProviderStates.AN_SBOM,
-              SBOM_AS_PLAIN_JSON));
+  /** Empty today: every pinned interaction verifies. */
+  static final List<KnownWrong> KNOWN_WRONG = List.of();
 
   @Inject ProviderStates states;
 
