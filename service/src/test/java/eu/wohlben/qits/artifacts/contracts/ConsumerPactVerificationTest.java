@@ -20,6 +20,7 @@ import java.net.URL;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.TestTemplate;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -34,10 +35,16 @@ import org.junit.jupiter.api.extension.ExtendWith;
  * a changed pact. {@link ClasspathPactLoader} finds them all.
  *
  * <p><b>The pinned pacts</b> are in {@code service/pom.xml}: qits-docs-service's (its {@code
- * DocsUpstream} reads of the docs sites) and qits-ci-service's ({@code HttpArtifactPresence}'s
- * newest-content-hash read of a release). {@link ClasspathPactLoader#REQUIRED} is true, so a
- * classpath that lost them fails rather than verifying nothing. A newly published consumer pact
- * against this provider is pinned there the same way.
+ * DocsUpstream} reads of the docs sites), qits-ci-service's ({@code HttpArtifactPresence}'s
+ * newest-content-hash read of a release), qits-bootstrap-cli's, qits-maintenance-service's,
+ * qits-orchestrator-service's (the scheduled GC) and qits-platform-access-cli's. {@link
+ * ClasspathPactLoader#REQUIRED} is true, so a classpath that lost them fails rather than verifying
+ * nothing. A newly published consumer pact against this provider is pinned there the same way.
+ *
+ * <p><b>A pinned pact that is wrong is named in {@link #KNOWN_WRONG}, by its jar's version</b>, and
+ * its interaction is reported as skipped with the reason — never answered by bending the provider
+ * to it. The entry is for that version alone: the bump that carries the consumer's fix verifies the
+ * interaction for real, and a bump that does not fix it goes red here, which is the point.
  *
  * <p>Each interaction runs against this {@code @QuarkusTest} application over real HTTP, as the
  * {@code %test} synthetic user — exactly as {@link GoldenMasterRecordingTest}'s calls run. Every
@@ -56,6 +63,38 @@ class ConsumerPactVerificationTest {
     // pact-jvm reports usage metrics over the network unless told not to; a test never should.
     System.setProperty("pact_do_not_track", "true");
   }
+
+  /**
+   * A pinned pact interaction this provider cannot honour, and why: the consumer must fix it. The
+   * state is part of the name, since one description often covers both a found and a missing case.
+   */
+  record KnownWrong(
+      String consumer, String version, String description, String state, String reason) {
+
+    boolean names(Pact pact, Interaction interaction) {
+      return consumer.equals(pact.getConsumer().getName())
+          && description.equals(interaction.getDescription())
+          && interaction.getProviderStates().stream().anyMatch(s -> state.equals(s.getName()))
+          && String.valueOf(pact.getSource()).contains("/" + version + "/");
+    }
+  }
+
+  private static final String SBOM_AS_PLAIN_JSON =
+      "the pact expects Content-Type application/json and a body of that type, but the golden"
+          + " master it was built from (state 'an sbom published for the coordinate') answers"
+          + " application/vnd.cyclonedx+json; version=1.6 — qits-pact-consumer before"
+          + " 2026.1018.164604 writes every JSON body as application/json. The fix comes as a new"
+          + " qits-maintenance-service-pacts-qits-artifacts-service version built on that helper"
+          + " (ticket qits-1149)";
+
+  static final List<KnownWrong> KNOWN_WRONG =
+      List.of(
+          new KnownWrong(
+              "qits-maintenance-service",
+              "2026.1018.165353",
+              "SoftwareRelease: getSbom",
+              ProviderStates.AN_SBOM,
+              SBOM_AS_PLAIN_JSON));
 
   @Inject ProviderStates states;
 
@@ -88,6 +127,13 @@ class ConsumerPactVerificationTest {
                 + interaction.getDescription()
                 + "' carries no comments.references."
                 + key);
+      }
+    }
+    for (KnownWrong wrong : KNOWN_WRONG) {
+      if (wrong.names(pact, interaction)) {
+        Assumptions.abort(
+            consumer + " " + wrong.version() + " '" + interaction.getDescription() + "': "
+                + wrong.reason());
       }
     }
     context.setTarget(new RawPathTarget(base.getHost(), base.getPort()));
