@@ -122,8 +122,8 @@
         <qits.ci-service-pacts-qits-artifacts-service.version>2026.1018.180637</qits.ci-service-pacts-qits-artifacts-service.version>
         <qits.bootstrap-cli-pacts-qits-artifacts-service.version>2026.1019.84610</qits.bootstrap-cli-pacts-qits-artifacts-service.version>
         <qits.maintenance-service-pacts-qits-artifacts-service.version>2026.1019.73752</qits.maintenance-service-pacts-qits-artifacts-service.version>
-        <qits.orchestrator-service-pacts-qits-artifacts-service.version>2026.1018.172917</qits.orchestrator-service-pacts-qits-artifacts-service.version>
-        <qits.platform-access-cli-pacts-qits-artifacts-service.version>2026.1019.65035</qits.platform-access-cli-pacts-qits-artifacts-service.version>
+        <qits.orchestrator-service-pacts-qits-artifacts-service.version>2026.1019.92500</qits.orchestrator-service-pacts-qits-artifacts-service.version>
+        <qits.platform-access-cli-pacts-qits-artifacts-service.version>2026.1019.92700</qits.platform-access-cli-pacts-qits-artifacts-service.version>
         <!-- THE PROVIDERS' GOLDEN MASTERS this service's OWN consumer pacts read (contracts/consumer,
              qits-1149): what each pin source and the idp record for their provider states. Test
              scope, read off the classpath by ProviderGoldenMasters. Moved by qits-maintenance like
@@ -131,7 +131,7 @@
         <qits.deployments-golden-masters.version>2026.1010.145913</qits.deployments-golden-masters.version>
         <qits.ci-golden-masters.version>2026.1018.180637</qits.ci-golden-masters.version>
         <qits.maintenance-golden-masters.version>2026.1018.165353</qits.maintenance-golden-masters.version>
-        <qits.workspaces-golden-masters.version>2026.1019.70413</qits.workspaces-golden-masters.version>
+        <qits.workspaces-golden-masters.version>2026.1019.95426</qits.workspaces-golden-masters.version>
         <qits.projects-golden-masters.version>2026.1018.195756</qits.projects-golden-masters.version>
         <qits.idp-golden-masters.version>2026.1018.175524</qits.idp-golden-masters.version>
         <qits.maven.repository.url>https://registry.qits.wohlben.eu/artifacts/maven/maven</qits.maven.repository.url>
