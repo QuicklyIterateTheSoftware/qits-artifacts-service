@@ -136,10 +136,15 @@ public class RegistryTokenEndpoint {
    *
    * <p>A blocking handler, like every other route in this service that does I/O: the relay is one
    * small JSON POST on a worker thread, and a token request is a rare event on a pool of 40.
+   *
+   * <p>UNORDERED — the trailing {@code false} — because a mint touches no state of this service:
+   * it relays one credential to idp and answers. Ordered, it would join the one queue every request
+   * on its event loop shares, waiting out any download parked on a slow client ahead of it, and in
+   * turn holding up every read behind it for as long as idp takes to answer (qits-1510).
    */
   void init(@Observes Router router) {
-    router.get(RegistryChallenge.TOKEN_PATH).blockingHandler(this::token);
-    router.post(RegistryChallenge.TOKEN_PATH).blockingHandler(this::token);
+    router.get(RegistryChallenge.TOKEN_PATH).blockingHandler(this::token, false);
+    router.post(RegistryChallenge.TOKEN_PATH).blockingHandler(this::token, false);
   }
 
   void token(RoutingContext rc) {

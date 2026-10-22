@@ -101,12 +101,24 @@ public class DocsRoutes {
 
     // HEAD is NOT derived from GET by Vert.x — every GET route needs its HEAD twin, or every client
     // that probes before downloading sees a 404.
-    router.headWithRegex(DocsPaths.FILE).blockingHandler(guarded("head file", rc -> serve(rc, false)));
-    router.getWithRegex(DocsPaths.FILE).blockingHandler(guarded("get file", rc -> serve(rc, true)));
+    //
+    // Every read is registered UNORDERED — the trailing `false` — and the publish keeps the ordered
+    // default: ordered tasks of one event loop run one at a time from a queue every request on that
+    // loop shares, so a read parked on a slow client would hold up every read behind it (qits-1510).
+    router
+        .headWithRegex(DocsPaths.FILE)
+        .blockingHandler(guarded("head file", rc -> serve(rc, false)), false);
+    router
+        .getWithRegex(DocsPaths.FILE)
+        .blockingHandler(guarded("get file", rc -> serve(rc, true)), false);
 
-    router.getWithRegex(DocsPaths.BUNDLE).blockingHandler(guarded("get version", this::version));
-    router.getWithRegex(DocsPaths.SITE).blockingHandler(guarded("list versions", this::versions));
-    router.getWithRegex(DocsPaths.SITES).blockingHandler(guarded("list sites", this::sites));
+    router
+        .getWithRegex(DocsPaths.BUNDLE)
+        .blockingHandler(guarded("get version", this::version), false);
+    router
+        .getWithRegex(DocsPaths.SITE)
+        .blockingHandler(guarded("list versions", this::versions), false);
+    router.getWithRegex(DocsPaths.SITES).blockingHandler(guarded("list sites", this::sites), false);
 
     // The publish PUT streams rather than buffers, for the two reasons OciRequestBody exists: a
     // BodyHandler would cap at 10 MiB, and a raw HttpServerRequest read is bounded by nothing.

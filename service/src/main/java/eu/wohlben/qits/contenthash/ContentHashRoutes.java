@@ -58,12 +58,16 @@ public class ContentHashRoutes {
 
   void init(@Observes Router router) {
     // HEAD is NOT derived from GET by Vert.x — the twin is registered explicitly, as on every wire.
+    //
+    // UNORDERED — the trailing `false` — like every read in this service: ordered tasks of one event
+    // loop run one at a time from a queue every request on that loop shares, so this lookup would
+    // otherwise wait out any download parked on a slow client ahead of it (qits-1510).
     router
         .headWithRegex(ContentHashPaths.VERSIONED)
-        .blockingHandler(guarded("head content hash", rc -> serve(rc, false)));
+        .blockingHandler(guarded("head content hash", rc -> serve(rc, false)), false);
     router
         .getWithRegex(ContentHashPaths.VERSIONED)
-        .blockingHandler(guarded("get content hash", rc -> serve(rc, true)));
+        .blockingHandler(guarded("get content hash", rc -> serve(rc, true)), false);
 
     // Everything else under the base — an unknown ecosystem included — is a short plain-text 404,
     // never the SPA's HTML.

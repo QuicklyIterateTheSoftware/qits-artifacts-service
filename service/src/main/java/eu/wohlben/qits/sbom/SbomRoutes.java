@@ -113,14 +113,20 @@ public class SbomRoutes {
 
     // HEAD is NOT derived from GET by Vert.x — every GET route needs its HEAD twin, or every client
     // that probes before downloading sees a 404.
+    //
+    // Every read is registered UNORDERED — the trailing `false` — and the publish keeps the ordered
+    // default: ordered tasks of one event loop run one at a time from a queue every request on that
+    // loop shares, so a read parked on a slow client would hold up every read behind it (qits-1510).
     router
         .headWithRegex(SbomPaths.DOCUMENT)
-        .blockingHandler(guarded("head document", rc -> serve(rc, false)));
+        .blockingHandler(guarded("head document", rc -> serve(rc, false)), false);
     router
         .getWithRegex(SbomPaths.DOCUMENT)
-        .blockingHandler(guarded("get document", rc -> serve(rc, true)));
+        .blockingHandler(guarded("get document", rc -> serve(rc, true)), false);
 
-    router.getWithRegex(SbomPaths.PACKAGE).blockingHandler(guarded("list versions", this::versions));
+    router
+        .getWithRegex(SbomPaths.PACKAGE)
+        .blockingHandler(guarded("list versions", this::versions), false);
 
     // The publish PUT streams rather than buffers off the request, for the two reasons
     // OciRequestBody exists: a BodyHandler would cap at 10 MiB, and a raw HttpServerRequest read is

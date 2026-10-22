@@ -89,12 +89,19 @@ public class DaemonRoutes {
   void init(@Observes Router router) {
     // HEAD is NOT derived from GET by Vert.x — every GET route needs its HEAD twin, or every client
     // that probes before downloading sees a 404.
+    //
+    // Both reads are registered UNORDERED — the trailing `false` — and the publish keeps the
+    // ordered default. An ordered blockingHandler does not get a worker of its own: its tasks join
+    // one queue per event loop, shared by every request on that loop (Quarkus' duplicated contexts
+    // share it too), and run one at a time. BlobSender holds its worker for the whole transfer,
+    // parked on the client's drain, so behind an ordered 43 MB download to a slow curl every later
+    // read on that loop — /v2 manifest HEADs included — waited out the transfer (qits-1510).
     router
         .headWithRegex(DaemonPaths.BINARY)
-        .blockingHandler(guarded("head binary", rc -> serve(rc, false)));
+        .blockingHandler(guarded("head binary", rc -> serve(rc, false)), false);
     router
         .getWithRegex(DaemonPaths.BINARY)
-        .blockingHandler(guarded("get binary", rc -> serve(rc, true)));
+        .blockingHandler(guarded("get binary", rc -> serve(rc, true)), false);
 
     // The publish PUT streams rather than buffers: a BodyHandler would hold 43 MB in memory AND cap
     // it at 10 MiB, and a raw HttpServerRequest read is bounded by nothing — the two rules
