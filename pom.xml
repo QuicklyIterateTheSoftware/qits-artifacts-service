@@ -120,7 +120,7 @@
              a changed pact. -->
         <qits.docs-service-pacts-qits-artifacts-service.version>2026.1010.143012</qits.docs-service-pacts-qits-artifacts-service.version>
         <qits.ci-service-pacts-qits-artifacts-service.version>2026.1019.100328</qits.ci-service-pacts-qits-artifacts-service.version>
-        <qits.bootstrap-cli-pacts-qits-artifacts-service.version>2026.1019.84610</qits.bootstrap-cli-pacts-qits-artifacts-service.version>
+        <qits.bootstrap-cli-pacts-qits-artifacts-service.version>2026.1023.225504</qits.bootstrap-cli-pacts-qits-artifacts-service.version>
         <qits.maintenance-service-pacts-qits-artifacts-service.version>2026.1019.73752</qits.maintenance-service-pacts-qits-artifacts-service.version>
         <qits.orchestrator-service-pacts-qits-artifacts-service.version>2026.1019.92500</qits.orchestrator-service-pacts-qits-artifacts-service.version>
         <qits.platform-access-cli-pacts-qits-artifacts-service.version>2026.1019.92700</qits.platform-access-cli-pacts-qits-artifacts-service.version>
