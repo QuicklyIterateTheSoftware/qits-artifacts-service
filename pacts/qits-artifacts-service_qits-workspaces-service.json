@@ -34,13 +34,8 @@
           "content": {
             "pins": [
               {
-                "image": "qits/qits-workspaces-runner",
-                "launches": "runner",
-                "version": "2026.101.120000"
-              },
-              {
-                "image": "qits/qits-workspaces-runner",
-                "launches": "runner",
+                "image": "qits/workspace",
+                "launches": "workspace",
                 "version": "2026.101.120000"
               }
             ]
