@@ -132,7 +132,7 @@
         <qits.ci-golden-masters.version>2026.1026.163551</qits.ci-golden-masters.version>
         <qits.maintenance-golden-masters.version>2026.1023.5649</qits.maintenance-golden-masters.version>
         <qits.workspaces-golden-masters.version>2026.1024.141209</qits.workspaces-golden-masters.version>
-        <qits.projects-golden-masters.version>2026.1025.214027</qits.projects-golden-masters.version>
+        <qits.projects-golden-masters.version>2026.1027.63255</qits.projects-golden-masters.version>
         <qits.idp-golden-masters.version>2026.1022.183304</qits.idp-golden-masters.version>
         <qits.maven.repository.url>https://registry.qits.wohlben.eu/artifacts/maven/maven</qits.maven.repository.url>
         <maven.compiler.release>25</maven.compiler.release>
