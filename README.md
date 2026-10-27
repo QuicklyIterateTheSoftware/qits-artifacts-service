@@ -1084,7 +1084,7 @@ that run: it is *condemned* — one row in `gc_condemned` (type, repository, ide
 `run_id`), nothing of the identity touched, every read and download answering as before, its blobs
 kept on the retained side of the reconciliation. A later run *purges* it — the delete path below,
 unchanged — only once the condemnation is older than `qits.artifacts.gc.condemn-grace-period`
-(`P1D`) **and** that run's own plan still finds it dead; the blob grace still applies on top. A run
+(`PT6H`) **and** that run's own plan still finds it dead; the blob grace still applies on top. A run
 whose keep-set names a condemned identity again lifts the condemnation by itself (`cleared` on the
 receipt). Before this, the only clock was the blob grace — the age of the *bytes* — so an old
 version left out of one run's keep-set by a wrong pin answer went in one run, unrecoverably.
@@ -1910,7 +1910,7 @@ app's `application.properties` overrides them.
 | Key | Default | What |
 |---|---|---|
 | `qits.artifacts.blobs-dir` | `~/.qits/data/artifacts/blobs` | content-addressed blob bytes |
-| `qits.artifacts.gc.condemn-grace-period` | `P1D` | how long a sweep's condemnation of a dead identity must stand before a later sweep may purge it (qits-1172) — the time a wrong keep-set answer stays reversible. In the `gc` jar, beside the code that reads it; see "Garbage collection" |
+| `qits.artifacts.gc.condemn-grace-period` | `PT6H` | how long a sweep's condemnation of a dead identity must stand before a later sweep may purge it (qits-1172) — the time a wrong keep-set answer stays reversible. In the `gc` jar, beside the code that reads it; see "Garbage collection" |
 | `qits.artifacts.gc.blob-grace-period` | `PT6H` | how long a blob file must sit untouched before the sweep may unlink it — see "Garbage collection". With the access windows at zero this is the only clock left, and it is race safety for a just-pushed artifact rather than retention: it gates identity rows as well as blob unlinks |
 | `qits.artifacts.gc.pins.cd-base-url` | `http://qits-cd:8080/cd/api` | where a run reads the image shas deployments pin (`GET /cd/api/pins`). **Renamed** from `qits.artifacts.gc.oci.cd-base-url` |
 | `qits.artifacts.gc.pins.cd-timeout` | `PT10S` | per-request timeout on that fetch. **Renamed** from `qits.artifacts.gc.oci.cd-timeout` |

@@ -387,7 +387,7 @@ collection" section is the contract; these are the rules that get "helpfully" re
   `GcCondemnations` — no entity, because the persistence unit's packages are the `artifacts` jar's
   to name) against the run's dead set per `(type, scope)`: lift what is no longer dead, condemn what
   is newly dead, and hand `apply` and `BlobSweep` only `Plan.purging(ripe)` — the identities
-  condemned at least `qits.artifacts.gc.condemn-grace-period` (`P1D`) ago, with every
+  condemned at least `qits.artifacts.gc.condemn-grace-period` (`PT6H`) ago, with every
   still-condemned identity's blobs moved to the retained side via the engine's
   `releasedByIdentity`. No adapter changed, because every delete loop acts on `plan.dead()` alone;
   do not push condemnation down into an adapter. A table rather than a column per type table,

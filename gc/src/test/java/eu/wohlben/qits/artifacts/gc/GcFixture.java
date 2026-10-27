@@ -179,7 +179,7 @@ abstract class GcFixture {
    * Ages every standing condemnation by the given span — the condemn grace's twin of {@link
    * #backdate}, and for the same reason: a test's condemnations are seconds old, and moving them
    * back exercises the comparison production runs instead of configuring the grace away. The suite
-   * runs on the shipped {@code P1D}.
+   * runs on the shipped {@code PT6H}.
    */
   void ageCondemnations(Duration age) {
     update(

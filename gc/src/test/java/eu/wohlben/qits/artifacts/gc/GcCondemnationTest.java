@@ -38,7 +38,7 @@ import org.junit.jupiter.api.Test;
  * repository's condemnations and nobody else's, an aborted run changes none, and the dry-run shows
  * which dead identities a sweep would purge rather than condemn.
  *
- * <p>The suite runs on the shipped {@code P1D}, and a day is crossed by ageing the condemnation
+ * <p>The suite runs on the shipped {@code PT6H}, and the grace is crossed by ageing the condemnation
  * rows ({@link #ageCondemnationsPastGrace}), the way every GC suite here crosses the blob grace by
  * backdating blobs rather than configuring the window away. Per type, the same promise is asserted
  * once in each adapter suite through {@link #condemnedFirstThenPurged}.
@@ -77,8 +77,8 @@ class GcCondemnationTest extends GcFixture {
     assertEquals(OLD_IDENTITY, waiting.identity());
     assertEquals(first.runId(), waiting.runId(), "the condemnation names the receipt that wrote it");
     assertEquals(first.executedAt(), waiting.condemnedAt());
-    assertEquals(first.executedAt().plus(Duration.ofDays(1)), waiting.purgeAt());
-    assertEquals("P1D", first.condemnGracePeriod());
+    assertEquals(first.executedAt().plus(Duration.ofHours(6)), waiting.purgeAt());
+    assertEquals("PT6H", first.condemnGracePeriod());
     assertTrue(daemonStored(DAEMON_REPO), "the row stands, so the binary is still served");
     assertTrue(blobStore.exists(oldBlob), "and its bytes stay on disk");
     assertEquals(0, first.sweep().blobsUnlinked());
@@ -133,7 +133,7 @@ class GcCondemnationTest extends GcFixture {
     assertEquals(List.of(OLD_IDENTITY), named(recondemned.condemned()));
     assertEquals(List.of(), recondemned.deleted());
     assertEquals(
-        dropped.executedAt().plus(Duration.ofDays(1)),
+        dropped.executedAt().plus(Duration.ofHours(6)),
         recondemned.awaitingPurge().get(0).purgeAt(),
         "a full grace from the run that condemned it again");
     assertTrue(daemonStored(DAEMON_REPO));

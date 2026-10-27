@@ -63,14 +63,14 @@ class GcCondemnedControllerTest {
         given().when().get(BASE + "/condemned").then().statusCode(200).extract().jsonPath();
 
     String entry = "condemned.find { it.identity == '" + identity + "' }";
-    org.junit.jupiter.api.Assertions.assertEquals("P1D", listing.getString("condemnGracePeriod"));
+    org.junit.jupiter.api.Assertions.assertEquals("PT6H", listing.getString("condemnGracePeriod"));
     org.junit.jupiter.api.Assertions.assertEquals("sboms", listing.getString(entry + ".type"));
     org.junit.jupiter.api.Assertions.assertEquals(SBOMS, listing.getString(entry + ".repository"));
     org.junit.jupiter.api.Assertions.assertEquals("run-listed", listing.getString(entry + ".runId"));
     org.junit.jupiter.api.Assertions.assertEquals(
         at, Instant.parse(listing.getString(entry + ".condemnedAt")));
     org.junit.jupiter.api.Assertions.assertEquals(
-        at.plus(java.time.Duration.ofDays(1)), Instant.parse(listing.getString(entry + ".purgeAt")));
+        at.plus(java.time.Duration.ofHours(6)), Instant.parse(listing.getString(entry + ".purgeAt")));
 
     restoreDirectly(SbomProfile.KEY, identity);
   }
