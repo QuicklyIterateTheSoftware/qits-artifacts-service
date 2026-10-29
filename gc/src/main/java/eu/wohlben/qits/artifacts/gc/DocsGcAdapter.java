@@ -133,7 +133,8 @@ public class DocsGcAdapter implements GcTypeAdapter {
                 // on the access window alone. See the class javadoc.
                 CALVER.matcher(row.version).matches(),
                 latest(row.publishedAt, row.accessedAt),
-                Set.copyOf(files.listBlobIds(row.repository, row.name, row.version))));
+                Set.copyOf(files.listBlobIds(row.repository, row.name, row.version)),
+                row.publishedAt));
       }
     }
     return List.copyOf(candidates);
@@ -184,9 +185,13 @@ public class DocsGcAdapter implements GcTypeAdapter {
         }
         // Any blob of the bundle still inside the grace window withholds the WHOLE version, because
         // the version is what would be deleted: collecting it would strand that blob as row-less and
-        // therefore untouchable forever, which is the failure the window exists to prevent.
-        if (files.listBlobIds(dead.repository(), name, version).stream()
-            .anyMatch(grace::withinGrace)) {
+        // therefore untouchable forever, which is the failure the window exists to prevent. And a
+        // version published inside the window is withheld whatever its files' age (qits-1732): a
+        // docs version byte-identical to last week's dedupes onto last week's blobs, whose
+        // stored_at does not move, so its row is the only clock that says it just arrived.
+        if (grace.withinGrace(row.publishedAt)
+            || files.listBlobIds(dead.repository(), name, version).stream()
+                .anyMatch(grace::withinGrace)) {
           withheld.add(dead);
           continue;
         }

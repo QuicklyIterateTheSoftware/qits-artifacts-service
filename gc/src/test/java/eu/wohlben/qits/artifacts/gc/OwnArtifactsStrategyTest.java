@@ -151,7 +151,7 @@ class OwnArtifactsStrategyTest {
         new FakeGcTypeAdapter().add("app:old", "app", false, daysAgo(400), "a");
     GcStrategy.Plan plan = engine.plan(adapter, WINDOW, NOW, GcPinned.NONE);
 
-    GcStrategy.Applied applied = adapter.delete(plan, blobId -> false);
+    GcStrategy.Applied applied = adapter.delete(plan, Graces.nothingYoung());
 
     assertSame(plan, adapter.deleted);
     assertEquals(plan.dead(), applied.deleted());

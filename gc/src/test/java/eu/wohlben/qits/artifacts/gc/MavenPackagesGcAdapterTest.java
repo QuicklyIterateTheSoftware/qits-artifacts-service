@@ -74,7 +74,7 @@ class MavenPackagesGcAdapterTest extends GcFixture {
     }
 
     GcStrategy.Plan plan = strategy.plan(census.take(), GcPins.none());
-    GcStrategy.Applied applied = strategy.apply(plan, blobId -> false);
+    GcStrategy.Applied applied = strategy.apply(plan, Graces.nothingYoung());
 
     assertEquals(
         List.of(COORDINATE + "1.0.0", COORDINATE + "1.1.0", COORDINATE + "2.0.0", COORDINATE + "2.1.0"),
@@ -356,7 +356,7 @@ class MavenPackagesGcAdapterTest extends GcFixture {
     String newest = COORDINATE + "1.0.1-20260802.123456-3";
 
     GcStrategy.Plan plan = strategy.plan(census.take(), GcPins.none());
-    GcStrategy.Applied applied = strategy.apply(plan, blobId -> false);
+    GcStrategy.Applied applied = strategy.apply(plan, Graces.nothingYoung());
 
     assertEquals(
         List.of(COORDINATE + "1.0.1-20260601.101010-1", COORDINATE + "1.0.1-20260701.202020-2"),
@@ -467,7 +467,8 @@ class MavenPackagesGcAdapterTest extends GcFixture {
     snapshot("1.0.1", "20260802.123456", 3, "pom", 84, daysAgo(400));
 
     GcStrategy.Plan plan = strategy.plan(census.take(), GcPins.none());
-    GcStrategy.Applied applied = strategy.apply(plan, blobId -> blobId.equals(youngPom));
+    GcStrategy.Applied applied =
+        strategy.apply(plan, Graces.blobsOnly(blobId -> blobId.equals(youngPom)));
 
     assertEquals(List.of(), applied.deleted());
     assertEquals(
@@ -511,7 +512,7 @@ class MavenPackagesGcAdapterTest extends GcFixture {
           List.of(COORDINATE + "1.0.1-20260601.101010-1"),
           identities(plan.dead()),
           "the case only says anything if this set is condemned in the first place");
-      applied = strategy.apply(plan, blobId -> false);
+      applied = strategy.apply(plan, Graces.nothingYoung());
     } finally {
       // Installed mid-method, so it outlives the method unless it is put back by hand — and a
       // MavenRegistryCollection that refuses every pom would fail the rest of this suite silently.
@@ -610,7 +611,7 @@ class MavenPackagesGcAdapterTest extends GcFixture {
     ledger.record("maven", MAVEN_REPO, name, "1.0.0", "v1:sha256:" + "c".repeat(64));
 
     GcStrategy.Plan plan = strategy.plan(census.take(), GcPins.none());
-    GcStrategy.Applied applied = strategy.apply(plan, blobId -> false);
+    GcStrategy.Applied applied = strategy.apply(plan, Graces.nothingYoung());
 
     assertEquals(List.of(COORDINATE + "1.0.1-20260601.101010-1"), identities(applied.deleted()));
     assertTrue(ledger.find("maven", MAVEN_REPO, name, "1.0.1-20260601.101010-1").isEmpty());
@@ -619,10 +620,9 @@ class MavenPackagesGcAdapterTest extends GcFixture {
   }
 
   @Test
-  void aDeadCoordinateIsCondemnedByTheRunThatFindsItAndPurgedOnlyPastTheCondemnGrace()
-      throws Exception {
-    // qits-1172 for this type: a coordinate nothing keeps is condemned whole, every file of it left
-    // standing, and the later run past the grace removes it whole through the same transaction.
+  void aDeadCoordinateIsDeletedWholeByTheFirstRunThatFindsIt() throws Exception {
+    // qits-1732 for this type: a coordinate nothing keeps, its files and rows past the identity
+    // grace, goes whole on the run that finds it dead, every file in the one transaction.
     maven();
     String jar = release("1.0.0", "jar", 21, daysAgo(400));
     String pom = release("1.0.0", "pom", 0, daysAgo(400));
@@ -633,7 +633,7 @@ class MavenPackagesGcAdapterTest extends GcFixture {
     release("3.0.0", "jar", 23, daysAgo(200));
     release("3.0.0", "pom", 0, daysAgo(200));
 
-    condemnedFirstThenPurged(
+    deletedOnTheRunThatFindsIt(
         strategy,
         COORDINATE + "1.0.0",
         () -> {
@@ -641,7 +641,7 @@ class MavenPackagesGcAdapterTest extends GcFixture {
           return mavenArtifacts.findOne(MAVEN_REPO, releasePath("1.0.0", "jar")).isPresent()
               && mavenArtifacts.findOne(MAVEN_REPO, releasePath("1.0.0", "pom")).isPresent();
         });
-    assertFalse(blobStore.exists(jar), "the purge unlinks what it frees, as the one-run sweep did");
+    assertFalse(blobStore.exists(jar), "the run unlinks what it frees");
   }
 
   // --- fixture ---------------------------------------------------------------------------------

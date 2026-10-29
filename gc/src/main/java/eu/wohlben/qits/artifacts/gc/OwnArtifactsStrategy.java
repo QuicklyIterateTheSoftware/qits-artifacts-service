@@ -116,6 +116,7 @@ public final class OwnArtifactsStrategy {
     Set<String> retained = new HashSet<>();
     Map<String, Set<String>> releasedByRepository = new HashMap<>();
     Map<GcStrategy.IdentityKey, Set<String>> releasedByIdentity = new HashMap<>();
+    Map<GcStrategy.IdentityKey, Instant> stampedByIdentity = new HashMap<>();
 
     for (GcCandidate candidate : candidates) {
       String pin = pins.pinnedBy(candidate);
@@ -131,11 +132,14 @@ public final class OwnArtifactsStrategy {
         releasedByRepository
             .computeIfAbsent(candidate.repository(), repository -> new HashSet<>())
             .addAll(candidate.blobs());
-        // And which identity, so a sweep that condemns this one without purging it yet can keep
-        // exactly its bytes on the retained side (GcStrategy.Plan#purging).
-        releasedByIdentity.put(
-            new GcStrategy.IdentityKey(candidate.repository(), candidate.identity()),
-            candidate.blobs());
+        // And which identity, with its own row stamp, so the dry run can withhold it whole the way
+        // a sweep does while its row or any of its bytes is inside the grace (qits-1732).
+        GcStrategy.IdentityKey key =
+            new GcStrategy.IdentityKey(candidate.repository(), candidate.identity());
+        releasedByIdentity.put(key, candidate.blobs());
+        if (candidate.stampedAt() != null) {
+          stampedByIdentity.put(key, candidate.stampedAt());
+        }
       } else {
         keep(candidate, keptAccessed(window), kept, retained);
       }
@@ -146,7 +150,13 @@ public final class OwnArtifactsStrategy {
     return dead.isEmpty()
         ? GcStrategy.Plan.nothingDies(kept, retained)
         : new GcStrategy.Plan(
-            dead, kept, released, retained, releasedByRepository, releasedByIdentity);
+            dead,
+            kept,
+            released,
+            retained,
+            releasedByRepository,
+            releasedByIdentity,
+            stampedByIdentity);
   }
 
   /**

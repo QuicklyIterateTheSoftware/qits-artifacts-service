@@ -278,7 +278,7 @@ class DaemonBinariesGcAdapterTest extends GcFixture {
     daemonRow(CI, "2026.801.30", blob(83), daysAgo(200), null);
 
     GcStrategy.Plan plan = strategy.plan(census.take(), GcPins.none());
-    GcStrategy.Applied applied = strategy.apply(plan, blobId -> false);
+    GcStrategy.Applied applied = strategy.apply(plan, Graces.nothingYoung());
 
     assertEquals(List.of(CI + "@2026.601.10"), identities(applied.deleted()));
     assertEquals(List.of(), applied.errors());
@@ -299,7 +299,8 @@ class DaemonBinariesGcAdapterTest extends GcFixture {
     daemonRow(CI, "2026.801.30", blob(93), daysAgo(200), null);
 
     GcStrategy.Plan plan = strategy.plan(census.take(), GcPins.none());
-    GcStrategy.Applied applied = strategy.apply(plan, blobId -> blobId.equals(doomed));
+    GcStrategy.Applied applied =
+        strategy.apply(plan, Graces.blobsOnly(blobId -> blobId.equals(doomed)));
 
     assertEquals(List.of(), applied.deleted());
     assertEquals(List.of(CI + "@2026.601.10"), identities(applied.withheldByGraceWindow()));

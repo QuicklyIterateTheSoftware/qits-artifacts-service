@@ -27,12 +27,8 @@ import java.util.List;
  * @param sweep the blob unlinks: what was freed, and what was withheld
  * @param untouchable the row-less pool as it stood before this run — restated on every receipt
  *     because it is the list a reviewer checks the ci-daemon binary against
- * @param runId this run's id — what every condemnation it wrote carries as {@code runId}, so a
- *     {@code GET /gc/condemned} entry can be traced to the receipt that condemned it. Present on an
- *     aborted receipt too, which condemned nothing.
- * @param condemnGracePeriod how long a condemnation must stand before a sweep may purge the
- *     identity, ISO-8601 (qits-1172). A sweep condemns what it finds dead and purges only what an
- *     earlier run condemned at least this long ago.
+ * @param runId this run's id, unique per receipt, so a log line, a receipt and whoever quotes it can
+ *     be matched up. Present on an aborted receipt too, which deleted nothing.
  */
 public record GcSweepReport(
     Instant executedAt,
@@ -43,5 +39,4 @@ public record GcSweepReport(
     List<GcTypeSweepResult> types,
     GcSweepOutcome sweep,
     GcUntouchablePool untouchable,
-    String runId,
-    String condemnGracePeriod) {}
+    String runId) {}

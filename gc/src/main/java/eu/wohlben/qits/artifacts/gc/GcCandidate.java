@@ -5,7 +5,7 @@ import java.util.Objects;
 import java.util.Set;
 
 /**
- * One identity of one type, reduced to the five facts a generic engine reads.
+ * One identity of one type, reduced to the facts a generic engine reads.
  *
  * <p>This is the whole translation between a repository type and the two engines. What an identity
  * <em>is</em> — a tag, a version, a deployed path, a record row — stays inside its {@link
@@ -26,6 +26,14 @@ import java.util.Set;
  *     read yet is young rather than never-read, and null therefore never reaches an engine.
  * @param blobs every blob this identity names. The engines put them in the released or the retained
  *     set; which of them may actually be unlinked stays {@link BlobSweep}'s answer alone.
+ * @param stampedAt the identity's <b>own row stamp</b>: when the push that made it this identity
+ *     wrote its row, server-set and moved by no read — {@code oci_tag.updated_at}, {@code
+ *     npm_version.created_at}, and so on per adapter. No rule reads it. It is carried so the dry run
+ *     can judge the identity grace a sweep applies (qits-1732): a dead identity whose row is inside
+ *     the window is withheld whole even when every blob it names is old, because a push that dedupes
+ *     onto bytes the store already held leaves their {@code stored_at} where it was. Null where a
+ *     caller has no row to read it from — a hand-built candidate — and then the identity's youth is
+ *     its blobs' alone.
  */
 public record GcCandidate(
     String repository,
@@ -33,7 +41,8 @@ public record GcCandidate(
     String group,
     boolean released,
     Instant lastAccessAt,
-    Set<String> blobs) {
+    Set<String> blobs,
+    Instant stampedAt) {
 
   public GcCandidate {
     Objects.requireNonNull(repository, "repository");
@@ -44,6 +53,17 @@ public record GcCandidate(
         "lastAccessAt: an adapter must fold creation into the access time, so that a row with no"
             + " read yet reads as young rather than as unknown");
     blobs = Set.copyOf(blobs);
+  }
+
+  /** A candidate without a row stamp — what a hand-built candidate can honestly say. */
+  public GcCandidate(
+      String repository,
+      String identity,
+      String group,
+      boolean released,
+      Instant lastAccessAt,
+      Set<String> blobs) {
+    this(repository, identity, group, released, lastAccessAt, blobs, null);
   }
 
   /** Whether this identity was last touched before the cut — the access rule, said once. */

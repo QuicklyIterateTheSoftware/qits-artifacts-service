@@ -456,7 +456,10 @@ public class MavenPackagesGcAdapter implements GcTypeAdapter {
         errors.add(dead.identity() + ": no such coordinate — the store moved since planning");
         continue;
       }
-      if (unit.blobs().stream().anyMatch(grace::withinGrace)) {
+      // Young if the coordinate's newest file row is OR any of its files is (qits-1732): a deploy
+      // whose files dedupe onto bytes the store already held keeps the old blobs' stored_at, and
+      // the rows it wrote are the only clock that says it just arrived.
+      if (grace.withinGrace(unit.stampedAt()) || unit.blobs().stream().anyMatch(grace::withinGrace)) {
         withheld.add(dead);
         continue;
       }
@@ -600,6 +603,7 @@ public class MavenPackagesGcAdapter implements GcTypeAdapter {
     private final Set<String> blobs = new TreeSet<>();
     private boolean released;
     private Instant lastAccessAt;
+    private Instant stampedAt;
 
     private Unit(String repository, String identity, String group) {
       this.repository = repository;
@@ -621,6 +625,15 @@ public class MavenPackagesGcAdapter implements GcTypeAdapter {
       if (lastAccessAt == null || lastAccessAt.isBefore(access)) {
         lastAccessAt = access;
       }
+      // The coordinate's row stamp is its NEWEST file's created_at: one file deployed a minute ago
+      // makes the whole set young, the same "lives or dies together" the grace applies to bytes.
+      if (stampedAt == null || stampedAt.isBefore(row.createdAt)) {
+        stampedAt = row.createdAt;
+      }
+    }
+
+    private Instant stampedAt() {
+      return stampedAt;
     }
 
     private Set<String> paths() {
@@ -632,7 +645,7 @@ public class MavenPackagesGcAdapter implements GcTypeAdapter {
     }
 
     private GcCandidate candidate() {
-      return new GcCandidate(repository, identity, group, released, lastAccessAt, blobs);
+      return new GcCandidate(repository, identity, group, released, lastAccessAt, blobs, stampedAt);
     }
   }
 }

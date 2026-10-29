@@ -551,7 +551,8 @@ class OciImagesGcAdapterTest extends GcFixture {
     tag("qits-projects", "2026.801.85448", image("qits-projects", config, 702), daysAgo(100));
 
     GcStrategy.Plan plan = strategy.plan(census.take(), GcPins.none());
-    GcStrategy.Applied applied = strategy.apply(plan, blobId -> blobId.equals(doomed));
+    GcStrategy.Applied applied =
+        strategy.apply(plan, Graces.blobsOnly(blobId -> blobId.equals(doomed)));
 
     assertEquals(List.of("qits-projects:" + SHA_A), identities(plan.dead()));
     assertEquals(List.of(), applied.deleted());
@@ -627,19 +628,19 @@ class OciImagesGcAdapterTest extends GcFixture {
         plan.blobsReleased(),
         "every blob the two tags reached — which is the type's whole live set here");
 
-    GcStrategy.Applied applied = strategy.apply(plan, blobId -> false);
+    GcStrategy.Applied applied = strategy.apply(plan, Graces.nothingYoung());
     assertEquals(2, applied.deleted().size());
     ociManifests.getEntityManager().clear();
     assertEquals(2, ociManifests.count(), "the manifests are next run's candidates, not this one's");
   }
 
   @Test
-  void aDeadTagIsCondemnedByTheRunThatFindsItAndPurgedOnlyPastTheCondemnGrace() throws Exception {
-    // qits-1172 for this type: the tag still resolves while it is condemned, so a pull of it is
-    // answered exactly as before; the purge past the grace is the registry's own collectTag.
+  void aDeadTagIsDeletedByTheFirstRunThatFindsIt() throws Exception {
+    // qits-1732 for this type: a tag nothing keeps, its manifest and bytes past the identity grace,
+    // goes on the run that finds it dead, through the registry's own collectTag.
     seed();
 
-    condemnedFirstThenPurged(
+    deletedOnTheRunThatFindsIt(
         strategy,
         "alpha:v1",
         () -> {

@@ -109,7 +109,8 @@ public class DaemonBinariesGcAdapter implements GcTypeAdapter {
                 row.repository + "/" + row.name,
                 true,
                 latest(row.publishedAt, row.accessedAt),
-                Set.of(row.blobId)));
+                Set.of(row.blobId),
+                row.publishedAt));
       }
     }
     return List.copyOf(candidates);
@@ -157,7 +158,10 @@ public class DaemonBinariesGcAdapter implements GcTypeAdapter {
           errors.add(dead.identity() + ": no such daemon row — the store moved since planning");
           continue;
         }
-        if (grace.withinGrace(row.blobId)) {
+        // Young if its row is OR its binary is (qits-1732): a version republished over bytes the
+        // store already held keeps the old blob's stored_at, and its row is the only clock that
+        // says it arrived a minute ago.
+        if (grace.withinGrace(row.publishedAt) || grace.withinGrace(row.blobId)) {
           withheld.add(dead);
           continue;
         }

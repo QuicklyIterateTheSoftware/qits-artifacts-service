@@ -2,18 +2,13 @@ package eu.wohlben.qits.artifacts.api;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import eu.wohlben.qits.blobstore.error.BadRequestException;
-import eu.wohlben.qits.blobstore.error.NotFoundException;
-import eu.wohlben.qits.blobstore.entity.RepositoryTypeProfile;
-import eu.wohlben.qits.artifacts.gc.GcCondemnations;
 import eu.wohlben.qits.artifacts.gc.GcPlanner;
 import eu.wohlben.qits.artifacts.gc.GcSuppliedPins;
 import eu.wohlben.qits.artifacts.gc.GcSweepExecutor;
-import eu.wohlben.qits.artifacts.gc.dto.GcCondemnedListing;
 import eu.wohlben.qits.artifacts.gc.dto.GcPlanReport;
 import eu.wohlben.qits.artifacts.gc.dto.GcRepositoriesPlanResponse;
 import eu.wohlben.qits.artifacts.gc.dto.GcRepositoryPlanReport;
 import eu.wohlben.qits.artifacts.gc.dto.GcRepositorySweepReport;
-import eu.wohlben.qits.artifacts.gc.dto.GcRestoreReceipt;
 import eu.wohlben.qits.artifacts.gc.dto.GcSweepReport;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.GET;
@@ -21,10 +16,7 @@ import jakarta.ws.rs.POST;
 import jakarta.ws.rs.Path;
 import jakarta.ws.rs.PathParam;
 import jakarta.ws.rs.Produces;
-import jakarta.ws.rs.QueryParam;
 import jakarta.ws.rs.core.MediaType;
-import java.time.Duration;
-import java.util.List;
 import org.eclipse.microprofile.openapi.annotations.Operation;
 import org.eclipse.microprofile.openapi.annotations.enums.SchemaType;
 import org.eclipse.microprofile.openapi.annotations.media.Content;
@@ -70,11 +62,11 @@ import org.eclipse.microprofile.openapi.annotations.parameters.RequestBody;
  * unchanged in every respect, and a supplied set never widens what a run may delete: a member left
  * out is that source unanswered, and the run refuses.
  *
- * <p><b>A sweep condemns before it deletes</b> (qits-1172): what a run finds dead is condemned and
- * left whole, and only a later run purges it, once the condemnation is older than {@code
- * qits.artifacts.gc.condemn-grace-period} and that run still finds it dead. {@code GET
- * /gc/condemned} is the list of what is waiting, and {@code POST
- * /gc/condemned/{type}/{identity}/restore} lifts one.
+ * <p><b>A sweep deletes what its own plan finds dead, on that run</b> (qits-1732). The condemn
+ * stage qits-1172 put in front of it — and its {@code GET /gc/condemned} list and {@code POST
+ * /gc/condemned/{type}/{identity}/restore} door — is gone: the keep-set is fail-closed and a run
+ * whose pins are incomplete aborts before the census, so what remains between a dead identity and
+ * its deletion is the identity grace alone, which no review of this page can shorten.
  *
  * <p>The registries' {@code 405} on client deletes is unaffected: no client gains deletion
  * semantics from any of this. The sweep is an operator invocation of an internal process, and its
@@ -87,14 +79,6 @@ public class GcPlanController {
   @Inject GcPlanner planner;
   @Inject GcSweepExecutor executor;
   @Inject ObjectMapper objectMapper;
-  @Inject GcCondemnations condemnations;
-
-  /** The sentence a restore receipt carries — the one thing the person restoring has to act on. */
-  static final String RESTORE_NOTE =
-      "condemnation lifted; if the next sweep's keep-set still leaves this identity dead it is"
-          + " condemned again with a fresh clock and purged no sooner than one full condemn grace"
-          + " after that run. A restore buys time, not retention: the fix is the pin source that"
-          + " should have named it (a manifest on main, a deployment, a launch configuration)";
 
   /**
    * Every repository type, its strategy's plan or the reason it has none, the cross-type sweep, and
@@ -236,71 +220,6 @@ public class GcPlanController {
   public GcRepositorySweepReport repositorySweep(
       @PathParam("repository") String repository, String body) {
     return executor.sweep(repository, suppliedPins(body));
-  }
-
-  /**
-   * Every identity a sweep has condemned and not yet purged — still served, still restorable —
-   * each with the run that condemned it and the first instant a sweep may purge it.
-   *
-   * <p>Reads one table and nothing else: no census, no pin fetch. The same roles as the plan, because
-   * it is the same kind of answer — what the collector is about to do — and the people who most need
-   * to read it are the ones whose artifact is on it.
-   */
-  @GET
-  @Path("/condemned")
-  @Operation(operationId = "listGcCondemned")
-  @jakarta.annotation.security.RolesAllowed({"qits:admin", "qits:agent", "qits:system", "qits:ci-run"})
-  public GcCondemnedListing condemned() {
-    return condemnations.listing();
-  }
-
-  /**
-   * Lifts the condemnation of one identity, so no sweep purges it on the clock it was condemned on.
-   *
-   * <p><b>The identity is the rest of the path</b>, everything between {@code {type}/} and the
-   * trailing {@code /restore}, decoded. Identities carry {@code @}, {@code /} and {@code :} of their
-   * own ({@code @qits/ui-components@1.2.3}, {@code npm/@qits/x@2026.1.0} for an sbom, {@code g:a:v}), and
-   * {@code @} and {@code :} are legal in a path segment as they are. A {@code /} may be sent raw or
-   * as {@code %2F}; both reach this method as the same identity, because the template's last
-   * variable is greedy up to the literal {@code /restore}. {@code type} is the wire spelling
-   * ({@code daemon-binaries}).
-   *
-   * <p>{@code ?repository=} narrows it to one repository. Without it, every repository of the type
-   * in which that identity is condemned is lifted — the only direction in which a missing parameter
-   * may widen a GC call, because a restore never deletes anything.
-   *
-   * <p>{@code qits:system}, exactly as the sweep: a restore changes what the next sweep may delete,
-   * and it sits inside {@code AdminWriteGuard}'s {@code gc} prefix like every other write here. 404
-   * when nothing of that identity is condemned — including an unknown type, which can have no
-   * condemnation.
-   *
-   * <p><b>A restore is not a keep</b>: see {@link #RESTORE_NOTE}, which the receipt carries.
-   */
-  @POST
-  @Path("/condemned/{type}/{identity: .+}/restore")
-  @Operation(operationId = "restoreGcCondemned")
-  @jakarta.annotation.security.RolesAllowed("qits:system")
-  public GcRestoreReceipt restore(
-      @PathParam("type") String type,
-      @PathParam("identity") String identity,
-      @QueryParam("repository") String repository) {
-    Duration grace = condemnations.gracePeriod();
-    List<GcCondemnations.Condemnation> restored =
-        condemnations.restore(
-            RepositoryTypeProfile.keyOfWireName(type),
-            identity,
-            repository == null || repository.isBlank() ? null : repository);
-    if (restored.isEmpty()) {
-      throw new NotFoundException(
-          "no condemnation of "
-              + type
-              + " "
-              + identity
-              + (repository == null || repository.isBlank() ? "" : " in " + repository)
-              + " — GET /gc/condemned lists what is condemned");
-    }
-    return new GcRestoreReceipt(
-        restored.stream().map(condemnation -> condemnation.toWire(grace)).toList(), RESTORE_NOTE);
   }
 
   /**

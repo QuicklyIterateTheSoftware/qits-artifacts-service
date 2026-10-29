@@ -248,7 +248,7 @@ class SbomGcAdapterTest extends GcFixture {
     sbomRow(SBOM_REPO, "npm", NPM_NAME, "2026.801.30", blob(33), daysAgo(200), null);
 
     GcStrategy.Plan plan = strategy.plan(census.take(), GcPins.none());
-    GcStrategy.Applied applied = strategy.apply(plan, blobId -> false);
+    GcStrategy.Applied applied = strategy.apply(plan, Graces.nothingYoung());
 
     assertEquals(List.of("npm/" + NPM_NAME + "@2026.601.10"), identities(applied.deleted()));
     assertEquals(List.of(), applied.errors());
@@ -268,7 +268,8 @@ class SbomGcAdapterTest extends GcFixture {
     sbomRow(SBOM_REPO, "npm", NPM_NAME, "2026.801.30", blob(43), daysAgo(200), null);
 
     GcStrategy.Plan plan = strategy.plan(census.take(), GcPins.none());
-    GcStrategy.Applied applied = strategy.apply(plan, blobId -> blobId.equals(young));
+    GcStrategy.Applied applied =
+        strategy.apply(plan, Graces.blobsOnly(blobId -> blobId.equals(young)));
 
     assertEquals(List.of(), applied.deleted());
     assertEquals(
@@ -294,7 +295,7 @@ class SbomGcAdapterTest extends GcFixture {
     GcStrategy.Plan plan = strategy.plan(census.take(), GcPins.none());
     execute("delete from sbom_document where version = '2026.601.10'");
     sbomDocuments.getEntityManager().clear();
-    GcStrategy.Applied applied = strategy.apply(plan, blobId -> false);
+    GcStrategy.Applied applied = strategy.apply(plan, Graces.nothingYoung());
 
     assertEquals(List.of(), applied.deleted());
     assertEquals(1, applied.errors().size());
@@ -325,10 +326,9 @@ class SbomGcAdapterTest extends GcFixture {
   }
 
   @Test
-  void aDeadDocumentIsCondemnedByTheRunThatFindsItAndPurgedOnlyPastTheCondemnGrace()
-      throws Exception {
-    // qits-1172 for this type: the document stays readable while it is condemned; the purge past
-    // the grace is SbomRegistryCollection's, unchanged.
+  void aDeadDocumentIsDeletedByTheFirstRunThatFindsIt() throws Exception {
+    // qits-1732 for this type: a document nothing keeps, its blob and row past the identity grace,
+    // goes on the run that finds it dead, through SbomRegistryCollection.
     repository();
     String doomed = blob(71);
     backdate(doomed, Duration.ofDays(30));
@@ -336,7 +336,7 @@ class SbomGcAdapterTest extends GcFixture {
     sbomRow(SBOM_REPO, "npm", NPM_NAME, "2026.701.20", blob(72), daysAgo(300), null);
     sbomRow(SBOM_REPO, "npm", NPM_NAME, "2026.801.30", blob(73), daysAgo(200), null);
 
-    condemnedFirstThenPurged(
+    deletedOnTheRunThatFindsIt(
         strategy,
         "npm/" + NPM_NAME + "@2026.601.10",
         () -> {

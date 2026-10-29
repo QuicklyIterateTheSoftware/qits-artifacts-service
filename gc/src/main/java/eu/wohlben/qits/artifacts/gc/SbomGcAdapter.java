@@ -148,7 +148,8 @@ public class SbomGcAdapter implements GcTypeAdapter {
                 // access window alone. See the class javadoc.
                 CALVER.matcher(row.version).matches(),
                 latest(row.createdAt, row.accessedAt),
-                Set.of(row.blobId)));
+                Set.of(row.blobId),
+                row.createdAt));
       }
     }
     return List.copyOf(candidates);
@@ -315,8 +316,9 @@ public class SbomGcAdapter implements GcTypeAdapter {
         }
         // A document whose blob is still inside the grace window is withheld whole: deleting the row
         // over it would strand the blob as row-less and therefore untouchable forever, which is the
-        // failure the window exists to prevent.
-        if (grace.withinGrace(row.blobId)) {
+        // failure the window exists to prevent. So is one whose own row is (qits-1732): an
+        // unchanged document re-filed dedupes onto the old blob, whose stored_at does not move.
+        if (grace.withinGrace(row.createdAt) || grace.withinGrace(row.blobId)) {
           withheld.add(dead);
           continue;
         }

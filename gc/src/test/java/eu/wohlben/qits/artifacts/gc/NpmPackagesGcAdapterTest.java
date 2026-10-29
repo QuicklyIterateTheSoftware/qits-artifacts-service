@@ -11,6 +11,7 @@ import eu.wohlben.qits.artifacts.control.NpmPackagesProfile;
 import eu.wohlben.qits.artifacts.control.SbomProfile;
 import eu.wohlben.qits.blobstore.entity.RepositoryTypeProfile;
 import eu.wohlben.qits.artifacts.gc.dto.GcIdentity;
+import eu.wohlben.qits.artifacts.gc.dto.GcPlanReport;
 import io.quarkus.narayana.jta.QuarkusTransaction;
 import io.quarkus.test.junit.QuarkusTest;
 import jakarta.inject.Inject;
@@ -156,7 +157,9 @@ class NpmPackagesGcAdapterTest extends GcFixture {
     // Prereleases earn no belt — own-ness protects releases, and a main build is not one — so with
     // the window at zero there is nothing left for one to survive on except a dist-tag or a
     // dependency pin, each of which has its own case. Four builds, aged from a year to a minute, and
-    // all four go: the one installed yesterday and the one published a minute ago included.
+    // the rule condemns all four: the one installed yesterday and the one published a minute ago
+    // included. What saves the newest is not the rule but the identity grace — its version row was
+    // written this second (qits-1732), so a run withholds it whole, and the dry run says so.
     //
     // That is the realignment stated at its sharpest, and it is safe for the reason the doctrine
     // gives: `@main` is what a consumer of a build resolves through, and a dist-tag names it.
@@ -187,10 +190,13 @@ class NpmPackagesGcAdapterTest extends GcFixture {
         Set.of(coldest, cold, installedYesterday, newest), plan.blobsReleased());
 
     // And through the substrate: a tarball is named by exactly one version, so every released blob
-    // loses its last reference and the whole reclaim is real.
+    // loses its last reference — and the three whose rows are past the grace are the reclaim. The
+    // newest tarball's bytes are a month old; its row is not, and it is withheld rather than
+    // promised.
+    GcPlanReport report = planner.plan(taken, List.of(strategy), GcPins.none());
     assertEquals(
-        Stream.of(coldest, cold, installedYesterday, newest).sorted().toList(),
-        planner.plan(taken, List.of(strategy), GcPins.none()).sweep().blobIds());
+        Stream.of(coldest, cold, installedYesterday).sorted().toList(), report.sweep().blobIds());
+    assertEquals(1, report.sweep().withheldByGraceWindow(), newest + " waits out its row's grace");
   }
 
   @Test
@@ -334,7 +340,7 @@ class NpmPackagesGcAdapterTest extends GcFixture {
     version(UI, "1.2.0", 83, daysAgo(380));
 
     GcStrategy.Plan plan = strategy.plan(census.take(), GcPins.none());
-    GcStrategy.Applied applied = strategy.apply(plan, blobId -> false);
+    GcStrategy.Applied applied = strategy.apply(plan, Graces.nothingYoung());
 
     assertEquals(List.of(UI + "@1.0.0-main.gab854a1"), identities(applied.deleted()));
     assertEquals(List.of(), applied.errors());
@@ -356,7 +362,7 @@ class NpmPackagesGcAdapterTest extends GcFixture {
     ledger.record("npm", "npm", UI, "1.1.0", "v1:sha256:" + "b".repeat(64));
 
     GcStrategy.Plan plan = strategy.plan(census.take(), GcPins.none());
-    GcStrategy.Applied applied = strategy.apply(plan, blobId -> false);
+    GcStrategy.Applied applied = strategy.apply(plan, Graces.nothingYoung());
 
     assertEquals(List.of(UI + "@1.0.0-main.gab854a1"), identities(applied.deleted()));
     assertEquals(List.of(), applied.errors());
@@ -376,7 +382,8 @@ class NpmPackagesGcAdapterTest extends GcFixture {
     version(UI, "1.2.0", 93, daysAgo(380));
 
     GcStrategy.Plan plan = strategy.plan(census.take(), GcPins.none());
-    GcStrategy.Applied applied = strategy.apply(plan, blobId -> blobId.equals(doomed));
+    GcStrategy.Applied applied =
+        strategy.apply(plan, Graces.blobsOnly(blobId -> blobId.equals(doomed)));
 
     assertEquals(List.of(), applied.deleted());
     assertEquals(List.of(UI + "@1.0.0-main.gab854a1"), identities(applied.withheldByGraceWindow()));
@@ -416,28 +423,24 @@ class NpmPackagesGcAdapterTest extends GcFixture {
   }
 
   @Test
-  void aDeadVersionIsCondemnedByTheRunThatFindsItAndPurgedWithItsTombstoneOnlyPastTheGrace()
-      throws Exception {
-    // qits-1172 for this type: no tombstone on the condemning run — the version is still a version
-    // — and the purge goes through the tombstone-writing funnel exactly as before.
+  void aDeadVersionIsDeletedWithItsTombstoneByTheFirstRunThatFindsIt() throws Exception {
+    // qits-1732 for this type: a version nothing keeps, its tarball and row past the identity
+    // grace, goes on the run that finds it dead, through the tombstone-writing funnel.
     hosted();
     String doomed = version(UI, "1.0.0-main.gab854a1", 81, daysAgo(400));
     version(UI, "1.1.0", 82, daysAgo(390));
     version(UI, "1.2.0", 83, daysAgo(380));
 
-    condemnedFirstThenPurged(
+    deletedOnTheRunThatFindsIt(
         strategy,
         UI + "@1.0.0-main.gab854a1",
         () -> {
           npmVersions.getEntityManager().clear();
-          boolean stored = npmVersions.findOne("npm", UI, "1.0.0-main.gab854a1").isPresent();
-          if (stored) {
-            assertTrue(
-                npmVersionTombstones.findOne("npm", UI, "1.0.0-main.gab854a1").isEmpty(),
-                "a condemned version carries no tombstone: it has not been collected");
-          }
-          return stored;
+          return npmVersions.findOne("npm", UI, "1.0.0-main.gab854a1").isPresent();
         });
+    assertTrue(
+        npmVersionTombstones.findOne("npm", UI, "1.0.0-main.gab854a1").isPresent(),
+        "collected through the funnel that writes the tombstone");
     assertTrue(npmVersionTombstones.findOne("npm", UI, "1.0.0-main.gab854a1").isPresent());
     assertFalse(blobStore.exists(doomed));
   }

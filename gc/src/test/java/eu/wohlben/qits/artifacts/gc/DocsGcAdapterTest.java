@@ -181,7 +181,7 @@ class DocsGcAdapterTest extends GcFixture {
     assertEquals(2, metadataRows());
 
     GcStrategy.Plan plan = strategy.plan(census.take(), GcPins.none());
-    GcStrategy.Applied applied = strategy.apply(plan, blobId -> false);
+    GcStrategy.Applied applied = strategy.apply(plan, Graces.nothingYoung());
 
     assertEquals(List.of(SITE + "@" + "a".repeat(40)), identities(applied.deleted()));
     assertEquals(List.of(), applied.errors());
@@ -189,17 +189,16 @@ class DocsGcAdapterTest extends GcFixture {
   }
 
   @Test
-  void aDeadVersionIsCondemnedByTheRunThatFindsItAndPurgedOnlyPastTheCondemnGrace()
-      throws Exception {
-    // qits-1172 for this type: the bundle keeps every file while it is condemned, so the site
-    // serves it unchanged; the purge past the grace is the docs funnel's.
+  void aDeadVersionIsDeletedByTheFirstRunThatFindsIt() throws Exception {
+    // qits-1732 for this type: a version nothing keeps, its files and row past the identity grace,
+    // goes on the run that finds it dead, through the docs funnel, files and all.
     repository();
     String doomed = blob(61);
     backdate(doomed, Duration.ofDays(30));
     docsSite(DOCS_REPO, SITE, "a".repeat(40), daysAgo(200), null, Map.of(), doomed);
     docsSite(DOCS_REPO, SITE, "2026.801.30", daysAgo(10), null, Map.of(), blob(62));
 
-    condemnedFirstThenPurged(
+    deletedOnTheRunThatFindsIt(
         strategy,
         SITE + "@" + "a".repeat(40),
         () -> {

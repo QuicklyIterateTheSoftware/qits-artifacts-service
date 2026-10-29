@@ -19,11 +19,6 @@ import java.util.List;
  *     only this type's plan applied and every other type left as the census found it
  * @param reclaimableBytes what those blobs occupy on disk. Zero is the common honest answer for a
  *     type whose content is shared with something that stays.
- * @param condemned the members of {@code dead} an earlier sweep already condemned, each with its
- *     {@code purgeAt} (qits-1172). A sweep now would purge those whose {@code purgeAt} has passed
- *     (blob grace permitting) and merely condemn every other dead identity — so {@code dead} stays
- *     "what the rule says is dead", and this is the split of it into "purged next" and "condemned
- *     next". The blob figures beside it stay structural, as they always were.
  */
 public record GcTypePlan(
     String type,
@@ -34,5 +29,4 @@ public record GcTypePlan(
     List<GcIdentity> kept,
     int blobsReleased,
     int blobsSweepable,
-    long reclaimableBytes,
-    List<GcCondemnedIdentity> condemned) {}
+    long reclaimableBytes) {}

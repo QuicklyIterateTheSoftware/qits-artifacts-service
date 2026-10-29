@@ -190,7 +190,8 @@ public class NpmPackagesGcAdapter implements GcTypeAdapter {
                   repository.name + "/" + packageName,
                   NpmSemver.parse(version).filter(parsed -> !parsed.isPrerelease()).isPresent(),
                   latest((Instant) row[2], (Instant) row[3]),
-                  Set.of((String) row[1])));
+                  Set.of((String) row[1]),
+                  (Instant) row[2]));
         }
       }
     }
@@ -378,7 +379,9 @@ public class NpmPackagesGcAdapter implements GcTypeAdapter {
           errors.add(dead.identity() + ": no such version row — the store moved since planning");
           continue;
         }
-        if (grace.withinGrace(row.tarballBlobId)) {
+        // Young if the version row is OR its tarball is (qits-1732): a version whose tarball
+        // dedupes onto bytes the store already held keeps the old blob's stored_at.
+        if (grace.withinGrace(row.createdAt) || grace.withinGrace(row.tarballBlobId)) {
           withheld.add(dead);
           continue;
         }

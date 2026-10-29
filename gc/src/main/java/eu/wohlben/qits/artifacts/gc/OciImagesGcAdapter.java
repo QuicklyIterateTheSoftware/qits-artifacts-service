@@ -297,7 +297,8 @@ public class OciImagesGcAdapter implements GcTypeAdapter {
     Set<String> reachableFromTags = new HashSet<>();
     for (OciTag tag : tags.listByImage(repository, image)) {
       tagged.add(tag.manifestDigest);
-      Set<String> blobs = blobsOf(byDigest.get(tag.manifestDigest));
+      OciManifest manifest = byDigest.get(tag.manifestDigest);
+      Set<String> blobs = blobsOf(manifest);
       reachableFromTags.addAll(blobs);
       candidates.add(
           new GcCandidate(
@@ -306,7 +307,8 @@ public class OciImagesGcAdapter implements GcTypeAdapter {
               group(repository, image),
               CALVER.matcher(tag.tag).matches(),
               latest(tag.updatedAt, tag.accessedAt),
-              blobs));
+              blobs,
+              stampOf(tag, manifest)));
     }
     for (OciManifest manifest : byDigest.values()) {
       // A tagged manifest's identity is its tag; an index child's is the index that names it.
@@ -322,8 +324,23 @@ public class OciImagesGcAdapter implements GcTypeAdapter {
               group(repository, image),
               false,
               latest(manifest.createdAt, manifest.accessedAt),
-              footprints.of(manifest).keySet()));
+              footprints.of(manifest).keySet(),
+              manifest.createdAt));
     }
+  }
+
+  /**
+   * A tag's own row stamp: the later of the tag row's {@code updated_at} — the moment those bytes
+   * became this tag's — and its manifest row's {@code created_at}. Either is a push this identity is
+   * the product of, and neither moves on a pull.
+   */
+  private static Instant stampOf(OciTag tag, OciManifest manifest) {
+    if (manifest == null || manifest.createdAt == null) {
+      return tag.updatedAt;
+    }
+    return tag.updatedAt == null || tag.updatedAt.isBefore(manifest.createdAt)
+        ? manifest.createdAt
+        : tag.updatedAt;
   }
 
   /**
@@ -424,7 +441,11 @@ public class OciImagesGcAdapter implements GcTypeAdapter {
         errors.add(dead.identity() + ": no such tag row — the store moved since planning");
         return;
       }
-      if (anyWithinGrace(dead.repository(), image, row.manifestDigest, grace)) {
+      // Young if the tag row is (qits-1732) — a tag pushed onto a manifest the store already held
+      // writes no new blob, so its bytes are as old as that manifest's — or if anything its
+      // manifest's closure releases is.
+      if (grace.withinGrace(row.updatedAt)
+          || anyWithinGrace(dead.repository(), image, row.manifestDigest, grace)) {
         withheld.add(dead);
         return;
       }
@@ -457,9 +478,11 @@ public class OciImagesGcAdapter implements GcTypeAdapter {
   }
 
   /**
-   * Whether any blob the manifest's closure releases is still inside the grace window — the gate on
-   * identity deletion, because a row deleted over a young file would strand that file row-less and
-   * therefore untouchable forever. A manifest row already gone gates on nothing.
+   * Whether the manifest row itself, or any blob its closure releases, is still inside the grace
+   * window — the gate on identity deletion, because a row deleted over a young file would strand
+   * that file row-less and therefore untouchable forever, and a manifest pushed a minute ago is one
+   * no pin source can name yet whatever its layers' age (qits-1732). A manifest row already gone
+   * gates on nothing.
    */
   private boolean anyWithinGrace(
       String repository, String image, String digest, GcStrategy.GraceWindow grace) {
@@ -467,6 +490,7 @@ public class OciImagesGcAdapter implements GcTypeAdapter {
     if (manifest == null) {
       return false;
     }
-    return footprints.of(manifest).keySet().stream().anyMatch(grace::withinGrace);
+    return grace.withinGrace(manifest.createdAt)
+        || footprints.of(manifest).keySet().stream().anyMatch(grace::withinGrace);
   }
 }

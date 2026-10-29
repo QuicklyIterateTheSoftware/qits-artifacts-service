@@ -16,13 +16,17 @@ import eu.wohlben.qits.artifacts.entity.OciManifest;
 import eu.wohlben.qits.artifacts.entity.OciTag;
 import eu.wohlben.qits.blobstore.control.CiScreenshotsProfile;
 import eu.wohlben.qits.blobstore.control.CiVideosProfile;
+import eu.wohlben.qits.artifacts.control.DaemonBinariesProfile;
 import eu.wohlben.qits.artifacts.control.NpmPackagesProfile;
 import eu.wohlben.qits.artifacts.control.OciImagesProfile;
 import eu.wohlben.qits.blobstore.entity.RepositoryTypeProfile;
 import eu.wohlben.qits.blobstore.error.NotFoundException;
 import eu.wohlben.qits.artifacts.gc.dto.GcIdentity;
+import eu.wohlben.qits.artifacts.gc.dto.GcPlanReport;
+import eu.wohlben.qits.artifacts.gc.dto.GcRepositoryPlanSummary;
 import eu.wohlben.qits.artifacts.gc.dto.GcRepositorySweepReport;
 import eu.wohlben.qits.artifacts.gc.dto.GcSweepReport;
+import eu.wohlben.qits.artifacts.gc.dto.GcTypePlan;
 import eu.wohlben.qits.artifacts.gc.dto.GcTypeSweepResult;
 import io.quarkus.narayana.jta.QuarkusTransaction;
 import io.quarkus.test.junit.QuarkusTest;
@@ -50,10 +54,12 @@ import org.junit.jupiter.api.Test;
  * {@code collect}'s tombstone-and-refusal mechanics are half of what is on trial.
  * The whole-run abort, which is what an incomplete aggregate causes, is {@code GcPinsTest}'s.
  *
- * <p><b>Deleting takes two runs since qits-1172</b>, so the deletion cases sweep through {@link
- * #sweptPastCondemnation}: a run that condemns, the condemnations aged past the shipped grace, and
- * the run that purges. What those cases assert is the purge — unchanged from the one-run sweep they
- * were written against. The two-phase mechanism itself is {@code GcCondemnationTest}'s.
+ * <p><b>One run deletes what its plan finds dead (qits-1732)</b>, so every deletion case below is
+ * one sweep and its receipt. Between qits-1172 and qits-1732 deleting took two runs and a
+ * condemnation aged past a second grace; that stage is gone, and what still stands between a dead
+ * identity and its deletion is the identity grace alone — its own row stamp or any of its blobs
+ * inside the window — which the last cases here pin, for a young row over old bytes, in both the
+ * receipt and the dry run.
  */
 @QuarkusTest
 class GcSweepExecutorTest extends GcFixture {
@@ -61,12 +67,15 @@ class GcSweepExecutorTest extends GcFixture {
   @Inject GcSweepExecutor executor;
   @Inject OciImageGcStrategy ociStrategy;
   @Inject NpmPackagesGcStrategy npmStrategy;
+  @Inject DaemonBinariesGcStrategy daemonStrategy;
+  @Inject GcPlanner planner;
 
   private static final String PKG = "@qits/sweep-case";
   private static final String RELEASE = "2026.801.85149";
   private static final String OLDER = RELEASE + "-main.g0000000";
   private static final String SUPERSEDED = RELEASE + "-main.g1111111";
   private static final String NEWEST = RELEASE + "-main.g2222222";
+  private static final String DAEMON = "qits-ci-daemon";
 
   @Test
   void aColdPrereleaseLosesItsRowGainsATombstoneAndItsTarballIsUnlinked() throws Exception {
@@ -87,7 +96,7 @@ class GcSweepExecutorTest extends GcFixture {
     versionRow(PKG, SUPERSEDED, supersededBlob, daysAgo(400));
     versionRow(PKG, NEWEST, newestBlob, Instant.now());
 
-    GcSweepReport report = sweptPastCondemnation(List.of(npmStrategy), GcPins.none());
+    GcSweepReport report = executor.execute(census.take(), List.of(npmStrategy), GcPins.none());
 
     assertFalse(report.dryRun());
     assertNotNull(report.executedAt());
@@ -133,7 +142,7 @@ class GcSweepExecutorTest extends GcFixture {
     versionRow(PKG, SUPERSEDED, supersededBlob, daysAgo(400));
     versionRow(PKG, RELEASE, releaseBlob, daysAgo(400));
 
-    GcSweepReport report = sweptPastCondemnation(List.of(npmStrategy), GcPins.none());
+    GcSweepReport report = executor.execute(census.take(), List.of(npmStrategy), GcPins.none());
 
     GcTypeSweepResult npm = typeResult(report, NpmPackagesProfile.KEY);
     assertEquals(List.of(), npm.deleted());
@@ -168,7 +177,7 @@ class GcSweepExecutorTest extends GcFixture {
             Set.of(taggedBlob),
             Set.of());
 
-    GcStrategy.Applied applied = npmStrategy.apply(condemned, blobId -> false);
+    GcStrategy.Applied applied = npmStrategy.apply(condemned, Graces.nothingYoung());
 
     assertEquals(List.of(), applied.deleted());
     assertEquals(1, applied.errors().size());
@@ -184,9 +193,10 @@ class GcSweepExecutorTest extends GcFixture {
     // untouched, a blob the npm type still serves outlives its own type's deletion, and a row-less
     // blob outlives everything — asserted through the executor, not just the plan.
     //
-    // Rows carry their ages here because the settled rule is access-gated: the dead sha tag is two
-    // months cold and the orphan manifest older still, while the calver release and the newest build
-    // were written moments ago.
+    // Rows carry their ages here because the settled rule is access-gated: the dead sha tag and its
+    // manifest are two months cold and the orphan manifest older still, while the calver release and
+    // the newest build were written moments ago — over bytes that are all a month old, which is what
+    // a tag pushed onto a manifest the store already held looks like.
     repositoryService.ensure("qits", OciImagesProfile.KEY);
     repositoryService.ensure("npm", NpmPackagesProfile.KEY);
     String config = agedBlob(10);
@@ -210,7 +220,7 @@ class GcSweepExecutorTest extends GcFixture {
         .run(
             () -> {
               ociManifests.persist(qitsManifest(manifestKept, keptBytes.length, Instant.now()));
-              ociManifests.persist(qitsManifest(manifestDoomed, doomedBytes.length, Instant.now()));
+              ociManifests.persist(qitsManifest(manifestDoomed, doomedBytes.length, cold));
               ociManifests.persist(qitsManifest(manifestOrphan, orphanBytes.length, cold));
               ociTags.persist(qitsTag("2026.801.5", manifestKept, Instant.now()));
               ociTags.persist(qitsTag(newestSha, manifestKept, Instant.now()));
@@ -219,19 +229,21 @@ class GcSweepExecutorTest extends GcFixture {
     // The cross-type case: the npm registry serves the doomed layer's bytes as a release tarball.
     versionRow(PKG, RELEASE, layerDoomed, Instant.now());
 
-    GcSweepReport report = sweptPastCondemnation(List.of(ociStrategy, npmStrategy), GcPins.none());
+    GcSweepReport report =
+        executor.execute(census.take(), List.of(ociStrategy, npmStrategy), GcPins.none());
 
     GcTypeSweepResult oci = typeResult(report, OciImagesProfile.KEY);
     assertNull(oci.error());
     assertEquals(
-        List.of(
-            "alpha8:" + deadSha,
-            "alpha8:" + newestSha,
-            "alpha8@sha256:" + manifestOrphan),
+        List.of("alpha8:" + deadSha, "alpha8@sha256:" + manifestOrphan),
         identities(oci.deleted()).stream().sorted().toList(),
-        "both sha tags — since 2026-09-05 the newest one has no claim on anything either — and the"
-            + " manifest no tag has ever named");
-    assertEquals(List.of(), oci.withheldByGraceWindow());
+        "the cold sha tag and the manifest no tag has ever named, on the run that finds them dead");
+    assertEquals(
+        List.of("alpha8:" + newestSha),
+        identities(oci.withheldByGraceWindow()),
+        "the newest sha tag has no claim on anything since 2026-09-05 and is dead by the rule — but"
+            + " it was pushed a moment ago, so its own row holds it for the grace even though every"
+            + " byte under it is a month old (qits-1732)");
 
     // Never a kept identity: both kept tag rows and the kept manifest row are exactly where they
     // were, and the dead rows are gone. The manifest the dead tag named is NOT gone — a tagged
@@ -240,9 +252,8 @@ class GcSweepExecutorTest extends GcFixture {
     detachEntities();
     assertTrue(ociTags.findOne("qits", "alpha8", "2026.801.5").isPresent(), "the release tag");
     assertTrue(
-        ociTags.findOne("qits", "alpha8", newestSha).isEmpty(),
-        "and the sha tag beside it goes: the release is what a deploy pulls, and nothing pulls a"
-            + " sha coordinate any more");
+        ociTags.findOne("qits", "alpha8", newestSha).isPresent(),
+        "and the sha tag beside it waits out the grace from its push, row intact");
     assertTrue(
         ociManifests.findOne("qits", "alpha8", manifestKept).isPresent(),
         "their shared manifest stays, because the release tag still names it");
@@ -273,6 +284,123 @@ class GcSweepExecutorTest extends GcFixture {
     // Row-less blobs are untouchable straight through an executed sweep, matured or not.
     assertTrue(blobStore.exists(rowless), "no identity ever named it, so nothing can reach it");
     assertTrue(report.untouchable().blobIds().contains(rowless));
+  }
+
+  @Test
+  void anUnpinnedDeadIdentityIsDeletedOnTheFirstRunThatFindsItDead() throws Exception {
+    // The bug qits-1732 fixes, as the receipt shows it. Between qits-1172 and qits-1732 the first
+    // run only condemned this version and the delete waited for a later run past a second grace;
+    // now the run that finds it dead deletes it, row and bytes. Nothing pins it, its row is a year
+    // old and its binary a month, so nothing is left to withhold it either.
+    repositoryService.ensure(DAEMON_REPO, DaemonBinariesProfile.KEY);
+    String doomed = agedBlob(31);
+    daemonRow(DAEMON, "2026.601.10", doomed, daysAgo(400), null);
+    daemonRow(DAEMON, "2026.701.20", agedBlob(32), daysAgo(300), null);
+    daemonRow(DAEMON, "2026.801.30", agedBlob(33), daysAgo(200), null);
+
+    GcSweepReport first = executor.execute(census.take(), List.of(daemonStrategy), GcPins.none());
+
+    GcTypeSweepResult daemons = typeResult(first, DaemonBinariesProfile.KEY);
+    assertEquals(List.of(DAEMON + "@2026.601.10"), identities(daemons.deleted()));
+    assertEquals(List.of(), daemons.withheldByGraceWindow());
+    assertEquals(List.of(doomed), first.sweep().unlinkedBlobIds(), "and its binary with it");
+    daemonBinaries.getEntityManager().clear();
+    assertTrue(daemonBinaries.findOne(DAEMON_REPO, DAEMON, "2026.601.10").isEmpty());
+    assertFalse(blobStore.exists(doomed));
+  }
+
+  @Test
+  void aDaemonVersionPublishedNowOverOldBytesIsWithheldByItsRowInTheSweepAndTheDryRun()
+      throws Exception {
+    // The young-identity clock (qits-1732). The binary's bytes were stored a month ago and the
+    // version that names them was published a moment ago — what a re-publish of unchanged bytes
+    // under a new version looks like, because the store dedupes and promote() leaves stored_at
+    // where it was. Judged on its bytes alone it would go on this run unpinned, inside the very
+    // push-to-pin gap the grace exists for. Its own row is the clock that says it just arrived.
+    repositoryService.ensure(DAEMON_REPO, DaemonBinariesProfile.KEY);
+    // Aged BEFORE the row exists, so the backdate ages the bytes and not the row.
+    String young = agedBlob(34);
+    daemonRow(DAEMON, "2026.601.10", young, Instant.now(), null);
+    daemonRow(DAEMON, "2026.701.20", agedBlob(35), daysAgo(300), null);
+    daemonRow(DAEMON, "2026.801.30", agedBlob(36), daysAgo(200), null);
+
+    // The dry run says what the run will do: the version is dead by the rule, and its bytes are
+    // withheld rather than promised.
+    GcPlanReport plan = planner.plan(census.take(), List.of(daemonStrategy), GcPins.none());
+    assertEquals(List.of(DAEMON + "@2026.601.10"), identities(planned(plan, "daemon-binaries").dead()));
+    assertEquals(List.of(), plan.sweep().blobIds(), "a dry run must not promise a young row's bytes");
+    assertEquals(1, plan.sweep().withheldByGraceWindow());
+    assertEquals(34L, plan.sweep().withheldBytes());
+    GcRepositoryPlanSummary repository =
+        plan.repositories().stream()
+            .filter(row -> row.repository().equals(DAEMON_REPO))
+            .findFirst()
+            .orElseThrow();
+    assertEquals(1, repository.withheldByGraceWindow(), "the repository row says the same");
+
+    // The sweep withholds exactly that identity, whole.
+    GcSweepReport swept = executor.execute(census.take(), List.of(daemonStrategy), GcPins.none());
+    GcTypeSweepResult daemons = typeResult(swept, DaemonBinariesProfile.KEY);
+    assertEquals(List.of(), daemons.deleted());
+    assertEquals(List.of(DAEMON + "@2026.601.10"), identities(daemons.withheldByGraceWindow()));
+    assertEquals(0, swept.sweep().blobsUnlinked());
+    assertEquals(
+        plan.sweep().withheldByGraceWindow(),
+        swept.sweep().withheldByGraceWindow(),
+        "the receipt withholds what the dry run said it would");
+    assertEquals(0, swept.sweep().stillReferenced(), "counted as withheld, not stumbled over");
+    daemonBinaries.getEntityManager().clear();
+    assertTrue(daemonBinaries.findOne(DAEMON_REPO, DAEMON, "2026.601.10").isPresent());
+    assertTrue(blobStore.exists(young));
+
+    // And it is the row alone that held it: aged past the window, the next run takes it.
+    backdate(young, Duration.ofDays(30));
+    daemonBinaries.getEntityManager().clear(); // the row was aged under the cached entity
+    GcSweepReport later = executor.execute(census.take(), List.of(daemonStrategy), GcPins.none());
+    assertEquals(
+        List.of(DAEMON + "@2026.601.10"),
+        identities(typeResult(later, DaemonBinariesProfile.KEY).deleted()));
+    assertFalse(blobStore.exists(young));
+  }
+
+  @Test
+  void aTagPushedNowOntoAnOldManifestIsWithheldByItsRowInTheSweepAndTheDryRun() throws Exception {
+    // The OCI shape of the same clock: a tag pushed onto a manifest the store already held writes
+    // no blob at all, so every byte under it — manifest, config, layer — is as old as that
+    // manifest. The tag row is the push, and its updated_at is what holds it. The manifest's own
+    // row is old too, and the tag is the only thing naming it, so on bytes alone this run would
+    // take the tag and the next one its manifest and layer.
+    repositoryService.ensure("qits", OciImagesProfile.KEY);
+    String config = agedBlob(11);
+    String layer = agedBlob(301);
+    byte[] bytes = imageManifest(config, Map.of(layer, 301L), 11);
+    String manifest = agedStore(bytes);
+    Instant cold = daysAgo(60);
+    String sha = "c".repeat(40);
+    QuarkusTransaction.requiringNew()
+        .run(
+            () -> {
+              ociManifests.persist(qitsManifest(manifest, bytes.length, cold));
+              ociTags.persist(qitsTag(sha, manifest, Instant.now()));
+            });
+
+    GcPlanReport plan = planner.plan(census.take(), List.of(ociStrategy), GcPins.none());
+    assertEquals(
+        List.of("alpha8:" + sha),
+        identities(planned(plan, "oci-images").dead()),
+        "nothing pins it and it is no release, so the rule finds it dead");
+    assertEquals(List.of(), plan.sweep().blobIds(), "and the dry run promises none of its bytes");
+    assertEquals(3, plan.sweep().withheldByGraceWindow(), "manifest, config and layer");
+
+    GcSweepReport swept = executor.execute(census.take(), List.of(ociStrategy), GcPins.none());
+    GcTypeSweepResult oci = typeResult(swept, OciImagesProfile.KEY);
+    assertEquals(List.of(), oci.deleted());
+    assertEquals(List.of("alpha8:" + sha), identities(oci.withheldByGraceWindow()));
+    assertEquals(0, swept.sweep().blobsUnlinked());
+    assertEquals(plan.sweep().withheldByGraceWindow(), swept.sweep().withheldByGraceWindow());
+    ociTags.getEntityManager().clear();
+    assertTrue(ociTags.findOne("qits", "alpha8", sha).isPresent(), "the tag still resolves");
+    assertTrue(blobStore.exists(layer));
   }
 
   @Test
@@ -329,7 +457,8 @@ class GcSweepExecutorTest extends GcFixture {
     versionRow("npm2", PKG, RELEASE, release2Blob, daysAgo(400));
     versionRow("npm2", PKG, SUPERSEDED, sharedBlob, daysAgo(400));
 
-    GcRepositorySweepReport report = sweptPastCondemnation(npm, List.of(npmStrategy), GcPins.none());
+    GcRepositorySweepReport report =
+        executor.execute(npm, census.take(), List.of(npmStrategy), GcPins.none());
 
     assertEquals("npm", report.repository());
     assertEquals("npm-packages", report.type());
@@ -532,6 +661,13 @@ class GcSweepExecutorTest extends GcFixture {
   private static GcTypeSweepResult typeResult(GcSweepReport report, String type) {
     return report.types().stream()
         .filter(result -> RepositoryTypeProfile.wireNameOf(type).equals(result.type()))
+        .findFirst()
+        .orElseThrow();
+  }
+
+  private static GcTypePlan planned(GcPlanReport report, String wireType) {
+    return report.types().stream()
+        .filter(type -> type.type().equals(wireType))
         .findFirst()
         .orElseThrow();
   }

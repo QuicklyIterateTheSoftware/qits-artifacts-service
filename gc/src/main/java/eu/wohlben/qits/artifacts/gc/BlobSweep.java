@@ -12,9 +12,11 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.TreeMap;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.TreeSet;
 
@@ -110,7 +112,8 @@ public class BlobSweep {
     }
 
     Set<String> rowless = census.rowless();
-    Instant graceStartsAt = Instant.now().minus(graceWindow());
+    GcStrategy.GraceWindow grace = applyGraceWindow ? grace() : null;
+    Set<String> heldWhole = applyGraceWindow ? heldWhole(plans, grace) : Set.of();
     List<String> sweepable = new ArrayList<>();
     long reclaimable = 0;
     int withheld = 0;
@@ -128,18 +131,61 @@ public class BlobSweep {
       if (rowless.contains(blobId)) {
         continue;
       }
-      if (applyGraceWindow) {
-        Instant written = blobs.lastWrittenAt(blobId);
-        if (written != null && written.isAfter(graceStartsAt)) {
-          withheld++;
-          withheldBytes += size;
-          continue;
-        }
+      if (applyGraceWindow && (heldWhole.contains(blobId) || grace.withinGrace(blobId))) {
+        withheld++;
+        withheldBytes += size;
+        continue;
       }
       sweepable.add(blobId);
       reclaimable += size;
     }
     return new GcSweepPlan(sweepable.size(), reclaimable, withheld, withheldBytes, sweepable);
+  }
+
+  /**
+   * The identity grace as the dry run judges it, so the blobs it withholds are the blobs of exactly
+   * the identities a sweep would withhold.
+   *
+   * <p>A sweep's adapters withhold a dead identity <b>whole</b> when its own row stamp or any blob
+   * it releases is inside the window (qits-1732, {@link GcStrategy.GraceWindow}): its rows stay, so
+   * every blob it names stays referenced — the old ones beside the young one, and all of them when
+   * only the row is young. Judging blob by blob would report those old blobs as sweepable, and the
+   * run would then find each one still referenced; a dry run that promises disk the run cannot free
+   * is the one thing this report must not do. So every blob of such an identity is withheld here.
+   *
+   * <p>Only an engine's plan can be judged this way, because only it says which dead identity named
+   * which blobs ({@link GcStrategy.Plan#releasedByIdentity}). A hand-built plan says nothing per
+   * identity and is judged on its blobs' own age alone, which is what the reconciliation did before.
+   */
+  private static Set<String> heldWhole(
+      Map<String, GcStrategy.Plan> plans, GcStrategy.GraceWindow grace) {
+    Set<String> held = new HashSet<>();
+    for (GcStrategy.Plan plan : plans.values()) {
+      plan.releasedByIdentity()
+          .forEach(
+              (identity, blobIds) -> {
+                if (grace.withinGrace(plan.stampedByIdentity().get(identity))
+                    || blobIds.stream().anyMatch(grace::withinGrace)) {
+                  held.addAll(blobIds);
+                }
+              });
+    }
+    return held;
+  }
+
+  /**
+   * The window as of now, built by the factory the executor builds its own from, so a plan and a
+   * receipt compare ages the same way. A blob's write time is read once per call to this method's
+   * answer, however many identities share it.
+   */
+  private GcStrategy.GraceWindow grace() {
+    Map<String, Optional<Instant>> written = new HashMap<>();
+    return GcStrategy.GraceWindow.since(
+        Instant.now().minus(graceWindow()),
+        blobId ->
+            written
+                .computeIfAbsent(blobId, id -> Optional.ofNullable(blobs.lastWrittenAt(id)))
+                .orElse(null));
   }
 
   /**
@@ -154,7 +200,8 @@ public class BlobSweep {
    *       filter left to the gates below.
    *   <li><b>Grace-withheld candidates never reach the unlink.</b> Their identities were withheld
    *       too (rows intact — the executor's gate), so they are counted once, as withheld, rather
-   *       than smeared across refusal counters.
+   *       than smeared across refusal counters. That includes every blob of an identity withheld
+   *       whole for its row stamp or one young sibling ({@link #heldWhole}), however old the blob.
    *   <li><b>The pre-unlink re-census</b>: one fresh census taken here, after the row deletions.
    *       A candidate something still references — a withheld identity of another type, a push
    *       since planning — is skipped and counted. The same set backs the {@link

@@ -2,11 +2,13 @@ package eu.wohlben.qits.artifacts.gc;
 
 import eu.wohlben.qits.artifacts.control.LiveBlobCensus;
 import eu.wohlben.qits.artifacts.gc.dto.GcIdentity;
+import java.time.Instant;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Function;
 
 /**
  * One repository type's garbage collection: which of <b>its</b> identities are dead, and which blobs
@@ -100,7 +102,8 @@ public interface GcStrategy {
    * strand the blob forever — row-less, therefore untouchable, and never reclaimed. An identity
    * whose released blobs include one still in grace is therefore <b>withheld whole</b>: its rows
    * stay, the next run re-plans it, and the run after the window matures deletes row and file
-   * together.
+   * together. So is an identity whose <b>own row</b> is inside the window, whatever its blobs' age
+   * (qits-1732): see {@link GraceWindow} for why the bytes' age alone is the wrong clock.
    *
    * <p>Failures are collected per identity rather than thrown, because a half-applied type must
    * report what it did — the rows already deleted are deleted, and hiding them behind an exception
@@ -111,7 +114,8 @@ public interface GcStrategy {
    * — the default is the correct implementation, applied to the empty set.
    *
    * @param plan this strategy's own freshly computed plan
-   * @param grace answers whether a blob's file is still inside the grace window
+   * @param grace answers whether a blob's file, or an identity's own row, is still inside the grace
+   *     window
    */
   default Applied apply(Plan plan, GraceWindow grace) {
     if (!plan.dead().isEmpty()) {
@@ -125,10 +129,55 @@ public interface GcStrategy {
     return Applied.nothing();
   }
 
-  /** Whether a blob's file is younger than the sweep's grace window. Supplied by the executor. */
-  @FunctionalInterface
+  /**
+   * Whether something is younger than the sweep's grace window — a blob's file, or an identity's own
+   * row. Supplied by the executor, measured back from the run's one clock; the dry run builds its
+   * own from the same {@link #since} so the two judge youth by one comparison.
+   *
+   * <p><b>Two questions, because an identity is young if its row is OR any of its blobs is
+   * (qits-1732).</b> The window exists for the push-to-pin gap: an identity pushed a minute ago is
+   * named by no pin source yet — no manifest on main references it, no deployment holds it — and
+   * the keep-set, however complete, cannot see it. Measured on the blobs alone the window misses
+   * exactly the pushes that need it most: the store dedupes, and {@code BlobStore.promote} does not
+   * move {@code stored_at} when new content lands on bytes it already holds, so a tag pushed onto an
+   * existing manifest, or a docs version whose files are byte-identical to last week's, is
+   * <em>outside</em> the window the moment it lands and would go on the next run unpinned. The row
+   * is what the push wrote, with a server-set stamp, so the row stamp is the clock that cannot lie
+   * about when the identity arrived. Each adapter answers with its own row's stamp: {@code
+   * oci_tag.updated_at} (and the manifest's {@code created_at}), {@code npm_version.created_at},
+   * the newest {@code maven_artifact.created_at} of a coordinate, {@code daemon_binary.published_at},
+   * {@code docs_site.published_at}, {@code sbom_document.created_at}.
+   */
   interface GraceWindow {
+
+    /** Whether a blob's file was written inside the window; an unknown blob is not young. */
     boolean withinGrace(String blobId);
+
+    /**
+     * Whether an identity's own row was stamped inside the window; a null stamp — a row that
+     * carries none — is not young, and its youth is then its blobs' alone.
+     */
+    boolean withinGrace(Instant stampedAt);
+
+    /**
+     * The window as the executor and the dry run both build it: anything written after {@code
+     * graceStartsAt} is young.
+     *
+     * @param lastWrittenAt when a blob's file was written, null for a blob the store does not hold
+     */
+    static GraceWindow since(Instant graceStartsAt, Function<String, Instant> lastWrittenAt) {
+      return new GraceWindow() {
+        @Override
+        public boolean withinGrace(String blobId) {
+          return withinGrace(lastWrittenAt.apply(blobId));
+        }
+
+        @Override
+        public boolean withinGrace(Instant stampedAt) {
+          return stampedAt != null && stampedAt.isAfter(graceStartsAt);
+        }
+      };
+    }
   }
 
   /**
@@ -172,11 +221,15 @@ public interface GcStrategy {
    *     #blobsReleased}; it exists so one repository's share of a type's plan can be read off
    *     ({@link #scopedTo}) without a second planning pass.
    * @param releasedByIdentity the same released blobs once more, split by the dead identity that
-   *     named them. It exists for the two-phase sweep ({@link #purging}): a run that condemns an
-   *     identity without purging it must keep that identity's blobs on the retained side, and only
-   *     the engine knows which blobs those are. Empty for a plan that cannot say — a hand-built one —
-   *     and then the sweep's pre-unlink re-census, which sees the condemned identity's surviving
-   *     row, is what protects them.
+   *     named them. It exists so the dry run can judge the identity grace the way a sweep does —
+   *     an identity is withheld <b>whole</b>, so every blob of a young identity stays, the old ones
+   *     too — and only the engine knows which blobs those are. Empty for a plan that cannot say — a
+   *     hand-built one — and then the dry run judges each blob's own age alone, while a sweep's
+   *     pre-unlink re-census, which sees the withheld identity's surviving row, protects the rest.
+   * @param stampedByIdentity each dead identity's own row stamp ({@link GcCandidate#stampedAt}),
+   *     the second half of that same judgement: a dead identity whose row is inside the window is
+   *     withheld by a sweep whatever its blobs' age, and a dry run that did not know the stamp would
+   *     promise its bytes. An identity absent here has no stamp to judge, which is not young.
    */
   record Plan(
       List<GcIdentity> dead,
@@ -184,7 +237,8 @@ public interface GcStrategy {
       Set<String> blobsReleased,
       Set<String> blobsRetained,
       Map<String, Set<String>> releasedByRepository,
-      Map<IdentityKey, Set<String>> releasedByIdentity) {
+      Map<IdentityKey, Set<String>> releasedByIdentity,
+      Map<IdentityKey, Instant> stampedByIdentity) {
 
     public Plan {
       dead = List.copyOf(dead);
@@ -193,16 +247,17 @@ public interface GcStrategy {
       blobsRetained = Set.copyOf(blobsRetained);
       releasedByRepository = copyOfSets(releasedByRepository);
       releasedByIdentity = copyOfSets(releasedByIdentity);
+      stampedByIdentity = Map.copyOf(stampedByIdentity);
     }
 
-    /** A plan attributed per repository but not per identity — what it was before qits-1172. */
+    /** A plan attributed per repository but not per identity — what a hand-built plan can say. */
     public Plan(
         List<GcIdentity> dead,
         List<GcIdentity> kept,
         Set<String> blobsReleased,
         Set<String> blobsRetained,
         Map<String, Set<String>> releasedByRepository) {
-      this(dead, kept, blobsReleased, blobsRetained, releasedByRepository, Map.of());
+      this(dead, kept, blobsReleased, blobsRetained, releasedByRepository, Map.of(), Map.of());
     }
 
     /**
@@ -226,52 +281,7 @@ public interface GcStrategy {
 
     /** A strategy with nothing to do — the honest answer for a type whose rules exist but match no row. */
     public static Plan nothingDies(List<GcIdentity> kept, Set<String> live) {
-      return new Plan(List.of(), kept, Set.of(), live, Map.of(), Map.of());
-    }
-
-    /**
-     * This plan with only the given dead identities going — the purge half of a two-phase sweep.
-     *
-     * <p>Every other dead identity is <b>condemned and still standing</b>: its rows stay, so its
-     * blobs move to the retained side here, where the reconciliation sees them as live and they are
-     * never even a candidate. That move needs {@link #releasedByIdentity}; for a plan that cannot
-     * attribute a dead identity's blobs the released set is left whole rather than guessed at,
-     * because narrowing it could take a purged identity's blob off the candidate list and strand it
-     * row-less. The surviving rows are then protected one layer down instead: {@code
-     * BlobSweep.execute} re-takes the census after the deletions and skips every blob a row still
-     * names.
-     *
-     * <p>{@link #kept} is carried unchanged — it is the report half and says nothing about what is
-     * applied.
-     */
-    public Plan purging(Set<IdentityKey> purge) {
-      List<GcIdentity> going =
-          dead.stream().filter(identity -> purge.contains(IdentityKey.of(identity))).toList();
-      if (going.size() == dead.size()) {
-        return this;
-      }
-      boolean attributed =
-          dead.stream().allMatch(identity -> releasedByIdentity.containsKey(IdentityKey.of(identity)));
-      if (!attributed) {
-        return new Plan(
-            going, kept, blobsReleased, blobsRetained, releasedByRepository, releasedByIdentity);
-      }
-      Set<String> released = new HashSet<>();
-      Set<String> retained = new HashSet<>(blobsRetained);
-      Map<String, Set<String>> byRepository = new HashMap<>();
-      Map<IdentityKey, Set<String>> byIdentity = new HashMap<>();
-      for (GcIdentity identity : dead) {
-        IdentityKey key = IdentityKey.of(identity);
-        Set<String> blobs = releasedByIdentity.get(key);
-        if (purge.contains(key)) {
-          released.addAll(blobs);
-          byRepository.computeIfAbsent(identity.repository(), repository -> new HashSet<>()).addAll(blobs);
-          byIdentity.put(key, blobs);
-        } else {
-          retained.addAll(blobs);
-        }
-      }
-      return new Plan(going, kept, released, retained, byRepository, byIdentity);
+      return new Plan(List.of(), kept, Set.of(), live, Map.of(), Map.of(), Map.of());
     }
 
     /**
@@ -302,20 +312,25 @@ public interface GcStrategy {
           retained.addAll(entry.getValue());
         }
       }
-      Map<IdentityKey, Set<String>> byIdentity = new HashMap<>();
-      releasedByIdentity.forEach(
-          (key, blobs) -> {
-            if (key.repository().equals(repository)) {
-              byIdentity.put(key, blobs);
-            }
-          });
       return new Plan(
           in(dead, repository),
           in(kept, repository),
           released,
           retained,
           released.isEmpty() ? Map.of() : Map.of(repository, released),
-          byIdentity);
+          in(releasedByIdentity, repository),
+          in(stampedByIdentity, repository));
+    }
+
+    private static <V> Map<IdentityKey, V> in(Map<IdentityKey, V> byIdentity, String repository) {
+      Map<IdentityKey, V> mine = new HashMap<>();
+      byIdentity.forEach(
+          (key, value) -> {
+            if (key.repository().equals(repository)) {
+              mine.put(key, value);
+            }
+          });
+      return mine;
     }
 
     private static List<GcIdentity> in(List<GcIdentity> identities, String repository) {
@@ -342,13 +357,12 @@ public interface GcStrategy {
   }
 
   /**
-   * Which identity, without the rule that judged it — the key a condemnation is stored and matched
-   * under.
+   * Which identity, without the rule that judged it — the key a plan's per-identity attribution is
+   * held under.
    *
-   * <p>The rule is left out on purpose: it is a sentence that may change between two runs (a window
-   * reconfigured, a keep-class renamed) while the identity it judged stays the same one, and a
-   * condemnation that failed to match its own identity on the next run would restart its grace for
-   * ever.
+   * <p>The rule is left out on purpose: it is a sentence about the identity, not part of which one
+   * it is, and a lookup keyed on it would miss the moment a window is reconfigured or a keep-class
+   * renamed.
    */
   record IdentityKey(String repository, String identity) {
 

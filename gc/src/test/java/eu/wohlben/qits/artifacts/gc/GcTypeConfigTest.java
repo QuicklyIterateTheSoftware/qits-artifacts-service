@@ -258,17 +258,17 @@ class GcTypeConfigTest extends GcFixture {
 
     // The blob half of the same comparison, and it is where both halves of this reconciliation show
     // up in one list. The cold daemon binary and the cold published tarball are released by the zero
-    // window, and since qits-739 so is the cold JAR: its coordinate is a release below the belt that
-    // nothing kept reaches. Its pom was stored this second, so that blob is still inside the grace
-    // period and only the jar shows here (and at execution the young pom withholds the coordinate
-    // whole, as GcSweepExecutorTest proves). What the zero window adds is the doomed
+    // window, and since qits-739 so is the cold JAR's coordinate: a release below the belt that
+    // nothing kept reaches. Its pom was stored this second, so a run withholds the coordinate whole
+    // — and since qits-1732 the dry run judges the grace the same way, per identity, so the cold jar
+    // is withheld beside its young pom rather than promised. What the zero window adds is the doomed
     // manifest's own layer, which the dead v2 tag released and nothing surviving names; the image's
     // other blobs stay, because the release tag reaches the kept manifest and the shared layer is an
     // npm tarball besides. This figure is the DRY RUN's, which runs one run ahead of the store for
     // OCI by design — the manifest rows the dead tags leave behind still hold their bytes until the
     // next run makes them candidates.
     assertEquals(
-        List.of(coldDaemon, coldTarball, coldJar, store.layerDoomed(), store.manifestDoomed())
+        List.of(coldDaemon, coldTarball, store.layerDoomed(), store.manifestDoomed())
             .stream()
             .sorted()
             .toList(),

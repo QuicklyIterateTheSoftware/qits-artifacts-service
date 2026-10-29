@@ -600,65 +600,6 @@ paths:
         "200":
           description: "{name, tags:[tag]}; an empty list for a name nothing was pushed\
             \ under."
-  /artifacts/api/gc/condemned:
-    get:
-      operationId: listGcCondemned
-      responses:
-        "200":
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/GcCondemnedListing"
-        "401":
-          description: Not Authorized
-        "403":
-          description: Not Allowed
-      summary: Condemned
-      tags:
-      - Gc Plan Controller
-      security:
-      - SecurityScheme:
-        - qits:admin
-        - qits:agent
-        - qits:system
-        - qits:ci-run
-  /artifacts/api/gc/condemned/{type}/{identity}/restore:
-    post:
-      operationId: restoreGcCondemned
-      parameters:
-      - name: identity
-        in: path
-        required: true
-        schema:
-          type: string
-          pattern: .+
-      - name: type
-        in: path
-        required: true
-        schema:
-          type: string
-      - name: repository
-        in: query
-        schema:
-          type: string
-      responses:
-        "200":
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/GcRestoreReceipt"
-        "401":
-          description: Not Authorized
-        "403":
-          description: Not Allowed
-      summary: Restore
-      tags:
-      - Gc Plan Controller
-      security:
-      - SecurityScheme:
-        - qits:system
   /artifacts/api/gc/plan:
     post:
       operationId: planGcWithSuppliedPins
@@ -855,30 +796,6 @@ components:
           $ref: "#/components/schemas/Instant"
         accessedAt:
           $ref: "#/components/schemas/Instant"
-    GcCondemnedIdentity:
-      type: object
-      properties:
-        type:
-          type: string
-        repository:
-          type: string
-        identity:
-          type: string
-        condemnedAt:
-          $ref: "#/components/schemas/Instant"
-        runId:
-          type: string
-        purgeAt:
-          $ref: "#/components/schemas/Instant"
-    GcCondemnedListing:
-      type: object
-      properties:
-        condemnGracePeriod:
-          type: string
-        condemned:
-          type: array
-          items:
-            $ref: "#/components/schemas/GcCondemnedIdentity"
     GcIdentity:
       type: object
       properties:
@@ -1004,15 +921,6 @@ components:
         withheldBytes:
           type: integer
           format: int64
-    GcRestoreReceipt:
-      type: object
-      properties:
-        restored:
-          type: array
-          items:
-            $ref: "#/components/schemas/GcCondemnedIdentity"
-        note:
-          type: string
     GcSweepOutcome:
       type: object
       properties:
@@ -1082,8 +990,6 @@ components:
           $ref: "#/components/schemas/GcUntouchablePool"
         runId:
           type: string
-        condemnGracePeriod:
-          type: string
     GcTypeConfiguration:
       type: object
       properties:
@@ -1123,10 +1029,6 @@ components:
         reclaimableBytes:
           type: integer
           format: int64
-        condemned:
-          type: array
-          items:
-            $ref: "#/components/schemas/GcCondemnedIdentity"
     GcTypeSweepResult:
       type: object
       properties:
@@ -1146,18 +1048,6 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/GcIdentity"
-        condemned:
-          type: array
-          items:
-            $ref: "#/components/schemas/GcIdentity"
-        cleared:
-          type: array
-          items:
-            $ref: "#/components/schemas/GcIdentity"
-        awaitingPurge:
-          type: array
-          items:
-            $ref: "#/components/schemas/GcCondemnedIdentity"
     GcUntouchablePool:
       type: object
       properties:

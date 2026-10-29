@@ -39,16 +39,11 @@ import java.util.List;
  *     zeros, which is the same "report rather than throw" posture the whole-store surface holds.
  * @param deleted this repository's identities whose rows are gone now, each still naming the rule
  *     that condemned it
- * @param withheldByGraceWindow identities left whole because a blob they release is still inside
- *     the window. Not lost: the next run past it takes rows and files together.
+ * @param withheldByGraceWindow identities left whole because their own row, or a blob they release,
+ *     is still inside the window. Not lost: the next run past it takes rows and files together.
  * @param sweep the blob unlinks — what was freed, and every candidate that was not
  * @param untouchable the row-less pool as it stood before this run, restated
- * @param runId this run's id, carried by every condemnation it wrote
- * @param condemnGracePeriod how long a condemnation must stand before a sweep may purge, ISO-8601
- * @param condemned this repository's dead identities this run condemned for the first time — and
- *     only this repository's: a scoped run condemns, clears and purges inside its scope alone
- * @param cleared this repository's condemnations lifted because the keep-set names them again
- * @param awaitingPurge this repository's dead identities still inside their condemnation's grace
+ * @param runId this run's id, unique per receipt
  */
 public record GcRepositorySweepReport(
     String repository,
@@ -65,8 +60,4 @@ public record GcRepositorySweepReport(
     List<GcIdentity> withheldByGraceWindow,
     GcSweepOutcome sweep,
     GcUntouchablePool untouchable,
-    String runId,
-    String condemnGracePeriod,
-    List<GcIdentity> condemned,
-    List<GcIdentity> cleared,
-    List<GcCondemnedIdentity> awaitingPurge) {}
+    String runId) {}
