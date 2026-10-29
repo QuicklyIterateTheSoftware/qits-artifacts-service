@@ -12,8 +12,9 @@ import java.util.List;
  *
  * @param blobCount how many files would be unlinked
  * @param reclaimableBytes what they occupy on disk — the real reclaim, before the grace window
- * @param withheldByGraceWindow blobs that qualify but whose file is younger than the grace window.
- *     They are not lost, only not yet: the next run takes them. The window is what closes the race
+ * @param withheldByGraceWindow blobs that qualify but whose file is younger than the grace window,
+ *     or that belong to a dead identity a sweep withholds whole because its own row stamp or another
+ *     of its blobs is (qits-1732). They are not lost, only not yet: the next run takes them. The window is what closes the race
  *     where a client's blob-exists probe answers "have it" for a blob about to be unlinked.
  * @param withheldBytes what those occupy
  * @param blobIds every digest that would be unlinked, in full and sorted. A sweep report exists to

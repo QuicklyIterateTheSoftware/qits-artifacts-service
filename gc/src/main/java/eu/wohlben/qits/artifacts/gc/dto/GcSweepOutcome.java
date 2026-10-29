@@ -8,9 +8,10 @@ import java.util.List;
  * @param blobsUnlinked how many files were unlinked
  * @param bytesReclaimed what they occupied on disk — the only figure in this feature that is disk
  *     coming back
- * @param withheldByGraceWindow candidates whose file is younger than the grace window. They are not
- *     lost, only not yet: their identity rows were withheld with them, and the next run past the
- *     window takes rows and files together.
+ * @param withheldByGraceWindow candidates whose file is younger than the grace window, or whose
+ *     identity was withheld whole for its own young row or a young sibling blob (qits-1732). They
+ *     are not lost, only not yet: their identity rows were withheld with them, and the next run past
+ *     the window takes rows and files together.
  * @param withheldBytes what the withheld candidates occupy
  * @param stillReferenced candidates something still named at unlink time — a withheld identity of
  *     another type, or a store that moved between plan and unlink. Refused, which is the mechanism

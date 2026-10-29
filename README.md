@@ -1075,41 +1075,44 @@ first, the user reviewed it, and only then did the execute route land. Nothing e
 GET  /artifacts/api/gc/plan     what every type's strategy would delete, and what a sweep would unlink
 POST /artifacts/api/gc/plan     the same report, over pins supplied in the body
 POST /artifacts/api/gc/sweep    execute exactly that, once, and answer with the receipt
-GET  /artifacts/api/gc/condemned                              what sweeps have condemned and not yet purged
-POST /artifacts/api/gc/condemned/{type}/{identity}/restore    lift one condemnation (?repository= narrows it)
 ```
 
-**A sweep condemns before it deletes (qits-1172).** What a run's plan finds dead is not deleted on
-that run: it is *condemned* — one row in `gc_condemned` (type, repository, identity, `condemned_at`,
-`run_id`), nothing of the identity touched, every read and download answering as before, its blobs
-kept on the retained side of the reconciliation. A later run *purges* it — the delete path below,
-unchanged — only once the condemnation is older than `qits.artifacts.gc.condemn-grace-period`
-(`PT6H`) **and** that run's own plan still finds it dead; the blob grace still applies on top. A run
-whose keep-set names a condemned identity again lifts the condemnation by itself (`cleared` on the
-receipt). Before this, the only clock was the blob grace — the age of the *bytes* — so an old
-version left out of one run's keep-set by a wrong pin answer went in one run, unrecoverably.
+**A sweep deletes what its own plan finds dead, on that run (qits-1732).** Between qits-1172 and
+qits-1732 it did not: a run *condemned* what it found dead (a row in `gc_condemned`) and only a later
+run past `qits.artifacts.gc.condemn-grace-period` purged it, so that a keep-set built from an
+incomplete pin answer could be corrected before anything went. The owner removed that stage, its
+table (V6 drops it), its config key and its two doors (`GET /gc/condemned`, `POST
+/gc/condemned/{type}/{identity}/restore`), because the hole it guarded is closed where it opened and
+the delay had a price: it held about a grace's worth of dead releases on disk, which at `P1D` was
+15–17 GiB and a full disk on 2026-10-27. What makes the one-phase collector safe:
 
-- Condemnation is **per type and per scope**: a scoped sweep reads, writes and lifts its own
-  repository's condemnations only. A type whose strategy refused changes none, and an **aborted**
-  run changes none at all — it ends before any plan exists.
-- `GET /gc/condemned` lists every standing condemnation with `type`, `repository`, `identity`,
-  `condemnedAt`, `runId` (the receipt's `runId`) and `purgeAt` (= `condemnedAt` + grace). The dry-run
-  marks the dead identities already condemned in each type's `condemned`; the rest of `dead` would
-  merely be condemned by a sweep now.
-- The restore takes the identity as the **rest of the path** up to the literal `/restore`, decoded,
-  so `npm/@qits/x@2026.1.0` and `g:a:v` may be sent raw or percent-encoded (`%2F`, `%40`). Without
-  `?repository=` it lifts the identity in every repository of the type — the one direction a missing
-  parameter may widen a GC call, because a restore deletes nothing. `qits:system`, like the sweep;
-  `404` when nothing is condemned under that name.
-- **A restore buys time, not retention.** If the next sweep still finds the identity dead it is
-  condemned again with a fresh clock — a full grace before any purge, and back on the list — and
-  the receipt's `note` says so. What makes it stay is the pin source that should have named it.
-- Each sweep's log line per type reads `condemned N, cleared C, purged P identities, awaiting purge
-  A, withheld W by grace, E errors`. The receipt keeps `deleted` (= purged) and
-  `withheldByGraceWindow` as they were and adds `runId`, `condemnGracePeriod` and, per type,
-  `condemned`, `cleared` and `awaitingPurge`.
-- `PT0S` gives back the one-phase collector (condemn and purge in one run) — an escape hatch for a
-  disk emergency, never a default.
+- **The keep-set is fail-closed.** Every pin source must answer, and answer whole — an empty
+  deployment or maintenance answer is a refusal, never "nothing is pinned".
+- **The abort rule.** A sweep reads its pins first and, when any source failed, returns an
+  `aborted` receipt before the census, deleting nothing — at repository scope too.
+- **The identity grace** covers the one gap no keep-set can see, the **push-to-pin gap**: an
+  identity pushed moments ago that no manifest, deployment or launch configuration names *yet*.
+  It is `qits.artifacts.gc.blob-grace-period`, which **stays `PT6H`**, and since qits-1732 an
+  identity is young while its **own row stamp** *or* any of its blobs' `stored_at` is inside it.
+  The row half is what makes it hold: the store dedupes and `BlobStore.promote` does not refresh
+  `stored_at`, so a tag pushed onto a manifest the store already held, or a docs version
+  byte-identical to last week's, lands on old bytes and was outside a blob-only window the moment
+  it landed. The row stamps are server-set and moved by no read: `oci_tag.updated_at` (and the
+  manifest row's `created_at`), `npm_version.created_at`, the newest `maven_artifact.created_at` of
+  a coordinate, `daemon_binary.published_at`, `docs_site.published_at`, `sbom_document.created_at`.
+
+**What the grace does not close, and why that costs no data.** A client's blob-exists probe (`HEAD
+/v2/…/blobs/<digest>`) can answer "have it" for an OLD blob a concurrent sweep is about to unlink,
+and the manifest naming it lands after — no window measured on rows or bytes can see a push that
+has written neither yet. The OCI manifest `PUT` then fails loudly with `MANIFEST_BLOB_UNKNOWN`, and
+the client pushes the blob again; nothing is silently lost. npm and maven upload their content
+inline with the version, with no probe at all, so they have no such race.
+
+Each sweep's log line per type reads `deleted D identities, withheld W by grace, E errors`, and the
+receipt carries `runId`, per type `deleted` and `withheldByGraceWindow`, and the blob loop's figures.
+The dry run judges the identity grace the same way, per identity: a dead identity whose row or any
+blob is young has *all* its blobs counted as withheld rather than sweepable, so the plan's withheld
+figures are those of the identities a sweep would withhold.
 
 The sweep computes its own plan inside the request — there is no way to submit one, because a
 stored plan is a plan on stale facts, and a plan on stale facts deletes a running image (the OCI
@@ -1119,9 +1122,9 @@ withheld, the pins section the plan carries, and the untouchable pool restated.
 
 **The grace window gates identity rows as well as blob unlinks.** A blob may only be swept by
 *losing* its last identity row — so deleting a row while the blob's file is still inside the window
-would strand the blob forever, row-less and untouchable. An identity whose released blobs include
-one still in grace is therefore withheld whole: rows stay, the next run re-plans it, and row and
-file mature out of the window together. On a store younger than the window a sweep provably
+would strand the blob forever, row-less and untouchable. An identity whose own row, or one of whose
+released blobs, is still in grace is therefore withheld whole: rows stay, the next run re-plans it,
+and row and file mature out of the window together. On a store younger than the window a sweep provably
 deletes nothing, and that no-op receipt is the mechanism's own safety proof.
 
 The `POST` is `@RolesAllowed("qits:system")` — a sweep is a machine's call, made by
@@ -1267,8 +1270,9 @@ disk; narrowing the pin coverage is what would make it one about correctness aga
 removed is a window owed.
 
 **The one clock left is the blob grace period** (`PT6H`), and it is race safety rather than
-retention: bytes pushed minutes ago must outlive the gap until their pin appears. See "A grace
-window" below.
+retention: an identity pushed minutes ago — measured on its own row stamp or its bytes' `stored_at`,
+whichever is younger (qits-1732) — must outlive the gap until its pin appears. See "A grace window"
+below.
 
 **That argument did not survive contact with `maven-packages`, and one night later.** At `01:58Z` on
 2026-09-05 the `P3D` window deleted 67 published `eu.wohlben.qits` maven coordinates and every gating
@@ -1458,17 +1462,21 @@ drives it behind the `POST`, after the strategies' identity deletions, against a
 after them. Three constraints are enforced in the method rather than trusted to its caller:
 
 - **A grace window** — `qits.artifacts.gc.blob-grace-period`, default **6 hours**, measured from the
-  file's mtime, which is when `promote` moved it into place. It closes the upload race: a client's
-  blob-exists probe (or npm's dedupe) answers "have it" for a blob about to be unlinked, and the
-  manifest referencing it lands after. A withheld blob is not lost — it is reported as withheld, and
-  the next run takes it.
+  blob's `stored_at`, which is when `promote` first wrote those bytes — and which a later push that
+  dedupes onto them does **not** move. It closes the upload race for young bytes: a client's
+  blob-exists probe answers "have it" for a blob about to be unlinked, and the manifest referencing
+  it lands after. For an OLD blob it cannot, and that race costs no data: the manifest `PUT` fails
+  with `MANIFEST_BLOB_UNKNOWN` and the client re-pushes (npm and maven upload inline, no probe). A
+  withheld blob is not lost — it is reported as withheld, and the next run takes it.
   **With the access windows at `P0D` this is the only clock left in the collector, and it is race
   safety rather than retention.** The keep-classes name a coordinate the moment somebody else's row,
   manifest or configuration names it; what they cannot do is name it in the gap between a push and
   that row appearing — an image landing minutes before its deployment row, a library landing before
   its consumer's fold resolves it. This window is exactly that gap. It gates identity **rows** as
-  well as blob unlinks, so a fresh push is immune whole for six hours, coordinate and bytes
-  together. It was `P7D` until 2026-09-04 and `P2D` until 2026-09-05.
+  well as blob unlinks, and since qits-1732 an identity is young while its own row stamp *or* any
+  of its blobs is inside it — so a fresh push is immune whole for six hours, coordinate and bytes
+  together, even when every byte it names deduped onto content the store already held. It was
+  `P7D` until 2026-09-04 and `P2D` until 2026-09-05.
 - **A pre-unlink re-census** — a plan is a photograph; the store moves. The caller passes a guard
   that is asked again inside the store's write lock, the same lock `promote` takes, so the check and
   the unlink cannot be separated by a write. Both writers live in one JVM, which is what makes an
@@ -1536,7 +1544,7 @@ always stays, and everything else dies on the run that finds it.**
 | qits-workspaces or qits-projects would launch it | any `image:version` `GET /workspaces/api/pins` or `GET /projects/api/pins` names, joined the same way. A workspace or agent image is started on demand, so the image a user's next click pulls can easily be one nobody has started for a week |
 | it is the moving pointer | a tag literally named `latest`. CI step recipes pull `qits/build-images/*:latest` by name; `latest` is not a calver, so no release rule covers it, and the host-side keep-prefix suppresses exactly the pulls that would keep it access-warm. Deleting it `404`s a fresh host's first pull of a step image, and it costs nothing — `latest` shares the newest push's blobs |
 | the next deploy will pull it | the newest **calver** tag per image, ordered `BY_CALVER` — the version's own order. This is the whole safety net for an image cd has never deployed, and a deploy pulls a version coordinate, so the newest release is the coordinate it will ask for. It named the newest build sha until 2026-09-04, which stopped being the pull target when deployments moved to version coordinates |
-| — | there is no sixth row any more. Access was the *unclassified-means-keep* backstop's last home, and at `P0D` a coordinate nobody names is condemned on the run that finds it. What buys a just-pushed tag time is the six-hour grace on its bytes, which withholds the identity whole |
+| — | there is no sixth row any more. Access was the *unclassified-means-keep* backstop's last home, and at `P0D` a coordinate nobody names is condemned on the run that finds it. What buys a just-pushed tag time is the six-hour grace on its row and its bytes (qits-1732: the tag row's own stamp counts, because a tag pushed onto an existing manifest writes no new bytes), which withholds the identity whole |
 
 **Two rules changed direction, and both changes are the settlement's.** Calver releases used to be
 kept forever and are now kept as the last two per image. Build-sha tags used to die structurally the
@@ -1910,8 +1918,7 @@ app's `application.properties` overrides them.
 | Key | Default | What |
 |---|---|---|
 | `qits.artifacts.blobs-dir` | `~/.qits/data/artifacts/blobs` | content-addressed blob bytes |
-| `qits.artifacts.gc.condemn-grace-period` | `PT6H` | how long a sweep's condemnation of a dead identity must stand before a later sweep may purge it (qits-1172) — the time a wrong keep-set answer stays reversible. In the `gc` jar, beside the code that reads it; see "Garbage collection" |
-| `qits.artifacts.gc.blob-grace-period` | `PT6H` | how long a blob file must sit untouched before the sweep may unlink it — see "Garbage collection". With the access windows at zero this is the only clock left, and it is race safety for a just-pushed artifact rather than retention: it gates identity rows as well as blob unlinks |
+| `qits.artifacts.gc.blob-grace-period` | `PT6H` | how long a blob file must sit untouched before the sweep may unlink it — see "Garbage collection". With the access windows at zero this is the only clock left, and it is race safety for a just-pushed artifact rather than retention: it gates identity rows as well as blob unlinks, and an identity is young while its own row stamp or any of its blobs' `stored_at` is inside it (qits-1732) |
 | `qits.artifacts.gc.pins.cd-base-url` | `http://qits-cd:8080/cd/api` | where a run reads the image shas deployments pin (`GET /cd/api/pins`). **Renamed** from `qits.artifacts.gc.oci.cd-base-url` |
 | `qits.artifacts.gc.pins.cd-timeout` | `PT10S` | per-request timeout on that fetch. **Renamed** from `qits.artifacts.gc.oci.cd-timeout` |
 | `qits.artifacts.gc.pins.ci-base-url` | `http://qits-ci:8080/ci/api` | where a run reads the daemon pin ladder (`GET /ci/api/daemon`) |

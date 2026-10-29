@@ -20,8 +20,9 @@ import java.util.List;
  * @param blobsSweepable how many blob files would lose their last reference
  * @param reclaimableBytes what those files occupy on disk
  * @param reclaimable the same figure in units a human reads, so nobody counts digits
- * @param withheldByGraceWindow blobs that qualify but whose file is younger than the grace window —
- *     not lost, only not yet
+ * @param withheldByGraceWindow blobs that qualify but that a run now would leave alone: their file
+ *     is younger than the grace window, or they belong to a dead identity a sweep withholds whole
+ *     because its own row or another of its blobs is (qits-1732) — not lost, only not yet
  * @param types one line per repository type, in the enum's order: its configured engine and window,
  *     what it condemns, what that frees, and the type's own note when it carries one. A type nobody
  *     collects says so here rather than being left out.

@@ -34,7 +34,8 @@ package eu.wohlben.qits.artifacts.gc.dto;
  *     having nothing to clean
  * @param reclaimableBytes what those blobs occupy on disk
  * @param withheldByGraceWindow how many of them a run <em>now</em> would leave alone because their
- *     files are younger than the grace window. Not lost, only not yet.
+ *     files are younger than the grace window, or because the dead identity naming them is withheld
+ *     whole for its own young row or a young sibling blob (qits-1732). Not lost, only not yet.
  * @param withheldBytes what the withheld ones occupy
  */
 public record GcRepositoryPlanSummary(

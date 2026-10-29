@@ -378,24 +378,37 @@ collection" section is the contract; these are the rules that get "helpfully" re
 - **The grace window gates identity rows, not only blob unlinks.** A blob can only be swept by
   *losing* its last row, so a row deleted while the blob's file is inside the window would strand
   the blob — row-less, untouchable, never reclaimed. `GcStrategy.apply` therefore withholds an
-  identity whole when any blob it releases is still in grace; `GcSweepExecutor` (behind
+  identity whole when its own row stamp or any blob it releases is still in grace (the row half is
+  qits-1732, next bullet); `GcSweepExecutor` (behind
   `POST /artifacts/api/gc/sweep`) applies only plans it computed in the same request, and on a
   store younger than the window a sweep provably deletes nothing.
 
-- **A sweep condemns, a later sweep purges (qits-1172), and the gate is the executor's, not an
-  adapter's.** `GcSweepExecutor.condemn` reconciles `gc_condemned` (V5, plain JDBC in
-  `GcCondemnations` — no entity, because the persistence unit's packages are the `artifacts` jar's
-  to name) against the run's dead set per `(type, scope)`: lift what is no longer dead, condemn what
-  is newly dead, and hand `apply` and `BlobSweep` only `Plan.purging(ripe)` — the identities
-  condemned at least `qits.artifacts.gc.condemn-grace-period` (`PT6H`) ago, with every
-  still-condemned identity's blobs moved to the retained side via the engine's
-  `releasedByIdentity`. No adapter changed, because every delete loop acts on `plan.dead()` alone;
-  do not push condemnation down into an adapter. A table rather than a column per type table,
-  because most identities are not one row (a maven coordinate, an OCI tag, a docs version) and most
-  of those tables are mapped by the `qits-registries-*` jars. The suites cross the day by ageing
-  the rows (`GcFixture.ageCondemnationsPastGrace`), as they cross the blob grace by `backdate`;
-  `sweptPastCondemnation` is the shortest honest route to a purge for a case that is about the
-  purge.
+- **A sweep deletes what its own plan finds dead, on that run (qits-1732) — do not put a delay
+  back.** qits-1172 made a run *condemn* (a row in `gc_condemned`) and a later run purge past a
+  condemn grace; the owner removed it: V6 drops the table, and `GcCondemnations`, `Plan.purging`,
+  the `/gc/condemned` doors and the receipt's `condemnGracePeriod`/`condemned`/`cleared`/
+  `awaitingPurge` are gone. What it guarded — a keep-set built from an incomplete pin answer — is
+  closed by the fail-closed keep-set and the whole-run abort below, and the delay cost a grace of
+  dead releases on disk (a full disk on 2026-10-27). A "safety" stage that re-adds one is solving a
+  problem the abort already solves, at the price that filled the disk.
+- **An identity is young if its OWN ROW STAMP is inside the blob grace OR any of its blobs is
+  (qits-1732), and the dry run must agree with the sweep about it.** `BlobStore.promote` does not
+  refresh `stored_at` on dedupe (qits-registries-javalib, left as is), so a tag pushed onto an
+  existing manifest or an unchanged docs version lands on old bytes; judged on bytes alone it went
+  on the next run unpinned, inside the push-to-pin gap the grace exists for. `GcStrategy.GraceWindow`
+  answers both questions (`withinGrace(blobId)`, `withinGrace(Instant)`), built once by
+  `GraceWindow.since` for the executor and for `BlobSweep`; each adapter's delete loop asks it about
+  its own row stamp (`oci_tag.updated_at` plus the manifest's `created_at`, `npm_version.created_at`,
+  the newest `maven_artifact.created_at` of a coordinate, `daemon_binary.published_at`,
+  `docs_site.published_at`, `sbom_document.created_at`). The dry run sees the same thing through the
+  plan: `GcCandidate.stampedAt` → `Plan.stampedByIdentity`, beside `releasedByIdentity`, and
+  `BlobSweep`'s grace-applied reconciliation withholds **every** blob of an identity a sweep would
+  withhold whole — so plan and receipt report the same withheld figures, and an old blob of a
+  withheld identity is counted as withheld rather than as `stillReferenced`. A hand-built plan has no
+  per-identity attribution and is judged per blob, as before. In the suites, `GcFixture.backdate`
+  ages a blob **and** every row stamp that names it directly (never forward); a case about a young
+  row over old bytes backdates the blob before its row exists and says so. Adapter suites that call
+  `apply` by hand pass `Graces.nothingYoung()` / `Graces.blobsOnly(...)`, which answer no for rows.
 - **Live pins are read once per run, and a source that cannot answer aborts the whole run.**
   `GcPinSources` reads five sources at the start of every plan and every sweep, never cached, and
   folds them into one `GcPins`: qits-platform-deployments (`GET /deployments/api/pins`,
