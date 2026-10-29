@@ -1,0 +1,20 @@
+-- The garbage collector's condemnations go (bug qits-1732, by the owner's decision): a sweep deletes
+-- what its own plan finds dead on the run that finds it, as it did before qits-1172, and nothing
+-- reads or writes this table any more.
+--
+-- V5 put a delay between "dead" and "deleted" — condemn on one run, purge on a later one past
+-- qits.artifacts.gc.condemn-grace-period — so that a keep-set built from an incomplete pin answer
+-- could be corrected before anything went. That hole is closed where it opened: the keep-set is
+-- fail-closed (an unanswered or empty pin source is a refusal, never "nothing is pinned") and a run
+-- whose pins are incomplete aborts before the census, deleting nothing. With the keep-set known to be
+-- whole, the delay protected nothing, and it was not free: it held about a grace's worth of dead
+-- releases on disk — at P1D that was 15-17 GiB of blob_chunk and a full disk on 2026-10-27, and
+-- PT6H (qits-1664) only shrank the bill. What still stands between a push and its deletion is the
+-- identity grace (qits.artifacts.gc.blob-grace-period), which covers the push-to-pin gap no
+-- keep-set can see and is measured on the identity's own row stamp as well as its blobs' stored_at.
+--
+-- A drop rather than an edit of V5, because applied history cannot be rewritten: V5 stays, and a
+-- store migrated through it ends here with the table gone. The rows it holds are dropped with it —
+-- a standing condemnation names an identity the next sweep judges afresh anyway, and the foreign key
+-- to artifact_repository goes with the table.
+drop table gc_condemned;

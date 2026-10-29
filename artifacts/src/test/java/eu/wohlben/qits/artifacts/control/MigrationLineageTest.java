@@ -383,10 +383,13 @@ class MigrationLineageTest {
 
   @Test
   void theCondemnationTableIsKeyedByIdentityAndGoesWithItsRepository() throws SQLException {
-    // V5's table (qits-1172). One condemnation per (type, repository, identity), so a run cannot
-    // re-stamp an identity's clock by inserting a second row; an identity spelled with '@', '/' and
-    // ':' fits; and a repository removed takes its condemnations with it, because a condemnation of
-    // an identity in a repository that no longer exists names nothing.
+    // V5's table (qits-1172), pinned as it stood at V5: V6 drops it, so the chain is stopped at V5
+    // for this one. History cannot be rewritten, and a store that applied V5 held exactly this.
+    // One condemnation per (type, repository, identity), so a run cannot re-stamp an identity's
+    // clock by inserting a second row; an identity spelled with '@', '/' and ':' fits; and a
+    // repository removed takes its condemnations with it, because a condemnation of an identity in a
+    // repository that no longer exists names nothing.
+    migrateTo("5");
     insertRepository("sboms", "SBOMS");
     String condemn =
         "insert into gc_condemned (type, repository, identity, condemned_at, run_id) values"
@@ -413,6 +416,28 @@ class MigrationLineageTest {
 
     execute("delete from artifact_repository where name = 'sboms'");
     assertEquals(0, count("select count(*) from gc_condemned"), "the cascade took it");
+  }
+
+  @Test
+  void theCondemnationTableIsGoneAfterV6() throws SQLException {
+    // V6 (qits-1732): the condemn stage went, and its table with it. A chain run from empty ends
+    // without it, and so does a store that applied V5 and held a standing condemnation — the row is
+    // dropped with the table rather than left for code that no longer reads it.
+    assertEquals(0, tableCount("gc_condemned"), "the chain from empty ends without it");
+
+    migrateTo("5");
+    insertRepository("daemons", "DAEMON_BINARIES");
+    execute(
+        "insert into gc_condemned (type, repository, identity, condemned_at, run_id) values"
+            + " ('DAEMON_BINARIES', 'daemons', 'qits-ci-daemon@2026.601.10', current_timestamp,"
+            + " 'r1')");
+    Flyway.configure()
+        .dataSource(dataSource)
+        .locations("classpath:db/artifacts/postgresql")
+        .load()
+        .migrate();
+    assertEquals(0, tableCount("gc_condemned"), "V6 drops it over a store that held one");
+    assertEquals(1, count("select count(*) from artifact_repository"), "and nothing else with it");
   }
 
   @Test
@@ -508,6 +533,25 @@ class MigrationLineageTest {
             + "', '"
             + type
             + "', current_timestamp)");
+  }
+
+  /**
+   * The chain from empty again, stopped at {@code version} — for the one case pinning a table a
+   * later migration drops. Clean first, because the method already ran the whole chain.
+   */
+  private void migrateTo(String version) {
+    Flyway.configure()
+        .dataSource(dataSource)
+        .locations("classpath:db/artifacts/postgresql")
+        .cleanDisabled(false)
+        .load()
+        .clean();
+    Flyway.configure()
+        .dataSource(dataSource)
+        .locations("classpath:db/artifacts/postgresql")
+        .target(version)
+        .load()
+        .migrate();
   }
 
   private void execute(String sql) throws SQLException {
