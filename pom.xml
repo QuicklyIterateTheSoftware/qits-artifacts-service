@@ -60,6 +60,10 @@
 
     <properties>
         <qits.auth-core.version>2026.1012.173247</qits.auth-core.version>
+        <!-- The platform's shared rules, test scope only (qits-1754). ProviderStateCoverageTest is
+             what this repo takes it for. Published by qits-integrations-quarkus, like qits-auth-core
+             above. -->
+        <qits.arch-rules.version>2026.1030.30851</qits.arch-rules.version>
         <!-- qits-http-core: QitsHttpClients.wrap puts a CLIENT span and X-Qits-Caller on every
              outbound java.net.http.HttpClient this repo builds to another qits service, the same
              way quarkus-opentelemetry already does for the REST client. Published by
@@ -384,6 +388,12 @@
                 <groupId>${project.groupId}</groupId>
                 <artifactId>qits-idp-golden-masters</artifactId>
                 <version>${qits.idp-golden-masters.version}</version>
+            </dependency>
+            <dependency>
+                <!-- Test scope at every declaration site: ProviderStateCoverageTest (qits-1754). -->
+                <groupId>${project.groupId}</groupId>
+                <artifactId>qits-arch-rules</artifactId>
+                <version>${qits.arch-rules.version}</version>
             </dependency>
         </dependencies>
     </dependencyManagement>

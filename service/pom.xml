@@ -312,6 +312,12 @@
             <artifactId>qits-idp-golden-masters</artifactId>
             <scope>test</scope>
         </dependency>
+        <dependency>
+            <!-- ProviderStateCoverageTest (qits-1754): the platform's shared rules. -->
+            <groupId>${project.groupId}</groupId>
+            <artifactId>qits-arch-rules</artifactId>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 
     <build>
