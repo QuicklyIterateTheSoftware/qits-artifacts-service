@@ -19,8 +19,8 @@ import java.util.Set;
  * with the blob store.
  *
  * <p><b>The rollout gate decides whether it does anything.</b> With {@code
- * qits.auth.machine.required} off — the shipped default — every call returns at once and the write
- * surface is open exactly as it was before qits-platform-idp existed. That is the same posture the
+ * qits.auth.machine.required} off — %dev/%test only; prod ships it on — every call returns at once
+ * and the write surface is open exactly as it was before qits-platform-idp existed. That is the same posture the
  * retired {@code X-Artifacts-Token} filter had with a blank secret, and it is why this can ship
  * before the idp is deployed. Reads (GET) are never guarded either way — a blob must stay usable
  * directly as an {@code <img>}/{@code <video>} src.

@@ -1129,9 +1129,9 @@ deletes nothing, and that no-op receipt is the mechanism's own safety proof.
 
 The `POST` is `@RolesAllowed("qits:system")` — a sweep is a machine's call, made by
 qits-platform-orchestrator — and, as a write under the `gc` prefix, it also passes through
-`AdminWriteGuard`'s `MachineAuth.require()`. Stated honestly: that second belt is inert while the
-`qits.auth.machine.required` rollout gate ships off, which is the standing qits-platform-idp
-direction and the reason the guard could ship before the idp was deployed. The retired
+`AdminWriteGuard`'s `MachineAuth.require()`. That second belt is live wherever the
+`qits.auth.machine.required` rollout gate is on — the shipped default since qits-765 — and inert
+only in `%dev`/`%test`; gate-off is what let the guard ship before the idp was deployed. The retired
 `X-Artifacts-Token` filter it replaced is gone; per the recorded decision, no interim token scheme
 is invented meanwhile. The
 registries' `405` on client deletes (`/v2` manifests, npm unpublish) is untouched: no client gains
@@ -1931,7 +1931,7 @@ app's `application.properties` overrides them.
 | `qits.artifacts.gc.pins.projects-timeout` | `PT10S` | per-request timeout on that fetch |
 | `qits.artifacts.gc.type.<wire-name>.strategy` | per type, see "The settlement" | which engine collects a repository type: `own` or `excluded` here — the `cache` engine is qits-platform-mirror's. Every registered type must have one, and a missing entry is refused, not defaulted |
 | `qits.artifacts.gc.type.<wire-name>.window` | `P0D` for all six own types | how long an identity may sit unaccessed before it is eligible, ISO-8601. At the shipped zero the keep-classes are the whole retention policy. Absent for an `excluded` type |
-| `qits.auth.machine.required` | `false` | the machine-token rollout gate. Off, the JSON admin write surface is open — network trust — and every wire accepts an anonymous publish, because the OIDC tenant follows this same key and a refusal would be demanding a credential nothing could validate. On, its writes need a bearer with `aud=qits-platform`, `PublishGuard` validates a bearer presented on a publish route, and a publish carrying none is refused on all six wires |
+| `qits.auth.machine.required` | `true` (`%dev`/`%test`: `false`) | the machine-token rollout gate, shipped at its live value since qits-765 (it used to arrive as `QITS_AUTH_MACHINE_REQUIRED=true` from qits-configuration). Off, the JSON admin write surface is open — network trust — and every wire accepts an anonymous publish, because the OIDC tenant follows this same key and a refusal would be demanding a credential nothing could validate. On, its writes need a bearer with `aud=qits-platform`, `PublishGuard` validates a bearer presented on a publish route, and a publish carrying none is refused on all six wires |
 | `qits.artifacts.startup-seed.enabled` | `true` | self-seed the hosted roots: `ci-screenshots`, `ci-videos`, `qits`, `npm`, `maven`, `daemons`, `docs`, `sboms`. No cache root — those are qits-platform-mirror's |
 | `quarkus.oidc.auth-server-url` | `http://qits-platform-idp:8080/idp` | the idp, reached direct on qits-net, for validating an inbound machine token |
 | `qits.artifacts.oci.max-layer-size` | `1G` | the registry's per-layer cap, enforced while streaming |
