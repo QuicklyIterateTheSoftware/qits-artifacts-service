@@ -113,6 +113,11 @@ public class PackagedProcessIT {
       overrides.put("quarkus.datasource.artifacts.username", EmbeddedPg.USER);
       overrides.put("quarkus.datasource.artifacts.password", EmbeddedPg.PASSWORD);
       overrides.put("quarkus.flyway.artifacts.clean-at-start", "true");
+      // The packaged process runs the PROD profile, where the machine-token gate now ships ON (the
+      // live value, qits-765). This profile's wire cases and stories are the gate-off posture —
+      // tokenless on qits-net, no issuer to reach — so it is stated here rather than inherited.
+      // TokenValidationBootstrapIT is the gate-on twin and sets the key the other way.
+      overrides.put("qits.auth.machine.required", "false");
       // No qits-platform-deployments or qits-ci here either, and the shipped defaults name them by their qits-net
       // aliases — which on a build machine resolve to whatever the resolver feels like, or hang.
       // Closed ports make the refusal deterministic while still driving a real HttpClient inside
