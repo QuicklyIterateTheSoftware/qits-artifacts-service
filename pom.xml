@@ -127,7 +127,7 @@
         <qits.bootstrap-cli-pacts-qits-artifacts-service.version>2026.1023.225504</qits.bootstrap-cli-pacts-qits-artifacts-service.version>
         <qits.maintenance-service-pacts-qits-artifacts-service.version>2026.1019.73752</qits.maintenance-service-pacts-qits-artifacts-service.version>
         <qits.orchestrator-service-pacts-qits-artifacts-service.version>2026.1019.92500</qits.orchestrator-service-pacts-qits-artifacts-service.version>
-        <qits.platform-access-cli-pacts-qits-artifacts-service.version>2026.1019.92700</qits.platform-access-cli-pacts-qits-artifacts-service.version>
+        <qits.platform-access-cli-pacts-qits-artifacts-service.version>2026.1031.10603</qits.platform-access-cli-pacts-qits-artifacts-service.version>
         <!-- THE PROVIDERS' GOLDEN MASTERS this service's OWN consumer pacts read (contracts/consumer,
              qits-1149): what each pin source and the idp record for their provider states. Test
              scope, read off the classpath by ProviderGoldenMasters. Moved by qits-maintenance like
