@@ -59,7 +59,7 @@
     </modules>
 
     <properties>
-        <qits.auth-core.version>2026.1012.173247</qits.auth-core.version>
+        <qits.auth-core.version>2026.1031.63225</qits.auth-core.version>
         <!-- The platform's shared rules, test scope only (qits-1754). ProviderStateCoverageTest is
              what this repo takes it for. Published by qits-integrations-quarkus, like qits-auth-core
              above. -->
@@ -133,7 +133,7 @@
              scope, read off the classpath by ProviderGoldenMasters. Moved by qits-maintenance like
              every other pin; do not hand-edit them to chase a release. -->
         <qits.deployments-golden-masters.version>2026.1010.145913</qits.deployments-golden-masters.version>
-        <qits.ci-golden-masters.version>2026.1026.163551</qits.ci-golden-masters.version>
+        <qits.ci-golden-masters.version>2026.1031.93847</qits.ci-golden-masters.version>
         <qits.maintenance-golden-masters.version>2026.1031.22002</qits.maintenance-golden-masters.version>
         <qits.workspaces-golden-masters.version>2026.1029.225748</qits.workspaces-golden-masters.version>
         <qits.projects-golden-masters.version>2026.1030.185452</qits.projects-golden-masters.version>
