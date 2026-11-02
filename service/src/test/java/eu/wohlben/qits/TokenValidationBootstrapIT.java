@@ -29,9 +29,10 @@ import org.junit.jupiter.api.TestMethodOrder;
  * The whole service as it is <b>packaged</b>, with the machine-token rollout gate <b>on</b> — the
  * posture a deployment with qits-platform-idp runs, and one no other suite here can prove:
  * {@link MachineTokens.Enforced} swaps the tenant's key distribution for a configured public key,
- * so the shipped {@code quarkus.oidc.*} block (auth-server-url + jwks-path against a real listener,
- * the boot-time JWKS fetch under {@code connection-delay}, audience enforcement, groups→roles
- * mapping) is exercised nowhere else. The far side is {@link MockIdp}, whose recordings make the
+ * so the shipped {@code quarkus.oidc.*} block (auth-server-url, the discovery document read from it
+ * and the JWKS its {@code jwks_uri} names, against a real listener, under {@code connection-delay};
+ * the issuer that document publishes; audience enforcement; groups→roles mapping) is exercised
+ * nowhere else on the artifact. {@code BearerIssuerTest} holds the issuer pin in-JVM (qits-708). The far side is {@link MockIdp}, whose recordings make the
  * interaction assertable on <b>both ends</b>. qits-githost's IT of the same name is the pattern.
  *
  * <p>It is also this repo's first <b>userflow</b>: the proof doubles as documentation, emitted under
@@ -91,7 +92,7 @@ public class TokenValidationBootstrapIT {
       // the tenant on, so the gate-follows-tenant coupling is itself under test.
       overrides.put("qits.auth.machine.required", "true");
       // The one seam this test moves: where the idp is. Runtime key, so the packaged artifact is
-      // otherwise exactly what ships — jwks-path stays `jwks`, joined onto this base.
+      // otherwise exactly what ships — discovery on, the issuer and jwks_uri read from this base.
       overrides.put("quarkus.oidc.auth-server-url", idp.baseUrl());
       // No qits-platform-deployments, qits-ci or public registry on a build machine — closed ports
       // refuse deterministically, the same three lines PackagedProcessIT passes.
@@ -148,9 +149,9 @@ public class TokenValidationBootstrapIT {
   @UserStoryDescription(
       """
       A qits-artifacts deployed with the machine-token gate on must validate service bearers
-      before any caller arrives: at startup it fetches the signing keys (JWKS) from
-      qits-platform-idp — discovery stays off, the path is configured — so the very first admin
-      write carrying a platform token is accepted.
+      before any caller arrives: at startup it reads qits-idp's discovery document, which names
+      the issuer every token must carry and where the signing keys (JWKS) are, and fetches those
+      keys — so the very first admin write carrying a platform token is accepted.
       """)
   @Order(1)
   void serviceBootFetchesJwksAndAcceptsPlatformTokens(Interactions story) {
@@ -160,15 +161,21 @@ public class TokenValidationBootstrapIT {
         "qits-artifacts starts with the rollout gate on, beside a reachable qits-platform-idp");
     given().get("/artifacts/q/health/ready").then().statusCode(200);
 
-    // End (a), the idp side: the JWKS was served during startup — before this story presented
-    // any token at all. connection-delay=30S is what turns the boot attempt into a retried one.
+    // End (a), the idp side: the discovery document and the JWKS it names were served during
+    // startup — before this story presented any token at all. connection-delay=30S is what turns
+    // the boot attempt into a retried one.
+    assertTrue(
+        idp.recordedRequests().stream()
+            .anyMatch(r -> "/idp/.well-known/openid-configuration".equals(r.path())),
+        "the packaged service never read the idp's discovery document at startup");
     assertTrue(
         idp.recordedRequests().stream().anyMatch(r -> "/idp/jwks".equals(r.path())),
         "the packaged service never fetched /idp/jwks at startup");
     // The edge itself is drained from the mock's recording; what is asserted here is that it
     // happened, and the note is the one thing the recording cannot carry — WHEN.
     story
-        .note("the signing keys were fetched at startup, before this story presented any token")
+        .note("the discovery document was read and the signing keys fetched at startup, before"
+            + " this story presented any token")
         .as("jwks-fetched");
 
     // End (b), the registry side: those keys are what token validation now runs on. A platform
@@ -286,6 +293,13 @@ public class TokenValidationBootstrapIT {
         SERVICE,
         MockIdp.SERVICE_NAME,
         "GET /idp/jwks -> 200");
+    ReportAssertions.assertEdge(
+        CATEGORY,
+        ACCEPTED_SLUG,
+        NetworkEdge.HTTP,
+        SERVICE,
+        MockIdp.SERVICE_NAME,
+        "GET /idp/.well-known/openid-configuration -> 200");
     // Observed on the near side, by the filter, with the actor this story set.
     ReportAssertions.assertEdge(
         CATEGORY,

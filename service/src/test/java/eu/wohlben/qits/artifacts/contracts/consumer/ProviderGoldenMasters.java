@@ -57,7 +57,8 @@ import java.util.regex.Pattern;
  *
  * <p>Leaf matchers follow the index's {@code frozen} lists, as in the original: {@code ids} a UUID
  * regex, {@code instants} an ISO-8601 regex, everything else a type match ({@code type OR null}
- * where some recorded element held null).
+ * where some recorded element held null) — except a string leaf the row names in {@link
+ * ConsumerContract.Row#exact}, which is bound to its recorded value (qits-708: the issuer).
  */
 public final class ProviderGoldenMasters {
 
@@ -239,7 +240,7 @@ public final class ProviderGoldenMasters {
   public PactBuilder interaction(PactBuilder builder, ConsumerContract.Row row) {
     Objects.requireNonNull(row.trigger(), "trigger: every interaction names its entry point");
     Operation op = operation(row.state(), row.operationId());
-    DslPart body = responseBody(op, row.consumes());
+    DslPart body = responseBody(op, row.consumes(), Set.copyOf(row.exact()));
     Map<String, Object> references = new LinkedHashMap<>();
     Map<String, String> call = new LinkedHashMap<>();
     call.put("app", repository);
@@ -278,6 +279,14 @@ public final class ProviderGoldenMasters {
 
   /** The recording reduced to {@code consumes}, as a matcher body; null when it consumes nothing. */
   DslPart responseBody(Operation op, List<String> consumes) {
+    return responseBody(op, consumes, Set.of());
+  }
+
+  /**
+   * {@link #responseBody(Operation, List)}, with each string leaf on an {@code exact} path bound to
+   * its recorded value rather than to its type.
+   */
+  DslPart responseBody(Operation op, List<String> consumes, Set<String> exact) {
     if (consumes.isEmpty()) {
       return null;
     }
@@ -289,7 +298,7 @@ public final class ProviderGoldenMasters {
     }
     JsonNode projected = project(recorded, consumes, op);
     PactDslJsonBody root = new PactDslJsonBody();
-    fillObject(root, Shape.of(projected), "$", op);
+    fillObject(root, Shape.of(projected), "$", op, exact);
     return root;
   }
 
@@ -354,31 +363,39 @@ public final class ProviderGoldenMasters {
 
   // --- the body ---------------------------------------------------------------------------------
 
-  private static void fillObject(PactDslJsonBody target, Shape shape, String path, Operation op) {
+  private static void fillObject(
+      PactDslJsonBody target, Shape shape, String path, Operation op, Set<String> exact) {
     for (Map.Entry<String, Shape> field : shape.fields.entrySet()) {
       String name = field.getKey();
       Shape child = field.getValue();
       String childPath = path + "." + name;
       switch (child.kind) {
         case NULL -> target.nullValue(name);
-        case LEAF -> leaf(target, name, child, childPath, op);
+        case LEAF -> leaf(target, name, child, childPath, op, exact);
         case OBJECT -> {
           if (child.nullable) {
             throw unsupported(op, childPath, "an object that is null in some elements");
           }
           PactDslJsonBody nested = target.object(name);
-          fillObject(nested, child, childPath, op);
+          fillObject(nested, child, childPath, op, exact);
           nested.closeObject();
         }
-        case ARRAY -> array(target, name, child, childPath, op);
+        case ARRAY -> array(target, name, child, childPath, op, exact);
       }
     }
   }
 
   private static void leaf(
-      PactDslJsonBody target, String name, Shape leaf, String path, Operation op) {
+      PactDslJsonBody target, String name, Shape leaf, String path, Operation op,
+      Set<String> exact) {
     JsonNode example = leaf.example;
-    if (op.ids().contains(path)) {
+    if (exact.contains(path)) {
+      requireText(example, path, op);
+      if (leaf.nullable) {
+        throw unsupported(op, path, "bound by value but null in some elements");
+      }
+      target.stringValue(name, example.asText());
+    } else if (op.ids().contains(path)) {
       requireText(example, path, op);
       if (leaf.nullable) {
         target.or(
@@ -410,7 +427,8 @@ public final class ProviderGoldenMasters {
   }
 
   private static void array(
-      PactDslJsonBody target, String name, Shape array, String path, Operation op) {
+      PactDslJsonBody target, String name, Shape array, String path, Operation op,
+      Set<String> exact) {
     if (array.nullable) {
       throw unsupported(op, path, "an array that is null in some elements");
     }
@@ -422,7 +440,7 @@ public final class ProviderGoldenMasters {
     switch (element.kind) {
       case OBJECT -> {
         PactDslJsonBody template = target.eachLike(name, array.length);
-        fillObject(template, element, elementPath, op);
+        fillObject(template, element, elementPath, op, exact);
         DslPart closed = template.closeObject();
         ((PactDslJsonArray) closed).closeArray();
       }

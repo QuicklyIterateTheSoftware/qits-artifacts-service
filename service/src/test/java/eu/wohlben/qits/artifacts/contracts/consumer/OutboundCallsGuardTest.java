@@ -36,10 +36,13 @@ import org.junit.jupiter.api.Test;
  * ConsumerContract#CLIENTS} with its provider, and each provider there must have a row. A new
  * client class with no row, or a row whose class is gone, fails here.
  *
- * <p>The quarkus-oidc tenant is not a class of this service's, so its call is derived from the
- * configuration: an {@code auth-server-url} with a {@code jwks-path} means a {@code getJwks} row,
- * discovery left on would mean a {@code getOpenIdConfiguration} row too, and a {@code
- * quarkus-oidc-client} on the classpath would mean the client-credentials mint ({@code issueToken}).
+ * <p>The quarkus-oidc tenant is not a class of this service's, so its calls are derived from the
+ * configuration: discovery on (as shipped since qits-708) means a {@code getOpenIdConfiguration}
+ * row whose {@code issuer} is bound by value, and a {@code getJwks} row for the {@code jwks_uri} it
+ * names; a {@code jwks-path} with discovery off would mean the {@code getJwks} row alone; and a
+ * {@code quarkus-oidc-client} on the classpath would mean the client-credentials mint ({@code
+ * issueToken}). The shipped file must carry no {@code quarkus.oidc.token.issuer}: the issuer is
+ * never configuration (qits-730), the discovery document is the pin.
  *
  * <p><b>Excluded by name</b>, because none is a qits REST contract: the registries' upstream
  * clients (the maven, npm and OCI proxies, whose caches are qits-mirror's and are excluded from
@@ -94,13 +97,22 @@ class OutboundCallsGuardTest {
     assertTrue(
         config.getProperty("quarkus.oidc.auth-server-url", "").contains("idp"),
         "the tenant validates against qits-idp");
-    if (config.getProperty("quarkus.oidc.jwks-path") != null) {
+    assertTrue(
+        config.getProperty("quarkus.oidc.token.issuer") == null,
+        "no issuer is configured (qits-730): the tenant pins the one the discovery document"
+            + " publishes");
+    boolean discovery = !"false".equals(config.getProperty("quarkus.oidc.discovery-enabled"));
+    if (discovery || config.getProperty("quarkus.oidc.jwks-path") != null) {
       assertTrue(hasRow("getJwks"), "the tenant reads the idp's JWKS: a getJwks row");
     }
-    if (!"false".equals(config.getProperty("quarkus.oidc.discovery-enabled"))) {
+    if (discovery) {
       assertTrue(
-          hasRow("getOpenIdConfiguration"),
-          "discovery is on: the tenant reads the discovery document, a getOpenIdConfiguration row");
+          ConsumerContract.ROWS.stream()
+              .anyMatch(r -> r.provider().equals(ConsumerContract.IDP)
+                          && r.operationId().equals("getOpenIdConfiguration")
+                          && r.exact().contains("$.issuer")),
+          "discovery is on: the tenant reads the discovery document, a getOpenIdConfiguration row"
+              + " binding the issuer by value");
     }
     if (present("io.quarkus.oidc.client.OidcClient")) {
       assertTrue(

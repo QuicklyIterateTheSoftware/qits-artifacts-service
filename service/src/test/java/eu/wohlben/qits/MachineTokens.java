@@ -62,9 +62,12 @@ public final class MachineTokens {
   /**
    * The enforced posture: the gate on, and this fixture's key as the one quarkus-oidc trusts.
    *
-   * <p>{@code auth-server-url} and {@code jwks-path} are blanked because a configured public key is
-   * the alternative to an OIDC server connection, not an addition to one — left set, the tenant
-   * would try to reach a host named qits-platform-idp that no test has.
+   * <p>{@code auth-server-url} is blanked because a configured public key is the alternative to an
+   * OIDC server connection, not an addition to one — left set, the tenant would try to read the
+   * discovery document of a host named dev-qits-idp that no test has. With no discovery document
+   * there is no published issuer either, so this TEST profile names the one {@link #ISSUER} its
+   * tokens carry; the shipped file names none (qits-730), and {@code BearerIssuerTest} is where the
+   * discovered issuer is held.
    */
   public static class Enforced implements QuarkusTestProfile {
     @Override
@@ -72,7 +75,6 @@ public final class MachineTokens {
       return Map.of(
           "qits.auth.machine.required", "true",
           "quarkus.oidc.auth-server-url", "",
-          "quarkus.oidc.jwks-path", "",
           "quarkus.oidc.public-key", PUBLIC_KEY,
           "quarkus.oidc.token.issuer", ISSUER);
     }

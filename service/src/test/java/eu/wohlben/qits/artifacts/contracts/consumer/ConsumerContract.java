@@ -19,10 +19,11 @@ import java.util.function.Function;
  * each answer</b> (qits-1149) — the one table the consumer pact tests and the pact file tests are
  * built from, so a committed pact and the verified behaviour cannot drift apart.
  *
- * <p><b>Seven calls, six providers.</b> Five are the GC pin readers in the {@code gc} module, one
+ * <p><b>Eight calls, six providers.</b> Five are the GC pin readers in the {@code gc} module, one
  * GET each, made by {@code GcPinSources.fetch()} at the start of every plan and sweep; the sixth is
- * {@code RegistryTokenEndpoint}'s relay of a docker login to the idp's token door; the seventh is
- * the quarkus-oidc tenant's read of the idp's signing keys. {@link #CLIENTS} names the class that
+ * {@code RegistryTokenEndpoint}'s relay of a docker login to the idp's token door; the seventh and
+ * eighth are the quarkus-oidc tenant's reads of the idp's discovery document and of the signing
+ * keys its {@code jwks_uri} names (qits-708). {@link #CLIENTS} names the class that
  * makes each, and {@code OutboundCallsGuardTest} holds that list to the code.
  *
  * <p><b>One trigger per GC row, not five.</b> The five GC routes ({@code GET /gc/plan}, {@code GET
@@ -104,6 +105,8 @@ public final class ConsumerContract {
    * @param readAt where in the recording {@code read}'s result sits: {@code $} or {@code $.pins}
    * @param pending null for a live row; otherwise why it waits — the provider records the state
    *     on a branch that has not released, so the pinned golden masters do not hold it yet
+   * @param exact the consumed string leaves the pact binds BY VALUE rather than by type: the ones
+   *     whose value is the contract, not merely their shape (the issuer the tenant pins)
    */
   public record Row(
       Provider provider,
@@ -114,7 +117,21 @@ public final class ConsumerContract {
       Request request,
       Function<String, Object> read,
       String readAt,
-      String pending) {
+      String pending,
+      List<String> exact) {
+
+    Row(
+        Provider provider,
+        Trigger trigger,
+        String state,
+        String operationId,
+        List<String> consumes,
+        Request request,
+        Function<String, Object> read,
+        String readAt,
+        String pending) {
+      this(provider, trigger, state, operationId, consumes, request, read, readAt, pending, List.of());
+    }
 
     Row(
         Provider provider,
@@ -126,6 +143,18 @@ public final class ConsumerContract {
         Function<String, Object> read,
         String readAt) {
       this(provider, trigger, state, operationId, consumes, request, read, readAt, null);
+    }
+
+    /** This row with {@code paths} bound by value; each must be one of {@link #consumes}. */
+    public Row exact(String... paths) {
+      for (String path : paths) {
+        if (!consumes.contains(path)) {
+          throw new IllegalArgumentException(path + " is bound by value but not consumed");
+        }
+      }
+      return new Row(
+          provider, trigger, state, operationId, consumes, request, read, readAt, pending,
+          List.of(paths));
     }
 
     /** Whether the row waits for its provider to publish the state it names. */
@@ -154,8 +183,9 @@ public final class ConsumerContract {
   static final Trigger REGISTRY_TOKEN = Trigger.operation("getRegistryToken");
 
   /**
-   * The quarkus-oidc tenant: it reads the idp's JWKS when it starts (discovery is off, so the key
-   * set is the one document), and again when a token names a key it does not hold.
+   * The quarkus-oidc tenant: when it starts it reads the idp's discovery document and then the JWKS
+   * that document's {@code jwks_uri} names (qits-708; discovery is on), and it reads the JWKS again
+   * when a token names a key it does not hold.
    */
   static final Trigger STARTUP = Trigger.event("StartupEvent");
 
@@ -251,6 +281,20 @@ public final class ConsumerContract {
               IDP_TOKEN_REQUEST,
               null,
               "$"),
+          // The tenant's first read (qits-708): the discovery document at auth-server-url. Its
+          // `issuer` is what every bearer's `iss` is checked against, so it is bound BY VALUE — an
+          // idp publishing another issuer refuses every token this service accepts. jwks_uri is
+          // where the keys are read next; token_endpoint is what quarkus-oidc records beside them.
+          new Row(
+                  IDP,
+                  STARTUP,
+                  "a published signing key",
+                  "getOpenIdConfiguration",
+                  List.of("$.issuer", "$.jwks_uri", "$.token_endpoint"),
+                  Request.NONE,
+                  base -> SigningKeys.discovery(base + "/idp/.well-known/openid-configuration"),
+                  "$")
+              .exact("$.issuer"),
           // The tenant builds an RSA public key from each entry; kid picks the key for a token.
           new Row(
               IDP,

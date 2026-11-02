@@ -959,7 +959,10 @@ where its traffic actually is:
   makes, and `MockIdp`'s recording is registered as a cumulative `NetworkCapture.source` for what the
   service sent *out*. Both ends, both assertable. Its two stories are `@Order`ed, and that is
   load-bearing: a cursor attributes each recorded request to exactly one story, so the **startup**
-  JWKS fetch lands in whichever story drains first and that must be the story about it.
+  discovery read and JWKS fetch land in whichever story drains first and that must be the story
+  about them. Discovery is on since qits-708, so the issuer every bearer's `iss` is held to is the
+  one qits-idp's discovery document publishes, never a configured one; `api/BearerIssuerTest` is
+  the in-JVM proof that a foreign `iss` is a 401.
   **The tap is the framework's, not this repository's, and no local copy of it may come back.** Four
   service repositories had each hand-copied the same twenty lines as a `StoryNetworkFilter` beside
   their own IT before `2026.829.201516` shipped one; this repository went straight to the shipped
