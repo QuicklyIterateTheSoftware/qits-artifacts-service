@@ -79,19 +79,21 @@ public class VideoExploreIT {
 
     // :text-is is exact, so `ci-videos` cannot be matched by the `ci-screenshots` row above it.
     flow.click("tbody th a:text-is('" + VideoPublishIT.REPOSITORY + "')");
-    flow.waitFor("tbody th[scope=\"row\"].mono a:text-is('" + shortened + "')");
+    flow.waitFor("tbody th[scope=\"row\"].mono :is(a,button):text-is('" + shortened + "')");
     flow.screenshot("the repository's recordings").as("records-listed");
 
     flow.fill(
         "form.filters input[name=\"createdAfter\"]", ScreenshotExploreIT.CREATED_AFTER);
     flow.click("form.filters button[type=\"submit\"]");
-    flow.waitFor("tbody th[scope=\"row\"].mono a:text-is('" + shortened + "')");
+    flow.waitFor("tbody th[scope=\"row\"].mono :is(a,button):text-is('" + shortened + "')");
     flow.screenshot("the recordings captured since the window opened").as("filters-applied");
 
     // The metadata cell of THIS row: the length key is where this type differs from screenshots,
-    // and it is printed rather than interpreted.
+    // and it is printed rather than interpreted. The digest sits on the row header's control — an
+    // anchor or, since qits-543, a download button — so `:has()` matches either.
     flow.expectText(
-        "tbody tr:has(a:text-is('" + shortened + "')) td.metadata", "media.resolution.length");
+        "tbody tr:has(:is(a,button):text-is('" + shortened + "')) td.metadata",
+        "media.resolution.length");
     flow.screenshot("the recording, with the length its run declared").as("record-shown");
   }
 
