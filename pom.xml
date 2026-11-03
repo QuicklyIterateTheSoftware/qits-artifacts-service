@@ -444,11 +444,28 @@
                 <plugin>
                     <artifactId>maven-surefire-plugin</artifactId>
                     <version>${surefire-plugin.version}</version>
+                    <configuration>
+                        <!-- The platform injects QITS_DOMAIN into CI steps and agent containers; a
+                             test JVM that inherited it would resolve the suite's addresses against
+                             the live domain, and OpenApiSchemaExportTest would write that domain
+                             into docs/openapi.yml (qits-1410). Keep it out, as qits-maintenance
+                             does: %test supplies its own. -->
+                        <excludedEnvironmentVariables>
+                            <excludedEnvironmentVariable>QITS_DOMAIN</excludedEnvironmentVariable>
+                        </excludedEnvironmentVariables>
+                    </configuration>
                 </plugin>
                 <plugin>
                     <!-- `service` binds it; declared here so the version lives with surefire's. -->
                     <artifactId>maven-failsafe-plugin</artifactId>
                     <version>${failsafe-plugin.version}</version>
+                    <configuration>
+                        <!-- Same reasoning: the ambient QITS_DOMAIN stays out of the forked JVM.
+                             service/pom.xml hands the ITs an explicit one instead. -->
+                        <excludedEnvironmentVariables>
+                            <excludedEnvironmentVariable>QITS_DOMAIN</excludedEnvironmentVariable>
+                        </excludedEnvironmentVariables>
+                    </configuration>
                 </plugin>
                 <plugin>
                     <groupId>io.smallrye</groupId>

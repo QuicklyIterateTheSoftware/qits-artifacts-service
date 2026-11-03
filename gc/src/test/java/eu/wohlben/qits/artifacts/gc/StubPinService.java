@@ -4,6 +4,8 @@ import com.sun.net.httpserver.HttpServer;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
  * An in-process stand-in for any of the six pin peers, one path and one canned answer.
@@ -27,8 +29,12 @@ final class StubPinService implements AutoCloseable {
 
   private final HttpServer server;
 
-  private StubPinService(HttpServer server) {
+  /** The Authorization header of every request served, "" for a request that sent none. */
+  private final List<String> authorizations;
+
+  private StubPinService(HttpServer server, List<String> authorizations) {
     this.server = server;
+    this.authorizations = authorizations;
   }
 
   /** Answers 200 with this body on the given path, and 404 everywhere else. */
@@ -39,9 +45,12 @@ final class StubPinService implements AutoCloseable {
   /** Answers the given status and body on the given path. */
   static StubPinService answering(String path, int status, String body) throws IOException {
     HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+    List<String> authorizations = new CopyOnWriteArrayList<>();
     server.createContext(
         path,
         exchange -> {
+          String authorization = exchange.getRequestHeaders().getFirst("Authorization");
+          authorizations.add(authorization == null ? "" : authorization);
           byte[] bytes = body.getBytes(StandardCharsets.UTF_8);
           exchange.getResponseHeaders().add("Content-Type", "application/json");
           exchange.sendResponseHeaders(status, bytes.length);
@@ -49,7 +58,12 @@ final class StubPinService implements AutoCloseable {
           exchange.close();
         });
     server.start();
-    return new StubPinService(server);
+    return new StubPinService(server, authorizations);
+  }
+
+  /** The Authorization header of every request served so far, in order; "" where none was sent. */
+  List<String> authorizations() {
+    return List.copyOf(authorizations);
   }
 
   /** The base url an adapter is configured with — no trailing slash, as the real ones have none. */

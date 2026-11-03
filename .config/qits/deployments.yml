@@ -39,7 +39,15 @@ navigation-entries: services.details.Artifacts:6, daemons.details.Artifacts:6, l
 # image ignores the injected triple, so the next deploy provisions the role and database while
 # nothing depends on them yet, and cutover day starts with credentials that already exist
 # (qits-artifacts-postgresql-plan.md §9.1).
-resources: postgresql:db
+#
+# idp:client ASKS QITS-DEPLOYMENTS TO PROVISION THIS APPLICATION'S OWN QITS-IDP SERVICE CLIENT — id
+# `<env>-qits-artifacts` (derived from env + application), roles fixed in qits-idp code. The
+# deployer stores the secret the way it stores a database password, and injects
+# QITS_RESOURCE_IDP_URL, QITS_RESOURCE_IDP_CLIENT_ID and QITS_RESOURCE_IDP_CLIENT_SECRET, which the
+# `qits` oidc client in application.properties reads. It is the bearer every GC pin read carries
+# now that the five pin sources are dialled at their edge hosts, where the edge refuses an anonymous
+# request (qits-1410, feature qits-1406; the qits-docs pattern of qits-1419).
+resources: postgresql:db, idp:client
 
 # The convention would derive the health path from the repository name, but the route path
 # deliberately did not move with the rename — the service still serves /artifacts. Without this line

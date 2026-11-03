@@ -5,7 +5,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import eu.wohlben.qits.http.QitsHttpClients;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
-import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
@@ -51,6 +50,9 @@ public class WorkspacesHttpLaunchPins implements WorkspacesLaunchPins {
 
   @Inject ObjectMapper objectMapper;
 
+  /** This service's {@code qits:system} bearer, which the edge in front of the source demands. */
+  @Inject PinSourceBearer bearer;
+
   /** For the client proxy ArC puts in front of this bean, and for nothing else. */
   WorkspacesHttpLaunchPins() {
     this.client = null;
@@ -77,7 +79,7 @@ public class WorkspacesHttpLaunchPins implements WorkspacesLaunchPins {
     try {
       HttpResponse<String> response =
           client.send(
-              HttpRequest.newBuilder(URI.create(url)).timeout(timeout).GET().build(),
+              PinSourceBearer.get(url, bearer).timeout(timeout).build(),
               HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
       if (response.statusCode() != 200) {
         throw new IllegalStateException(

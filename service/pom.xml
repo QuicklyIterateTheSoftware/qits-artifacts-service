@@ -132,6 +132,15 @@
             <artifactId>quarkus-oidc</artifactId>
         </dependency>
         <dependency>
+            <!-- The named oidc client `qits` (qits-1410): this service's own qits:system bearer,
+                 minted by client credentials from the deployer's idp:client resource. Every GC pin
+                 read carries it, now that the five pin sources are dialled at their edge hosts and
+                 the edge refuses an anonymous request. A client only: inbound validation stays the
+                 quarkus-oidc tenant's above. -->
+            <groupId>io.quarkus</groupId>
+            <artifactId>quarkus-oidc-client</artifactId>
+        </dependency>
+        <dependency>
             <groupId>io.quarkus</groupId>
             <artifactId>quarkus-rest-jackson</artifactId>
         </dependency>
@@ -395,6 +404,15 @@
                                 <qits.userflows.quinoa-node-dir>${project.basedir}/.quinoa/node</qits.userflows.quinoa-node-dir>
                                 <java.util.logging.manager>org.jboss.logmanager.LogManager</java.util.logging.manager>
                             </systemPropertyVariables>
+                            <environmentVariables>
+                                <!-- QITS_DOMAIN carries no default in the prod profile (qits-1410):
+                                     the GC pin sources, the tenant's idp and the qits oidc client's
+                                     idp fallback all expand it, so the LAUNCHED packaged artifact
+                                     refuses to boot without one. Never dialled for real: no IT
+                                     plans a GC run against a live source, the tenant's ITs point
+                                     it at their own mock idp, and example.test resolves nowhere. -->
+                                <QITS_DOMAIN>example.test</QITS_DOMAIN>
+                            </environmentVariables>
                         </configuration>
                     </execution>
                 </executions>

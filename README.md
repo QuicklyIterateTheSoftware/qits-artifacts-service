@@ -1920,21 +1920,21 @@ app's `application.properties` overrides them.
 |---|---|---|
 | `qits.artifacts.blobs-dir` | `~/.qits/data/artifacts/blobs` | content-addressed blob bytes |
 | `qits.artifacts.gc.blob-grace-period` | `PT6H` | how long a blob file must sit untouched before the sweep may unlink it — see "Garbage collection". With the access windows at zero this is the only clock left, and it is race safety for a just-pushed artifact rather than retention: it gates identity rows as well as blob unlinks, and an identity is young while its own row stamp or any of its blobs' `stored_at` is inside it (qits-1732) |
-| `qits.artifacts.gc.pins.cd-base-url` | `http://qits-cd:8080/cd/api` | where a run reads the image shas deployments pin (`GET /cd/api/pins`). **Renamed** from `qits.artifacts.gc.oci.cd-base-url` |
+| `qits.artifacts.gc.pins.cd-base-url` | `https://deployments.qits.${QITS_DOMAIN}/deployments/api` | where a run reads the image shas deployments pin (`GET /deployments/api/pins`). **Renamed** from `qits.artifacts.gc.oci.cd-base-url` |
 | `qits.artifacts.gc.pins.cd-timeout` | `PT10S` | per-request timeout on that fetch. **Renamed** from `qits.artifacts.gc.oci.cd-timeout` |
-| `qits.artifacts.gc.pins.ci-base-url` | `http://qits-ci:8080/ci/api` | where a run reads the daemon pin ladder (`GET /ci/api/daemon`) |
+| `qits.artifacts.gc.pins.ci-base-url` | `https://ci.qits.${QITS_DOMAIN}/ci/api` | where a run reads the daemon pin ladder (`GET /ci/api/daemon`) |
 | `qits.artifacts.gc.pins.ci-timeout` | `PT10S` | per-request timeout on that fetch |
-| `qits.artifacts.gc.pins.maintenance-base-url` | `http://qits-platform-maintenance:8080/maintenance/api` | where a run reads the manifest dependency pins (`GET /maintenance/api/pins`) |
+| `qits.artifacts.gc.pins.maintenance-base-url` | `https://maintenance.qits.${QITS_DOMAIN}/maintenance/api` | where a run reads the manifest dependency pins (`GET /maintenance/api/pins`) |
 | `qits.artifacts.gc.pins.maintenance-timeout` | `PT10S` | per-request timeout on that fetch |
-| `qits.artifacts.gc.pins.workspaces-base-url` | `http://qits-workspaces:8080/workspaces/api` | where a run reads the images a workspace or editor start would pull today (`GET /workspaces/api/pins`) |
+| `qits.artifacts.gc.pins.workspaces-base-url` | `https://workspaces.qits.${QITS_DOMAIN}/workspaces/api` | where a run reads the images a workspace or editor start would pull today (`GET /workspaces/api/pins`) |
 | `qits.artifacts.gc.pins.workspaces-timeout` | `PT10S` | per-request timeout on that fetch |
-| `qits.artifacts.gc.pins.projects-base-url` | `http://qits-projects:8080/projects/api` | where a run reads the images an agent or refinement start would pull today (`GET /projects/api/pins`) |
+| `qits.artifacts.gc.pins.projects-base-url` | `https://projects.qits.${QITS_DOMAIN}/projects/api` | where a run reads the images an agent or refinement start would pull today (`GET /projects/api/pins`). All five pin reads go to the source's edge host with this service's own `qits:system` bearer (qits-1410); `QITS_DOMAIN` has no default |
 | `qits.artifacts.gc.pins.projects-timeout` | `PT10S` | per-request timeout on that fetch |
 | `qits.artifacts.gc.type.<wire-name>.strategy` | per type, see "The settlement" | which engine collects a repository type: `own` or `excluded` here — the `cache` engine is qits-platform-mirror's. Every registered type must have one, and a missing entry is refused, not defaulted |
 | `qits.artifacts.gc.type.<wire-name>.window` | `P0D` for all six own types | how long an identity may sit unaccessed before it is eligible, ISO-8601. At the shipped zero the keep-classes are the whole retention policy. Absent for an `excluded` type |
 | `qits.auth.machine.required` | `true` (`%dev`/`%test`: `false`) | the machine-token rollout gate, shipped at its live value since qits-765 (it used to arrive as `QITS_AUTH_MACHINE_REQUIRED=true` from qits-configuration). Off, the JSON admin write surface is open — network trust — and every wire accepts an anonymous publish, because the OIDC tenant follows this same key and a refusal would be demanding a credential nothing could validate. On, its writes need a bearer with `aud=qits-platform`, `PublishGuard` validates a bearer presented on a publish route, and a publish carrying none is refused on all six wires |
 | `qits.artifacts.startup-seed.enabled` | `true` | self-seed the hosted roots: `ci-screenshots`, `ci-videos`, `qits`, `npm`, `maven`, `daemons`, `docs`, `sboms`. No cache root — those are qits-platform-mirror's |
-| `quarkus.oidc.auth-server-url` | `http://${QITS_ENVIRONMENT:dev}-qits-idp:8080/idp` | the idp, reached direct on qits-net, for validating an inbound machine token. Discovery is on (qits-708): the tenant reads `<this>/.well-known/openid-configuration` for the JWKS address and for the issuer every bearer's `iss` must equal. No issuer is configured anywhere (qits-730) |
+| `quarkus.oidc.auth-server-url` | `https://idp.qits.${QITS_DOMAIN}/idp` | the idp, reached through the edge at its own host (qits-1410), for validating an inbound machine token. Discovery is on (qits-708): the tenant reads `<this>/.well-known/openid-configuration` for the JWKS address and for the issuer every bearer's `iss` must equal. No issuer is configured anywhere (qits-730) |
 | `qits.artifacts.oci.max-layer-size` | `1G` | the registry's per-layer cap, enforced while streaming |
 | `qits.artifacts.oci.max-manifest-size` | `4M` | manifests are buffered whole to be digested and parsed |
 | `qits.artifacts.oci.upload-session-ttl` | `PT30M` | in-memory upload sessions; lost on restart, by design |
@@ -1975,8 +1975,10 @@ timeouts are still read by wire code the excluded profile does not unregister.
 
 The git host's keys (`qits.repositories.git.*`, `qits.ci.intake-url`, `qits.projects.intake-url`,
 `qits.projects.name-resolver-url`) do not even resolve here any more — they left with
-qits-githost-service,
-along with the `quarkus.oidc-client` extension whose only user was the post-receive bearer.
+qits-githost-service. The `quarkus.oidc-client` extension came back for a different user (qits-1410):
+the named client `qits` (`quarkus.oidc-client.qits.*`, fed by the deployer's `idp:client` resource
+as `QITS_RESOURCE_IDP_URL` / `_CLIENT_ID` / `_CLIENT_SECRET`) mints the bearer every GC pin read
+presents at the edge, and is off under `%dev` and `%test`.
 
 `quarkus.http.enable-compression` is in the shipped `application.properties` and **cannot be moved to
 a deployment's environment**: it is `BUILD_AND_RUN_TIME_FIXED`, so an env var on the container is

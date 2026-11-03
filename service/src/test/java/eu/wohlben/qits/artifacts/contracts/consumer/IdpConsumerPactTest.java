@@ -74,6 +74,9 @@ class IdpConsumerPactTest {
       if (row.read() != null) {
         continue; // a plain reader's row (the key read): ConsumerPactTest runs it
       }
+      if (!row.trigger().equals(ConsumerContract.REGISTRY_TOKEN)) {
+        continue; // the qits client's own mint: IdpTokenMintPactTest runs it
+      }
       Map<String, String> params = masters.params(row.state());
       V4Pact pact = ConsumerContract.pact(provider, List.of(row));
       // A refusal is a status and carries no body the relay reads: it must answer 401, mint nothing.
