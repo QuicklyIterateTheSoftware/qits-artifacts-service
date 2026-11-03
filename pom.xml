@@ -133,10 +133,10 @@
              scope, read off the classpath by ProviderGoldenMasters. Moved by qits-maintenance like
              every other pin; do not hand-edit them to chase a release. -->
         <qits.deployments-golden-masters.version>2026.1010.145913</qits.deployments-golden-masters.version>
-        <qits.ci-golden-masters.version>2026.1031.184656</qits.ci-golden-masters.version>
+        <qits.ci-golden-masters.version>2026.1102.180015</qits.ci-golden-masters.version>
         <qits.maintenance-golden-masters.version>2026.1031.22002</qits.maintenance-golden-masters.version>
-        <qits.workspaces-golden-masters.version>2026.1029.225748</qits.workspaces-golden-masters.version>
-        <qits.projects-golden-masters.version>2026.1031.205956</qits.projects-golden-masters.version>
+        <qits.workspaces-golden-masters.version>2026.1102.193613</qits.workspaces-golden-masters.version>
+        <qits.projects-golden-masters.version>2026.1102.220031</qits.projects-golden-masters.version>
         <qits.idp-golden-masters.version>2026.1027.165632</qits.idp-golden-masters.version>
         <qits.maven.repository.url>https://registry.qits.wohlben.eu/artifacts/maven/maven</qits.maven.repository.url>
         <maven.compiler.release>25</maven.compiler.release>
