@@ -1127,7 +1127,7 @@ components:
   securitySchemes:
     SecurityScheme:
       type: openIdConnect
-      openIdConnectUrl: https://idp.qits.wohlben.eu/idp/.well-known/openid-configuration
+      openIdConnectUrl: https://idp.qits.localhost/idp/.well-known/openid-configuration
       description: Authentication
 info:
   title: qits-artifacts API
