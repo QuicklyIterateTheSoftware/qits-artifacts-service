@@ -351,6 +351,12 @@
             <plugin>
                 <artifactId>maven-surefire-plugin</artifactId>
                 <configuration>
+                    <!-- One fresh fork per test class (qits-428). With the qits oidc client and its
+                         mint pact test, the suite's Quarkus restarts no longer fit one fork's heap:
+                         the golden-recordings automation of qits-artifacts-service-rr-105 died with
+                         `OutOfMemoryError: Java heap space` in the shared fork. Surefire only; the
+                         story ITs under failsafe depend on sharing one JVM and keep it. -->
+                    <reuseForks>false</reuseForks>
                     <systemPropertyVariables>
                         <java.util.logging.manager>org.jboss.logmanager.LogManager</java.util.logging.manager>
                     </systemPropertyVariables>
