@@ -138,7 +138,7 @@ class ProviderGoldenMastersTest {
         assertFalse(row.consumes().isEmpty(), row.description());
       }
     }
-    assertEquals(9, ConsumerContract.ROWS.size());
+    assertEquals(10, ConsumerContract.ROWS.size());
   }
 
   /**

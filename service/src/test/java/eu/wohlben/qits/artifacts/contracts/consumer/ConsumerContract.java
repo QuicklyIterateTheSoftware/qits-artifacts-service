@@ -19,11 +19,12 @@ import java.util.function.Function;
  * each answer</b> (qits-1149) — the one table the consumer pact tests and the pact file tests are
  * built from, so a committed pact and the verified behaviour cannot drift apart.
  *
- * <p><b>Eight calls, six providers.</b> Five are the GC pin readers in the {@code gc} module, one
+ * <p><b>Nine calls, six providers.</b> Five are the GC pin readers in the {@code gc} module, one
  * GET each, made by {@code GcPinSources.fetch()} at the start of every plan and sweep; the sixth is
  * {@code RegistryTokenEndpoint}'s relay of a docker login to the idp's token door; the seventh and
  * eighth are the quarkus-oidc tenant's reads of the idp's discovery document and of the signing
- * keys its {@code jwks_uri} names (qits-708). {@link #CLIENTS} names the class that
+ * keys its {@code jwks_uri} names (qits-708); the ninth is the named oidc client {@code qits}
+ * minting the bearer those five reads carry (qits-1410). {@link #CLIENTS} names the class that
  * makes each, and {@code OutboundCallsGuardTest} holds that list to the code.
  *
  * <p><b>One trigger per GC row, not five.</b> The five GC routes ({@code GET /gc/plan}, {@code GET
@@ -217,6 +218,25 @@ public final class ConsumerContract {
               .header("Accept", "application/json")
               .body("grant_type=client_credentials", "application/x-www-form-urlencoded");
 
+  /**
+   * What the named oidc client {@code qits} sends the idp's token door: its own id and secret as
+   * HTTP Basic, client credentials, the one platform audience (qits-1410; qits-docs-service's row of
+   * the same name). The credential is the provider state's.
+   */
+  private static final Request IDP_MINT_REQUEST =
+      (request, params) ->
+          request
+              .header(
+                  "Authorization",
+                  Matchers.fromProviderState("${authorization}", params.get("authorization")))
+              .header("Content-Type", "application/x-www-form-urlencoded")
+              .body(
+                  "grant_type=client_credentials&audience=qits-platform",
+                  "application/x-www-form-urlencoded");
+
+  /** The qits-idp state that records the client-credentials mint of a service client. */
+  static final String A_SERVICE_CLIENT_CALLING_ITS_PEERS = "a service client calling its peers";
+
   static final List<Row> ROWS =
       List.of(
           new Row(
@@ -279,6 +299,20 @@ public final class ConsumerContract {
               "issueToken",
               List.of("$.access_token", "$.expires_in"),
               IDP_TOKEN_REQUEST,
+              null,
+              "$"),
+          // The mint behind the five GC rows above (qits-1410): QitsClientBearer asks the named
+          // client `qits` for this service's own qits:system token, which every pin read presents
+          // at the source's edge host. The plan is what first needs it, so the plan is the trigger.
+          // No plain reader can make it — the client exists only inside the application — so
+          // IdpTokenMintPactTest runs it.
+          new Row(
+              IDP,
+              GC_PLAN,
+              A_SERVICE_CLIENT_CALLING_ITS_PEERS,
+              "issueToken",
+              List.of("$.access_token", "$.expires_in"),
+              IDP_MINT_REQUEST,
               null,
               "$"),
           // The tenant's first read (qits-708): the discovery document at auth-server-url. Its

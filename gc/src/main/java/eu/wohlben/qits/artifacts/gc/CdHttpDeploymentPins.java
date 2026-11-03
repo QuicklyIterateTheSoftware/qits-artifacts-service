@@ -5,7 +5,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import eu.wohlben.qits.http.QitsHttpClients;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
-import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
@@ -16,7 +15,8 @@ import java.util.List;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 /**
- * One GET on qits-net, at plan time, every time: {@code GET /deployments/api/pins}.
+ * One GET at the deployer's edge host, with this service's bearer, at plan time, every time: {@code GET
+ * /deployments/api/pins}.
  *
  * <p><b>One call, not two, and the deployer's rule rather than ours.</b> This used to list environments and
  * then each environment's deployments, and derive the keep-set here. cd answers the question
@@ -66,6 +66,9 @@ public class CdHttpDeploymentPins implements CdDeploymentPins {
   Duration timeout;
 
   @Inject ObjectMapper objectMapper;
+
+  /** This service's {@code qits:system} bearer, which the edge in front of the source demands. */
+  @Inject PinSourceBearer bearer;
 
   /** For the client proxy ArC puts in front of this bean, and for nothing else. */
   CdHttpDeploymentPins() {
@@ -136,7 +139,7 @@ public class CdHttpDeploymentPins implements CdDeploymentPins {
     try {
       HttpResponse<String> response =
           client.send(
-              HttpRequest.newBuilder(URI.create(url)).timeout(timeout).GET().build(),
+              PinSourceBearer.get(url, bearer).timeout(timeout).build(),
               HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
       if (response.statusCode() != 200) {
         throw new IllegalStateException(
