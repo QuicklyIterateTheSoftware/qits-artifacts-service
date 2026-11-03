@@ -277,7 +277,7 @@
         </dependency>
         <dependency>
             <groupId>${project.groupId}</groupId>
-            <artifactId>qits-platform-access-cli-pacts-qits-artifacts-service</artifactId>
+            <artifactId>qits-platform-access-monorepo-pacts-qits-artifacts-service</artifactId>
             <scope>test</scope>
         </dependency>
         <dependency>
