@@ -4,6 +4,7 @@ import static io.restassured.RestAssured.given;
 import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.is;
 
+import eu.wohlben.qits.SuiteBearers;
 import io.quarkus.test.junit.QuarkusTest;
 import io.restassured.http.ContentType;
 import java.util.Map;
@@ -16,6 +17,7 @@ class RepositoryControllerTest {
   void ensureIsIdempotentAndListed() {
     // First ensure creates it.
     given()
+        .header("Authorization", SuiteBearers.platform())
         .contentType(ContentType.JSON)
         .body(Map.of("type", "ci-screenshots"))
         .when()
@@ -27,6 +29,7 @@ class RepositoryControllerTest {
 
     // Re-ensuring is a no-op success (idempotent).
     given()
+        .header("Authorization", SuiteBearers.platform())
         .contentType(ContentType.JSON)
         .body(Map.of("type", "ci-screenshots"))
         .when()
@@ -35,6 +38,7 @@ class RepositoryControllerTest {
         .statusCode(200);
 
     given()
+        .header("Authorization", SuiteBearers.operator())
         .when()
         .get("/artifacts/api/repositories")
         .then()
@@ -45,6 +49,7 @@ class RepositoryControllerTest {
   @Test
   void ensureRejectsATypeChange() {
     given()
+        .header("Authorization", SuiteBearers.platform())
         .contentType(ContentType.JSON)
         .body(Map.of("type", "ci-videos"))
         .when()
@@ -52,6 +57,7 @@ class RepositoryControllerTest {
         .then()
         .statusCode(200);
     given()
+        .header("Authorization", SuiteBearers.platform())
         .contentType(ContentType.JSON)
         .body(Map.of("type", "ci-screenshots"))
         .when()

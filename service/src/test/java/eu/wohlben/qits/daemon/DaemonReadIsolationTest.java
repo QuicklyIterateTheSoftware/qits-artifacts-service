@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
+import eu.wohlben.qits.SuiteBearers;
 import io.quarkus.test.common.http.TestHTTPResource;
 import io.quarkus.test.junit.QuarkusTest;
 import io.quarkus.test.junit.QuarkusTestProfile;
@@ -70,6 +71,7 @@ class DaemonReadIsolationTest {
   @Test
   void aDaemonHeadIsNotQueuedBehindAStalledDaemonDownload() throws Exception {
     given()
+        .header("Authorization", SuiteBearers.platform())
         .contentType("application/json")
         .body("{\"type\":\"daemon-binaries\"}")
         .when()

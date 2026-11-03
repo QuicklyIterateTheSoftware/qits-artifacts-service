@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import eu.wohlben.qits.SuiteBearers;
 import eu.wohlben.qits.artifacts.persistence.DocsFileRepository;
 import io.quarkus.test.common.http.TestHTTPResource;
 import io.quarkus.test.junit.QuarkusTest;
@@ -48,6 +49,7 @@ class DocsRegistryTest {
   @BeforeEach
   void ensureRepository() {
     given()
+        .header("Authorization", SuiteBearers.platform())
         .contentType("application/json")
         .body("{\"type\":\"docs\"}")
         .when()

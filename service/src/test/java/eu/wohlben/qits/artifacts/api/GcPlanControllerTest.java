@@ -8,6 +8,7 @@ import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.notNullValue;
 import static org.hamcrest.Matchers.nullValue;
 
+import eu.wohlben.qits.SuiteBearers;
 import io.quarkus.test.junit.QuarkusTest;
 import org.junit.jupiter.api.Test;
 
@@ -55,6 +56,7 @@ class GcPlanControllerTest {
   @Test
   void thePlanNamesEveryTypeIncludingTheOnesNobodyCollects() {
     given()
+        .header("Authorization", SuiteBearers.operator())
         .when()
         .get("/artifacts/api/gc/plan")
         .then()
@@ -110,6 +112,7 @@ class GcPlanControllerTest {
     // and whether a sweep run now could execute the plan at all. It could not here — the pin sources
     // are closed ports — so the zeros beside oci-images are a refusal, not a finding.
     given()
+        .header("Authorization", SuiteBearers.operator())
         .when()
         .get("/artifacts/api/gc/plan")
         .then()
@@ -142,7 +145,14 @@ class GcPlanControllerTest {
     // produced content; with rows, the fail-closed refusal that names the rule to implement. What
     // is never acceptable is a plan: dead stays empty in both states.
     io.restassured.path.json.JsonPath json =
-        given().when().get("/artifacts/api/gc/plan").then().statusCode(200).extract().jsonPath();
+        given()
+            .header("Authorization", SuiteBearers.operator())
+            .when()
+            .get("/artifacts/api/gc/plan")
+            .then()
+            .statusCode(200)
+            .extract()
+            .jsonPath();
     assertStubState(json, "ci-screenshots", "branch-scoped", "branch", "dead");
     assertStubState(json, "ci-videos", "byte-budgeted", "byte", "dead");
   }
@@ -177,6 +187,7 @@ class GcPlanControllerTest {
     // cannot run must never be skimmed as a plan that would free nothing. The pins section is the
     // provenance under every keep the report claims: which service, at which url, answering what.
     given()
+        .header("Authorization", SuiteBearers.operator())
         .when()
         .get("/artifacts/api/gc/plan")
         .then()
@@ -218,6 +229,7 @@ class GcPlanControllerTest {
   @Test
   void anUnreachableQitsCdAbortsTheOciPlanRatherThanCondemningEveryTag() {
     given()
+        .header("Authorization", SuiteBearers.operator())
         .when()
         .get("/artifacts/api/gc/plan")
         .then()
@@ -233,6 +245,7 @@ class GcPlanControllerTest {
   @Test
   void theSweepWouldUnlinkNothingAndTheRowLessPoolIsReportedAsUntouchable() {
     given()
+        .header("Authorization", SuiteBearers.operator())
         .when()
         .get("/artifacts/api/gc/plan")
         .then()
@@ -252,6 +265,7 @@ class GcPlanControllerTest {
     // row-less pool is reported as UNCOMPUTED rather than empty — an empty list there would be a
     // claim about a store this run never read.
     given()
+        .header("Authorization", SuiteBearers.platform())
         .when()
         .post("/artifacts/api/gc/sweep")
         .then()
@@ -276,6 +290,7 @@ class GcPlanControllerTest {
     // closed ports — so the envelope has to say so once, run-wide, rather than leaving eight
     // repositories looking clean.
     given()
+        .header("Authorization", SuiteBearers.operator())
         .when()
         .get("/artifacts/api/gc/repositories")
         .then()
@@ -303,6 +318,7 @@ class GcPlanControllerTest {
     // whole store instead, which on the sweep route is the difference between collecting one
     // repository and collecting the platform.
     given()
+        .header("Authorization", SuiteBearers.operator())
         .when()
         .get("/artifacts/api/gc/repositories/no-such-repository/plan")
         .then()
@@ -310,6 +326,7 @@ class GcPlanControllerTest {
         .body("message", org.hamcrest.Matchers.containsString("no-such-repository"));
 
     given()
+        .header("Authorization", SuiteBearers.operator())
         .when()
         .get("/artifacts/api/gc/repositories/" + REPO + "/plan")
         .then()
@@ -334,6 +351,7 @@ class GcPlanControllerTest {
     // by digest — so a run with an unreadable qits-platform-deployments stops before the census here exactly as it
     // does on the whole-store route, and says which source failed.
     given()
+        .header("Authorization", SuiteBearers.platform())
         .when()
         .post("/artifacts/api/gc/repositories/" + REPO + "/sweep")
         .then()
@@ -360,15 +378,33 @@ class GcPlanControllerTest {
     // scoped pair carries it the same way, and adds the one a path segment buys: a name that is not
     // a repository can never widen into the whole store. POST /gc/plan is a reader too — it exists
     // to carry supplied pins in a body — so it answers a report, never a deletion.
-    given().when().post("/artifacts/api/gc/plan").then().statusCode(200).body("dryRun", is(true));
-    given().when().get("/artifacts/api/gc/sweep").then().statusCode(405);
     given()
+        .header("Authorization", SuiteBearers.operator())
+        .when()
+        .post("/artifacts/api/gc/plan")
+        .then()
+        .statusCode(200)
+        .body("dryRun", is(true));
+    given()
+        .header("Authorization", SuiteBearers.operator())
+        .when()
+        .get("/artifacts/api/gc/sweep")
+        .then()
+        .statusCode(405);
+    given()
+        .header("Authorization", SuiteBearers.operator())
         .when()
         .post("/artifacts/api/gc/repositories/" + REPO + "/plan")
         .then()
         .statusCode(405);
-    given().when().get("/artifacts/api/gc/repositories/" + REPO + "/sweep").then().statusCode(405);
     given()
+        .header("Authorization", SuiteBearers.operator())
+        .when()
+        .get("/artifacts/api/gc/repositories/" + REPO + "/sweep")
+        .then()
+        .statusCode(405);
+    given()
+        .header("Authorization", SuiteBearers.platform())
         .when()
         .post("/artifacts/api/gc/repositories/no-such-repository/sweep")
         .then()
@@ -456,6 +492,7 @@ class GcPlanControllerTest {
     // The report says so: the sources are named "supplied", and they carry no url because this
     // service made no call.
     given()
+        .header("Authorization", SuiteBearers.operator())
         .contentType(io.restassured.http.ContentType.JSON)
         .body(body())
         .when()
@@ -501,6 +538,7 @@ class GcPlanControllerTest {
     // one document supplied half a keep-set, and half a keep-set condemns whatever the other half
     // protected — so the plan is not executable and the sweep deletes nothing.
     given()
+        .header("Authorization", SuiteBearers.operator())
         .contentType(io.restassured.http.ContentType.JSON)
         .body(
             body(
@@ -520,6 +558,7 @@ class GcPlanControllerTest {
     // been upgraded sends an older envelope, and that has to refuse rather than plan against a
     // partial keep-set.
     given()
+        .header("Authorization", SuiteBearers.operator())
         .contentType(io.restassured.http.ContentType.JSON)
         .body(body(DEPLOYMENTS, CI_DAEMON, null, null, null))
         .when()
@@ -544,6 +583,7 @@ class GcPlanControllerTest {
     // is in: everything else answered and the launch versions missing, which is exactly the
     // keep-set a run must not proceed without.
     given()
+        .header("Authorization", SuiteBearers.operator())
         .contentType(io.restassured.http.ContentType.JSON)
         .body(
             body(DEPLOYMENTS, CI_DAEMON, DEPENDENCIES, null, PROJECT_LAUNCHES))
@@ -558,6 +598,7 @@ class GcPlanControllerTest {
         .body("pins.find { it.source == 'supplied: qits-projects' }.answered", is(true));
 
     given()
+        .header("Authorization", SuiteBearers.platform())
         .contentType(io.restassured.http.ContentType.JSON)
         .body(
             body(
@@ -579,6 +620,7 @@ class GcPlanControllerTest {
     // grace window. Two independent things would have to be true for a deletion, which is the
     // property that makes this case safe to run at all.
     given()
+        .header("Authorization", SuiteBearers.platform())
         .contentType(io.restassured.http.ContentType.JSON)
         .body(body())
         .when()
@@ -593,6 +635,7 @@ class GcPlanControllerTest {
         .body("pins.source", org.hamcrest.Matchers.hasItem("supplied: qits-ci"));
 
     given()
+        .header("Authorization", SuiteBearers.platform())
         .contentType(io.restassured.http.ContentType.JSON)
         .body(body())
         .when()
@@ -611,6 +654,7 @@ class GcPlanControllerTest {
     // must keep meaning "read the pins over HTTP". Here those readers are closed ports, so the
     // refusal on the wire is the proof the HTTP path is what ran.
     given()
+        .header("Authorization", SuiteBearers.operator())
         .when()
         .post("/artifacts/api/gc/plan")
         .then()
@@ -626,6 +670,7 @@ class GcPlanControllerTest {
 
     // An empty JSON object is the SPA's scoped sweep, which posts {} rather than nothing.
     given()
+        .header("Authorization", SuiteBearers.platform())
         .contentType(io.restassured.http.ContentType.JSON)
         .body("{}")
         .when()
@@ -642,6 +687,7 @@ class GcPlanControllerTest {
     // read different ones — quietly reading the closed ports instead would be a plan about a
     // keep-set nobody asked for.
     given()
+        .header("Authorization", SuiteBearers.operator())
         .contentType(io.restassured.http.ContentType.JSON)
         .body("{\"pins\": not json}")
         .when()
@@ -649,6 +695,7 @@ class GcPlanControllerTest {
         .then()
         .statusCode(400);
     given()
+        .header("Authorization", SuiteBearers.platform())
         .contentType(io.restassured.http.ContentType.JSON)
         .body("{\"pins\": 5}")
         .when()

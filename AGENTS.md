@@ -740,17 +740,42 @@ There is no auth variant to select in this service. The shared `qits-auth-core` 
 `@RolesAllowed("qits:admin")`. Machine-facing boundaries require an authenticated identity and
 retain their narrower `MachineAuth` audience/scope checks.
 
-**The `@RolesAllowed` answers differ by suite, and the packaged ITs must play the gateway.** Under
-`@QuarkusTest` the `%test`-scoped synthetic dev-user answers every role check, which is why the
-in-JVM suites need no headers. The **packaged** process runs `LaunchMode.NORMAL`, where
-`ForwardAuthMechanism` deliberately stays anonymous — so every `/artifacts/api` read 401s unless
-the request carries the `X-Qits-User`/`X-Qits-Roles` pair the gateway would assert.
-`PackagedProcessIT.asOperator()` is that pair for RestAssured, and `stories.support.StoryBrowser
-.asOperator(flow)` sets the same headers on the Playwright browser context before the first
-navigate — one copy, used by all seven explore stories; the wire cases stay header-free on
-purpose, because tokenless-on-qits-net is their contract. `StoryBrowser` is the only thing in
-`stories/support/` that touches auth, and it uses `Flow.page()` rather than a recorded step
-precisely because it is harness plumbing and not a step in anybody's story.
+**No test uses forward-auth (epic qits-543, qits-1358).** `X-Qits-User` / `X-Qits-Roles` and the
+`%test` dev user leave qits-auth-core with qits-1338, and the suites already run without them: the
+service's test config blanks the dev user and renames the forward headers
+(`%test.qits.auth.forward.*` in `service/src/test/resources/application.properties`, which go with
+qits-1338), so a header-less request is anonymous and a stray pair authenticates nothing. Every
+caller of `/artifacts/api` names itself with a bearer:
+
+- **In-JVM, gate off** (the default profile, OIDC tenant off): `SuiteBearers` — a test-only
+  `HttpAuthenticationMechanism` asked before the shipped ones — turns a bearer it granted into that
+  identity. `SuiteBearers.platform()` (`qits:system`) creates repositories and sweeps,
+  `SuiteBearers.ciRun()` (`qits:ci-run`) uploads CI media, `SuiteBearers.operator()` (`qits:admin`)
+  reads, and `SuiteBearers.bearer(subject, roles...)` names any other caller (an agent's
+  `qits:agent` in `AgentReadAccessTest`). The contract suites send one for an interaction that
+  carries none: a `-service` consumer as `qits:system`, anything else as an operator; the golden
+  master records the reads as an operator and the sweeps as the platform. The wire routes never ask
+  for an identity with the gate off, so wire-only requests stay header-free.
+- **In-JVM, gate on** (`MachineTokens.Enforced`): `MachineTokens` signs real tokens the tenant
+  validates; a person is `MachineTokens.forAdmin()`.
+- **Packaged** (`PackagedProcessIT.TargetDirState`, every story): the shipped tenant is on against
+  the run's `MockIdp`, with the gate off, and `stories.support.StoryIdentities` mints each caller's
+  token — `PackagedProcessIT.asOperator()` / `asPlatform()` / `asCiRun()` for RestAssured, the curl
+  stories' `-H` (the token `redact`ed out of the report), and `StoryBrowser.asOperator(flow)` on the
+  Playwright context before the first navigate, one copy for all seven explore stories. The wire
+  cases stay header-free on purpose, because tokenless-on-qits-net is their contract. The profile
+  hands the tenant the mock's public key and issuer instead of its address, so this process asks
+  the idp nothing and the mock's recording stays `TokenValidationBootstrapIT`'s evidence alone.
+
+The one test that still sends the pair is `PublishGuardTest.aForwardedPairCarriesNoIdentityHereAnyMore`,
+which proves it is ignored.
+
+**Dev mode needs a bearer.** The `%dev` dev user goes with qits-1338, and `%dev` keeps the OIDC
+tenant off, so `quarkus:dev` answers 401 on every `/artifacts/api` route until the tenant is pointed
+at an idp (`-Dqits.auth.machine.required=true -Dquarkus.oidc.auth-server-url=https://idp.qits.${QITS_DOMAIN}/idp`);
+then call it with a person's token, for example
+`curl -H "Authorization: Bearer $(qits-token qits-platform)" ...`, or through the `qits` CLI. The
+wires stay open with the gate off.
 
 - `mvn verify` runs 478 tests (50 in `artifacts/`, 158 in `gc/`, 270 in `service/`) in about a
   minute — counted from the surefire reports — and then the failsafe ITs against the packaged

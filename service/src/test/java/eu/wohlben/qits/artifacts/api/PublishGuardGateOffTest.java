@@ -3,6 +3,7 @@ package eu.wohlben.qits.artifacts.api;
 import static eu.wohlben.qits.artifacts.api.PublishWires.assertAccepted;
 import static io.restassured.RestAssured.given;
 
+import eu.wohlben.qits.SuiteBearers;
 import eu.wohlben.qits.artifacts.api.PublishWires.Wire;
 import io.quarkus.test.common.http.TestHTTPResource;
 import io.quarkus.test.junit.QuarkusTest;
@@ -45,6 +46,7 @@ class PublishGuardGateOffTest {
         .forEach(
             (repository, type) ->
                 given()
+                    .header("Authorization", SuiteBearers.platform())
                     .contentType(ContentType.JSON)
                     .body(Map.of("type", type))
                     .when()

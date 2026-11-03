@@ -10,6 +10,7 @@ import static org.hamcrest.Matchers.notNullValue;
 import static org.hamcrest.Matchers.nullValue;
 import static org.hamcrest.Matchers.startsWith;
 
+import eu.wohlben.qits.SuiteBearers;
 import eu.wohlben.qits.blobstore.control.ArtifactRepositoryService;
 import eu.wohlben.qits.blobstore.control.BlobStore;
 import eu.wohlben.qits.artifacts.control.OciMediaTypes;
@@ -168,6 +169,7 @@ class ArtifactBrowseControllerTest {
     // The endpoint that already existed, extended. `type` was always there; the two numbers are new
     // and are what makes the listing a landing page rather than a set of names.
     given()
+        .header("Authorization", SuiteBearers.operator())
         .when()
         .get("/artifacts/api/repositories")
         .then()
@@ -182,6 +184,7 @@ class ArtifactBrowseControllerTest {
   @Test
   void imagesAreListedForAnImageRepository() {
     given()
+        .header("Authorization", SuiteBearers.operator())
         .when()
         .get("/artifacts/api/repositories/qits/images")
         .then()
@@ -197,6 +200,7 @@ class ArtifactBrowseControllerTest {
     // its 5-byte config, which also proves the footprint reached the stored document.
     for (String spelling : new String[] {IMAGE.replace("/", "%2F"), IMAGE}) {
       given()
+          .header("Authorization", SuiteBearers.operator())
           .urlEncodingEnabled(false)
           .when()
           .get("/artifacts/api/repositories/qits/images/" + spelling + "/tags")
@@ -227,6 +231,7 @@ class ArtifactBrowseControllerTest {
       manifests.persist(row);
     });
     given()
+        .header("Authorization", SuiteBearers.operator())
         .urlEncodingEnabled(false)
         .queryParam("never-accessed", "true")
         .when()
@@ -245,6 +250,7 @@ class ArtifactBrowseControllerTest {
   @Test
   void packagesAreListedForAnNpmRepository() {
     given()
+        .header("Authorization", SuiteBearers.operator())
         .when()
         .get("/artifacts/api/repositories/npm/packages")
         .then()
@@ -260,6 +266,7 @@ class ArtifactBrowseControllerTest {
     // the tarball urls it follows, so a browse API that accepted only one would be a third rule.
     for (String spelling : new String[] {PACKAGE.replace("/", "%2F"), PACKAGE}) {
       given()
+          .header("Authorization", SuiteBearers.operator())
           .urlEncodingEnabled(false)
           .when()
           .get("/artifacts/api/repositories/npm/packages/" + spelling + "/versions")
@@ -279,6 +286,7 @@ class ArtifactBrowseControllerTest {
     // repository segment (the seeded `daemons` row is the only namespace), but the explorer's
     // subject is a repository throughout, so this type gets no addressing scheme of its own.
     given()
+        .header("Authorization", SuiteBearers.operator())
         .when()
         .get("/artifacts/api/repositories/daemons/daemons")
         .then()
@@ -294,6 +302,7 @@ class ArtifactBrowseControllerTest {
   @Test
   void daemonVersionsAreNewestFirstAndCarryTheWireDigest() {
     given()
+        .header("Authorization", SuiteBearers.operator())
         .when()
         .get("/artifacts/api/repositories/daemons/daemons/" + DAEMON + "/versions")
         .then()
@@ -308,6 +317,7 @@ class ArtifactBrowseControllerTest {
 
     // A daemon nobody published is an empty list, not a 404 — a daemon is not a row.
     given()
+        .header("Authorization", SuiteBearers.operator())
         .when()
         .get("/artifacts/api/repositories/daemons/daemons/never-published/versions")
         .then()
@@ -318,6 +328,7 @@ class ArtifactBrowseControllerTest {
   @Test
   void docsSitesAreListedWithASizeTheOpenWireCatalogDoesNotCarry() {
     given()
+        .header("Authorization", SuiteBearers.operator())
         .when()
         .get("/artifacts/api/repositories/docs/docs")
         .then()
@@ -337,6 +348,7 @@ class ArtifactBrowseControllerTest {
     // browser, so it has to answer both, which is a property of the path template and nothing else.
     for (String spelling : new String[] {SITE.replace("/", "%2F"), SITE}) {
       given()
+          .header("Authorization", SuiteBearers.operator())
           .urlEncodingEnabled(false)
           .when()
           .get("/artifacts/api/repositories/docs/docs/" + spelling + "/versions")
@@ -356,21 +368,44 @@ class ArtifactBrowseControllerTest {
 
   @Test
   void anUnknownRepositoryIsFourOhFourOnBothBrowseSurfaces() {
-    given().when().get("/artifacts/api/repositories/no-such-repo/images").then().statusCode(404);
-    given().when().get("/artifacts/api/repositories/no-such-repo/packages").then().statusCode(404);
     given()
+        .header("Authorization", SuiteBearers.operator())
+        .when()
+        .get("/artifacts/api/repositories/no-such-repo/images")
+        .then()
+        .statusCode(404);
+    given()
+        .header("Authorization", SuiteBearers.operator())
+        .when()
+        .get("/artifacts/api/repositories/no-such-repo/packages")
+        .then()
+        .statusCode(404);
+    given()
+        .header("Authorization", SuiteBearers.operator())
         .when()
         .get("/artifacts/api/repositories/no-such-repo/images/anything/tags")
         .then()
         .statusCode(404);
-    given().when().get("/artifacts/api/repositories/no-such-repo/daemons").then().statusCode(404);
-    given().when().get("/artifacts/api/repositories/no-such-repo/docs").then().statusCode(404);
     given()
+        .header("Authorization", SuiteBearers.operator())
+        .when()
+        .get("/artifacts/api/repositories/no-such-repo/daemons")
+        .then()
+        .statusCode(404);
+    given()
+        .header("Authorization", SuiteBearers.operator())
+        .when()
+        .get("/artifacts/api/repositories/no-such-repo/docs")
+        .then()
+        .statusCode(404);
+    given()
+        .header("Authorization", SuiteBearers.operator())
         .when()
         .get("/artifacts/api/repositories/no-such-repo/daemons/anything/versions")
         .then()
         .statusCode(404);
     given()
+        .header("Authorization", SuiteBearers.operator())
         .when()
         .get("/artifacts/api/repositories/no-such-repo/docs/anything/versions")
         .then()
@@ -381,10 +416,30 @@ class ArtifactBrowseControllerTest {
   void aWrongTypedRepositoryIsFourHundredRatherThanAnEmptyList() {
     // The distinction that matters to a client: an npm repository has no images and never will, so
     // an empty list would read as an image registry that lost its images.
-    given().when().get("/artifacts/api/repositories/npm/images").then().statusCode(400);
-    given().when().get("/artifacts/api/repositories/qits/packages").then().statusCode(400);
-    given().when().get("/artifacts/api/repositories/npm/daemons").then().statusCode(400);
-    given().when().get("/artifacts/api/repositories/npm/docs").then().statusCode(400);
+    given()
+        .header("Authorization", SuiteBearers.operator())
+        .when()
+        .get("/artifacts/api/repositories/npm/images")
+        .then()
+        .statusCode(400);
+    given()
+        .header("Authorization", SuiteBearers.operator())
+        .when()
+        .get("/artifacts/api/repositories/qits/packages")
+        .then()
+        .statusCode(400);
+    given()
+        .header("Authorization", SuiteBearers.operator())
+        .when()
+        .get("/artifacts/api/repositories/npm/daemons")
+        .then()
+        .statusCode(400);
+    given()
+        .header("Authorization", SuiteBearers.operator())
+        .when()
+        .get("/artifacts/api/repositories/npm/docs")
+        .then()
+        .statusCode(400);
   }
 
   @Test
@@ -392,6 +447,7 @@ class ArtifactBrowseControllerTest {
     // Values depend on whatever else this JVM's suite has pushed, so the assertion is the contract
     // rather than the arithmetic — that lives in the artifacts module, over a fixture it owns.
     given()
+        .header("Authorization", SuiteBearers.operator())
         .when()
         .get("/artifacts/api/store/summary")
         .then()

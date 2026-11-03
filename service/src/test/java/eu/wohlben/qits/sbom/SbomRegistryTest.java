@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import eu.wohlben.qits.SuiteBearers;
 import eu.wohlben.qits.artifacts.persistence.SbomDocumentRepository;
 import io.quarkus.test.common.http.TestHTTPResource;
 import io.quarkus.test.junit.QuarkusTest;
@@ -57,6 +58,7 @@ class SbomRegistryTest {
   @BeforeEach
   void ensureRepository() {
     given()
+        .header("Authorization", SuiteBearers.platform())
         .contentType("application/json")
         .body("{\"type\":\"sboms\"}")
         .when()

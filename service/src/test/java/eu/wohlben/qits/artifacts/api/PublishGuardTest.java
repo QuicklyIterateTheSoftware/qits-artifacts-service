@@ -334,7 +334,7 @@ class PublishGuardTest {
         new OciClient(URI.create(root.toString())).bearer(MachineTokens.forAdmin())) {
       assertArrayEquals(image.manifest(), person.pull(name, "latest").manifest());
     }
-    assertStatus(200, wires.send("GET", "v2/", null, forwarded("alice", "qits:admin")));
+    assertStatus(200, wires.send("GET", "v2/", null, bearer(MachineTokens.forAdmin())));
     // And an anonymous read is not a publish either: the flip touched the write verbs alone, so a
     // pull from a machine with no credential — which is every bootstrap — still answers.
     assertStatus(200, wires.send("GET", "v2/", null));

@@ -12,6 +12,7 @@ import au.com.dius.pact.provider.junit5.PactVerificationInvocationContextProvide
 import au.com.dius.pact.provider.junitsupport.Provider;
 import au.com.dius.pact.provider.junitsupport.State;
 import au.com.dius.pact.provider.junitsupport.loader.PactSource;
+import eu.wohlben.qits.SuiteBearers;
 import io.quarkus.test.common.http.TestHTTPResource;
 import io.quarkus.test.junit.QuarkusTest;
 import jakarta.inject.Inject;
@@ -122,7 +123,7 @@ class ConsumerPactVerificationTest {
                 + wrong.reason());
       }
     }
-    context.setTarget(new RawPathTarget(base.getHost(), base.getPort()));
+    context.setTarget(new RawPathTarget(base.getHost(), base.getPort(), consumer));
   }
 
   @TestTemplate
@@ -142,8 +143,11 @@ class ConsumerPactVerificationTest {
    */
   static final class RawPathTarget extends HttpTestTarget {
 
-    RawPathTarget(String host, int port) {
+    private final String consumer;
+
+    RawPathTarget(String host, int port, String consumer) {
       super(host, port);
+      this.consumer = consumer;
     }
 
     @Override
@@ -151,9 +155,23 @@ class ConsumerPactVerificationTest {
       if (request instanceof HttpRequest http) {
         http.setPath(
             http.getPath().replace("%3A", ":").replace("%3a", ":").replace("%40", "@"));
+        if (!http.containsHeader("Authorization")) {
+          // An interaction without a bearer names no caller of its own, so the suite names the one
+          // the consumer is (epic qits-543, qits-1358) rather than leaning on a forward-auth dev
+          // user: a platform service sends its own qits:system bearer, anything else — the CLI,
+          // the bootstrap — a signed-in operator's. The open wires never ask for either.
+          http.setHeader("Authorization", callerOf(consumer));
+        }
       }
       return super.executeInteraction(client, request);
     }
+  }
+
+  /** The bearer a consumer's bearer-less interaction stands for, by what kind of consumer it is. */
+  static String callerOf(String consumer) {
+    return consumer.endsWith("-service")
+        ? SuiteBearers.bearer(consumer, "qits:system")
+        : SuiteBearers.operator();
   }
 
   // --- the states: each one line into the registry -------------------------------------------

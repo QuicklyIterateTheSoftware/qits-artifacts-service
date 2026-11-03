@@ -16,6 +16,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import eu.wohlben.qits.testdb.EmbeddedPg;
 import io.quarkus.test.common.http.TestHTTPResource;
+import eu.wohlben.qits.servicemock.idp.MockIdp;
+import eu.wohlben.qits.stories.support.StoryIdentities;
 import io.quarkus.test.junit.QuarkusIntegrationTest;
 import io.quarkus.test.junit.QuarkusTestProfile;
 import io.quarkus.test.junit.TestProfile;
@@ -118,6 +120,19 @@ public class PackagedProcessIT {
       // tokenless on qits-net, no issuer to reach — so it is stated here rather than inherited.
       // TokenValidationBootstrapIT is the gate-on twin and sets the key the other way.
       overrides.put("qits.auth.machine.required", "false");
+      // The shipped OIDC tenant on regardless, trusting this run's mock idp: with forward-auth gone
+      // (epic qits-543, qits-1358; qits-1338) a bearer is how every caller of the JSON API names
+      // itself, a person as much as a machine, and the tenant is what validates it. The gate stays
+      // off, so the wires stay tokenless — TokenValidationBootstrapIT is where the gate is on.
+      // The idp's key and issuer are handed over directly rather than discovered, so this process
+      // asks the mock nothing: its recording stays TokenValidationBootstrapIT's evidence alone.
+      MockIdp idp = MockIdp.ensureStarted();
+      overrides.put("quarkus.oidc.tenant-enabled", "true");
+      overrides.put("quarkus.oidc.auth-server-url", "");
+      overrides.put(
+          "quarkus.oidc.public-key",
+          java.util.Base64.getEncoder().encodeToString(idp.publicKey().getEncoded()));
+      overrides.put("quarkus.oidc.token.issuer", idp.issuer());
       // No qits-platform-deployments or qits-ci here either, and the shipped defaults name them by their qits-net
       // aliases — which on a build machine resolve to whatever the resolver feels like, or hang.
       // Closed ports make the refusal deterministic while still driving a real HttpClient inside
@@ -156,25 +171,29 @@ public class PackagedProcessIT {
   private static final String BROWSE_SITE = "@qits/packaged-it-browse-docs";
 
   /**
-   * The gateway's asserted identity, played by this suite for the JSON API. Every read there is
-   * {@code @RolesAllowed("qits:admin")}, the repository write {@code "qits:system"} and the blob
-   * upload {@code "qits:ci-run"} (see {@link #asCiRun()}); a
-   * {@code @QuarkusTest} passes them on the %test synthetic dev-user, but the PACKAGED process runs
-   * {@code LaunchMode.NORMAL}, where {@code ForwardAuthMechanism} deliberately stays anonymous — so
-   * this suite asserts the header pair qits-gateway would, believed by contract (the gateway strips
-   * client-supplied copies; network trust is the deployed posture). The wire cases below
-   * deliberately do NOT use this: tokenless on qits-net is their contract, and it is asserted by
-   * their requests staying header-free.
+   * The JSON API's callers, as the bearers a deployment's would present (epic qits-543, qits-1358).
+   * Every read there is {@code @RolesAllowed} on the four platform roles, the repository write and
+   * the sweep {@code "qits:system"} and the blob upload {@code "qits:ci-run"}; the packaged process
+   * runs {@code LaunchMode.NORMAL}, where no {@code %test} dev user answers for a caller that names
+   * none, and forward-auth's {@code X-Qits-User} / {@code X-Qits-Roles} pair leaves qits-auth-core
+   * with qits-1338. So each caller presents a token minted by this run's {@link MockIdp}, which the
+   * shipped tenant validates ({@link TargetDirState}). The wire cases below deliberately do NOT use
+   * these: tokenless on qits-net is their contract, and it is asserted by their requests staying
+   * header-free.
    */
   private static io.restassured.specification.RequestSpecification asOperator() {
-    return given()
-        .header("X-Qits-User", "packaged-it")
-        .header("X-Qits-Roles", "qits:admin,qits:system");
+    return given().header("Authorization", StoryIdentities.operator("packaged-it"));
   }
 
-  /** A CI run's asserted identity — the only one that publishes (USER RULING 2026-09-13). */
+  /** The platform peer that creates repositories and sweeps: {@code qits:system}. */
+  private static io.restassured.specification.RequestSpecification asPlatform() {
+    return given()
+        .header("Authorization", StoryIdentities.bearer("packaged-it-platform", "qits:system"));
+  }
+
+  /** A CI run's token — the only one that publishes (USER RULING 2026-09-13). */
   private static io.restassured.specification.RequestSpecification asCiRun() {
-    return given().header("X-Qits-User", "packaged-it-ci-run").header("X-Qits-Roles", "qits:ci-run");
+    return given().header("Authorization", StoryIdentities.ciRun("packaged-it-ci-run"));
   }
 
   @Test
@@ -387,7 +406,7 @@ public class PackagedProcessIT {
     //
     // The seed has already written the `npm` row in a packaged process; this states its own
     // precondition anyway rather than resting on another test's subject.
-    asOperator()
+    asPlatform()
         .contentType("application/json")
         .body("{\"type\":\"npm-packages\"}")
         .when()
@@ -434,7 +453,7 @@ public class PackagedProcessIT {
     //
     // The seed has already written the `maven` row in a packaged process; this states its own
     // precondition anyway rather than resting on another test's subject.
-    asOperator()
+    asPlatform()
         .contentType("application/json")
         .body("{\"type\":\"maven-packages\"}")
         .when()
@@ -767,7 +786,7 @@ public class PackagedProcessIT {
     // the receipt of a sweep with no pin source to read. It ABORTS whole rather than degrading the
     // way the plan above does, which is the settlement's all-or-nothing rule — so every type
     // carries the abort and nothing is deleted.
-    asOperator()
+    asPlatform()
         .when()
         .post("/artifacts/api/gc/sweep")
         .then()
@@ -838,7 +857,7 @@ public class PackagedProcessIT {
   }
 
   private void ensureOciRepository() {
-    asOperator()
+    asPlatform()
         .contentType("application/json")
         .body("{\"type\":\"oci-images\"}")
         .when()

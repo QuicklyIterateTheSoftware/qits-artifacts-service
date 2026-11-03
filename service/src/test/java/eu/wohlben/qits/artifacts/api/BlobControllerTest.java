@@ -6,6 +6,7 @@ import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.notNullValue;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 
+import eu.wohlben.qits.SuiteBearers;
 import io.quarkus.test.junit.QuarkusTest;
 import io.restassured.http.ContentType;
 import java.util.Arrays;
@@ -19,6 +20,7 @@ class BlobControllerTest {
   @BeforeEach
   void ensureRepo() {
     given()
+        .header("Authorization", SuiteBearers.platform())
         .contentType(ContentType.JSON)
         .body(Map.of("type", "ci-screenshots"))
         .when()
@@ -30,6 +32,7 @@ class BlobControllerTest {
   private io.restassured.specification.RequestSpecification upload(
       String branch, String flow, byte[] png) {
     return given()
+        .header("Authorization", SuiteBearers.ciRun())
         .contentType("image/png")
         .headers(ArtifactsTestMedia.screenshotHeaders(branch, flow, 100, 50))
         .body(png);
@@ -83,6 +86,7 @@ class BlobControllerTest {
     // Serve: exact bytes, stored mediatype, immutable cache header.
     byte[] served =
         given()
+            .header("Authorization", SuiteBearers.operator())
             .when()
             .get("/artifacts/api/repositories/ci-screenshots/blobs/" + id)
             .then()
@@ -95,6 +99,7 @@ class BlobControllerTest {
 
     // Query by branch, latest collapse.
     given()
+        .header("Authorization", SuiteBearers.operator())
         .queryParam("meta.git.branch.name", "main")
         .queryParam("latest", "true")
         .when()
@@ -109,6 +114,7 @@ class BlobControllerTest {
   @Test
   void invalidTypedFilterIs400() {
     given()
+        .header("Authorization", SuiteBearers.operator())
         .queryParam("accessed-before", "not-an-instant")
         .when()
         .get("/artifacts/api/repositories/ci-screenshots/blobs")
@@ -122,6 +128,7 @@ class BlobControllerTest {
     byte[] png = ArtifactsTestMedia.png(100, 50, 2);
     String id =
         given()
+            .header("Authorization", SuiteBearers.ciRun())
             .contentType("image/jpeg") // lie — bytes are PNG
             .headers(ArtifactsTestMedia.screenshotHeaders("main", "checkout", 100, 50))
             .body(png)
@@ -133,6 +140,7 @@ class BlobControllerTest {
             .path("id");
 
     given()
+        .header("Authorization", SuiteBearers.operator())
         .when()
         .get("/artifacts/api/repositories/ci-screenshots/blobs/" + id)
         .then()
@@ -145,6 +153,7 @@ class BlobControllerTest {
     var headers = ArtifactsTestMedia.screenshotHeaders("main", "checkout", 100, 50);
     headers.remove("X-Artifacts-Meta-qits.diff.hash");
     given()
+        .header("Authorization", SuiteBearers.ciRun())
         .contentType("image/png")
         .headers(headers)
         .body(ArtifactsTestMedia.png(100, 50, 3))
@@ -166,6 +175,7 @@ class BlobControllerTest {
   @Test
   void serveUnknownBlobIs404() {
     given()
+        .header("Authorization", SuiteBearers.operator())
         .when()
         .get(
             "/artifacts/api/repositories/ci-screenshots/blobs/"
@@ -177,6 +187,7 @@ class BlobControllerTest {
   @Test
   void serveMalformedIdIs404NotATraversal() {
     given()
+        .header("Authorization", SuiteBearers.operator())
         .when()
         .get("/artifacts/api/repositories/ci-screenshots/blobs/not-a-sha")
         .then()

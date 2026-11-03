@@ -2,6 +2,7 @@ package eu.wohlben.qits.artifacts.api;
 
 import static io.restassured.RestAssured.given;
 
+import eu.wohlben.qits.SuiteBearers;
 import eu.wohlben.qits.artifacts.control.DaemonBinariesProfile;
 import eu.wohlben.qits.artifacts.control.DocsProfile;
 import eu.wohlben.qits.artifacts.control.MavenPackagesProfile;
@@ -22,9 +23,10 @@ import org.junit.jupiter.api.Test;
  * <p>Agents will stop inheriting their owner's roles and hold {@code qits:agent} instead. Every
  * read on this API accepts that role; no write does.
  *
- * <p>The identity is the forward-auth pair. With {@code X-Qits-User} present, the roles are exactly
- * {@code X-Qits-Roles}, so the {@code %test} dev user's roles do not leak in. Seeding sends no
- * header and so runs as that dev user.
+ * <p>The agent presents its own bearer holding {@code qits:agent} alone ({@link SuiteBearers}); the
+ * seeding names its own callers too — the platform creates the repository, a CI run uploads the
+ * blob. Forward-auth and its {@code %test} dev user leave with qits-1338 (epic qits-543,
+ * qits-1358), so nothing here is anybody by default.
  */
 @QuarkusTest
 class AgentReadAccessTest {
@@ -44,8 +46,7 @@ class AgentReadAccessTest {
 
   private static RequestSpecification asAgent() {
     return given()
-        .header("X-Qits-User", "dyn-workspace-agent-reads")
-        .header("X-Qits-Roles", "qits:agent");
+        .header("Authorization", SuiteBearers.bearer("dyn-workspace-agent-reads", "qits:agent"));
   }
 
   @Test
@@ -93,6 +94,7 @@ class AgentReadAccessTest {
   @Test
   void anAgentReadsBlobs() {
     given()
+        .header("Authorization", SuiteBearers.platform())
         .contentType(ContentType.JSON)
         .body(Map.of("type", "ci-screenshots"))
         .when()
@@ -101,6 +103,7 @@ class AgentReadAccessTest {
         .statusCode(200);
     String id =
         given()
+            .header("Authorization", SuiteBearers.ciRun())
             .contentType("image/png")
             .headers(ArtifactsTestMedia.screenshotHeaders("main", "agent-reads", 100, 50))
             .body(ArtifactsTestMedia.png(100, 50, 23))

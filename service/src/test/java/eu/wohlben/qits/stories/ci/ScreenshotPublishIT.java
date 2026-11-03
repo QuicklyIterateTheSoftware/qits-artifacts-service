@@ -10,6 +10,7 @@ import eu.wohlben.qits.stories.support.AccessLogSource;
 import eu.wohlben.qits.stories.support.Cli;
 import eu.wohlben.qits.stories.support.StoryMedia;
 import eu.wohlben.qits.stories.support.StoryTarget;
+import eu.wohlben.qits.stories.support.StoryIdentities;
 import eu.wohlben.qits.userflows.Commands;
 import eu.wohlben.qits.userflows.Interactions;
 import eu.wohlben.qits.userflows.NetworkEdge;
@@ -51,9 +52,9 @@ import org.junit.jupiter.api.condition.EnabledIf;
  *       precisely so a caller cannot drift from it.
  *   <li><b>The upload is {@code @RolesAllowed("qits:ci-run")}</b>: only a CI run publishes. The CI
  *       media plane is a JAX-RS boundary rather than a raw-Vert.x one, so tokenless-on-qits-net
- *       does not apply to it: the request carries an {@code X-Qits-User}/{@code X-Qits-Roles} pair
- *       naming a CI run, because the packaged process runs {@code LaunchMode.NORMAL} and is
- *       anonymous without them.
+ *       does not apply to it: the request carries a CI run's bearer, minted by the run's mock idp
+ *       ({@code StoryIdentities}), because the packaged process runs {@code LaunchMode.NORMAL} and
+ *       is anonymous without one.
  * </ul>
  */
 @QuarkusIntegrationTest
@@ -156,7 +157,7 @@ public class ScreenshotPublishIT {
         .run(
             "{} -sS -X POST -H 'Expect:' -H {}"
                 + " -H {} -H {} -H {} -H {} -H {} -H {} -H {} -H {}"
-                + " -H {} -H {}"
+                + " -H {}"
                 + " --data-binary @{} -o {} -w %{http_code} {}",
             Cli.curl(),
             "Content-Type: image/png",
@@ -168,8 +169,7 @@ public class ScreenshotPublishIT {
             header(meta, "qits.diff.hash"),
             header(meta, "media.resolution.width"),
             header(meta, "media.resolution.height"),
-            "X-Qits-User: " + PUBLISHER,
-            "X-Qits-Roles: qits:ci-run",
+            StoryIdentities.authorizationHeader(commands, StoryIdentities.ciRun(PUBLISHER)),
             "screenshot.png",
             "publish-response.json",
             target.apiBase() + "/repositories/" + REPOSITORY + "/blobs")
