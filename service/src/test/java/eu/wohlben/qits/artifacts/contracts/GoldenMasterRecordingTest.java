@@ -9,6 +9,7 @@ import com.fasterxml.jackson.databind.node.IntNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.fasterxml.jackson.databind.node.TextNode;
+import eu.wohlben.qits.SuiteBearers;
 import io.quarkus.test.junit.QuarkusTest;
 import io.restassured.response.Response;
 import io.restassured.specification.RequestSpecification;
@@ -683,6 +684,18 @@ class GoldenMasterRecordingTest {
     } else {
       // As a browser sends a body-less call: RestAssured would otherwise add a form content type.
       request = request.noContentType();
+    }
+    if (interaction.path().startsWith("/artifacts/api/")) {
+      // A recorded call names no caller of its own, so the suite names one rather than leaning on a
+      // forward-auth dev user (epic qits-543, qits-1358): a sweep is the platform's (qits:system),
+      // every read a signed-in operator's. The header is sent, not recorded, so the golden master
+      // stays the consumer's shape; the open wires never ask for an identity.
+      request =
+          request.header(
+              "Authorization",
+              interaction.path().endsWith("/sweep")
+                  ? SuiteBearers.platform()
+                  : SuiteBearers.operator());
     }
     Response response =
         request.when().request(interaction.method(), expand(interaction.path(), params));

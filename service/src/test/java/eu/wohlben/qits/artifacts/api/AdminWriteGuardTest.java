@@ -12,7 +12,7 @@ import org.junit.jupiter.api.Test;
 /**
  * The JSON admin API with the machine-token gate ON — the posture a deployment with
  * qits-platform-idp runs. Writes (PUT/POST/DELETE) need a bearer carrying the platform audience;
- * reads stay open so a blob is usable directly as an {@code <img>} src.
+ * reads are not this guard's, only their own {@code @RolesAllowed} (any platform role reads).
  *
  * <p>The gate-OFF posture is what every other suite here runs under, so "unchanged when the gate is
  * off" is asserted by all of them at once rather than by one test.
@@ -53,17 +53,17 @@ class AdminWriteGuardTest {
 
   @Test
   void aUserWithoutTheSystemRoleIsForbidden() {
-    // The gateway's forward-auth identity names a person; this API is machine-only, and a browser
-    // session must not reach a write just because it reached the service.
+    // A person's qits CLI token (qits:admin, the platform audience); this write is the platform's,
+    // and a person must not reach it just because their token reached the service.
     given()
-        .header("X-Qits-User", "alice")
+        .header("Authorization", bearer(MachineTokens.forAdmin()))
         .contentType(ContentType.JSON)
         .body(Map.of("type", "ci-screenshots"))
         .when()
         .put("/artifacts/api/repositories/guarded")
         .then()
-        // Forward auth produced a real user identity, so this is authorization (403), not a
-        // missing-authentication challenge (401). The user still cannot cross the system role.
+        // The token authenticated a real identity, so this is authorization (403), not a
+        // missing-authentication challenge (401). The person still cannot cross the system role.
         .statusCode(403);
   }
 
@@ -105,7 +105,9 @@ class AdminWriteGuardTest {
             .extract()
             .path("id");
 
+    // A read is not this guard's: an operator's token reads the blob the CI run uploaded.
     given()
+        .header("Authorization", bearer(MachineTokens.forAdmin()))
         .when()
         .get("/artifacts/api/repositories/guarded/blobs/" + id)
         .then()
@@ -118,10 +120,25 @@ class AdminWriteGuardTest {
     // The prefix set is extended by hand, never inherited — a resource served outside it ships
     // unguarded. The mirror-upstreams cases that used to lead this method went to
     // qits-platform-mirror with the controller; what stays is the shape of the rule: writes under a
-    // guarded prefix are 401 without a token, and reads under the same prefix are not guarded at all.
-    given().when().get("/artifacts/api/store/summary").then().statusCode(200);
-    given().when().get("/artifacts/api/gc/plan").then().statusCode(200);
-    given().when().get("/artifacts/api/repositories").then().statusCode(200);
+    // guarded prefix are 401 without a token, and reads under the same prefix are not this guard's:
+    // an operator's token, which holds no qits:system, reads all three (epic qits-543, qits-1358 —
+    // a header-less read was the %test dev user, which leaves with qits-1338).
+    String operator = bearer(MachineTokens.forAdmin());
+    given()
+        .header("Authorization", operator)
+        .get("/artifacts/api/store/summary")
+        .then()
+        .statusCode(200);
+    given()
+        .header("Authorization", operator)
+        .get("/artifacts/api/gc/plan")
+        .then()
+        .statusCode(200);
+    given()
+        .header("Authorization", operator)
+        .get("/artifacts/api/repositories")
+        .then()
+        .statusCode(200);
 
     given()
         .contentType(ContentType.JSON)

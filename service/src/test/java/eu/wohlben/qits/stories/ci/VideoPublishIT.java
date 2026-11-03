@@ -9,6 +9,7 @@ import eu.wohlben.qits.stories.support.AccessLogSource;
 import eu.wohlben.qits.stories.support.Cli;
 import eu.wohlben.qits.stories.support.StoryMedia;
 import eu.wohlben.qits.stories.support.StoryTarget;
+import eu.wohlben.qits.stories.support.StoryIdentities;
 import eu.wohlben.qits.userflows.Commands;
 import eu.wohlben.qits.userflows.Interactions;
 import eu.wohlben.qits.userflows.NetworkEdge;
@@ -120,7 +121,7 @@ public class VideoPublishIT {
         .run(
             "{} -sS -X POST -H 'Expect:' -H {}"
                 + " -H {} -H {} -H {} -H {} -H {} -H {} -H {}"
-                + " -H {} -H {}"
+                + " -H {}"
                 + " --data-binary @{} -o {} -w %{http_code} {}",
             Cli.curl(),
             "Content-Type: video/webm",
@@ -131,8 +132,8 @@ public class VideoPublishIT {
             ScreenshotPublishIT.header(meta, "qits.display.name"),
             ScreenshotPublishIT.header(meta, "qits.diff.hash"),
             ScreenshotPublishIT.header(meta, "media.resolution.length"),
-            "X-Qits-User: " + ScreenshotPublishIT.PUBLISHER,
-            "X-Qits-Roles: qits:ci-run",
+            StoryIdentities.authorizationHeader(
+                commands, StoryIdentities.ciRun(ScreenshotPublishIT.PUBLISHER)),
             "recording.webm",
             "publish-response.json",
             target.apiBase() + "/repositories/" + REPOSITORY + "/blobs")

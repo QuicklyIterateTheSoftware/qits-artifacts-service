@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import eu.wohlben.qits.SuiteBearers;
 import eu.wohlben.qits.artifacts.persistence.DaemonBinaryRepository;
 import io.quarkus.test.common.http.TestHTTPResource;
 import io.quarkus.test.junit.QuarkusTest;
@@ -44,6 +45,7 @@ class DaemonRegistryTest {
   @BeforeEach
   void ensureRepository() {
     given()
+        .header("Authorization", SuiteBearers.platform())
         .contentType("application/json")
         .body("{\"type\":\"daemon-binaries\"}")
         .when()
@@ -175,6 +177,7 @@ class DaemonRegistryTest {
     String digest = TinyDaemon.sha256(binary);
 
     given()
+        .header("Authorization", SuiteBearers.platform())
         .contentType("application/json")
         .body("{\"type\":\"oci-images\"}")
         .when()
@@ -206,6 +209,7 @@ class DaemonRegistryTest {
     String digest = TinyDaemon.sha256(binary);
 
     given()
+        .header("Authorization", SuiteBearers.platform())
         .contentType("application/json")
         .body("{\"type\":\"oci-images\"}")
         .when()

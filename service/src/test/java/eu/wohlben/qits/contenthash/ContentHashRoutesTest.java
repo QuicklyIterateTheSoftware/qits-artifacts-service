@@ -4,6 +4,7 @@ import static io.restassured.RestAssured.given;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import eu.wohlben.qits.SuiteBearers;
 import eu.wohlben.qits.maven.TinyArtifact;
 import eu.wohlben.qits.npm.TinyPackage;
 import eu.wohlben.qits.registry.ContentHashLedger;
@@ -50,6 +51,7 @@ class ContentHashRoutesTest {
   void ensureRepositories() {
     for (String[] repository : new String[][] {{"maven", "maven-packages"}, {"npm", "npm-packages"}}) {
       given()
+          .header("Authorization", SuiteBearers.platform())
           .contentType("application/json")
           .body("{\"type\":\"" + repository[1] + "\"}")
           .when()

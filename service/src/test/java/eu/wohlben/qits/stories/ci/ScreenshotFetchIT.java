@@ -9,6 +9,7 @@ import eu.wohlben.qits.stories.support.AccessLogSource;
 import eu.wohlben.qits.stories.support.Cli;
 import eu.wohlben.qits.stories.support.StoryMedia;
 import eu.wohlben.qits.stories.support.StoryTarget;
+import eu.wohlben.qits.stories.support.StoryIdentities;
 import eu.wohlben.qits.userflows.Commands;
 import eu.wohlben.qits.userflows.Interactions;
 import eu.wohlben.qits.userflows.NetworkEdge;
@@ -106,10 +107,9 @@ public class ScreenshotFetchIT {
     // nothing else in this store answers to it.
     commands
         .run(
-            "{} -sS -H {} -H {} -o {} -w %{http_code} {}",
+            "{} -sS -H {} -o {} -w %{http_code} {}",
             Cli.curl(),
-            "X-Qits-User: " + READER,
-            "X-Qits-Roles: qits:admin",
+            StoryIdentities.authorizationHeader(commands, StoryIdentities.operator(READER)),
             "golden.json",
             blobs + goldenQuery(branch, flow))
         .as("golden-queried");
@@ -127,10 +127,9 @@ public class ScreenshotFetchIT {
 
     commands
         .run(
-            "{} -sS -f -H {} -H {} -o {} -w %{http_code} {}",
+            "{} -sS -f -H {} -o {} -w %{http_code} {}",
             Cli.curl(),
-            "X-Qits-User: " + READER,
-            "X-Qits-Roles: qits:admin",
+            StoryIdentities.authorizationHeader(commands, StoryIdentities.operator(READER)),
             "golden.png",
             blobs + "/" + published)
         .as("golden-downloaded");
