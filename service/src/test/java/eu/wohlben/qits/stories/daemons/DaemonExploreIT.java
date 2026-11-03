@@ -82,15 +82,17 @@ public class DaemonExploreIT {
     flow.waitFor("tbody th[scope=\"row\"] a:text-is('" + daemon + "')");
     flow.screenshot("the daemons repository's binaries").as("daemon-listed");
 
-    // A version's link leaves this application entirely — it is the wire download at
+    // A version's control leaves this application entirely — it downloads the wire binary at
     // /artifacts/daemons/<name>/<version> — so the page is reached by clicking the daemon, never
-    // by clicking a version.
+    // by clicking a version. The daemon's own link stays an anchor.
     flow.click("tbody th[scope=\"row\"] a:text-is('" + daemon + "')");
-    // The version is waited for on its ANCHOR, not on the row header around it: `:text-is()`
+    // The version is waited for on its CONTROL, not on the row header around it: `:text-is()`
     // matches the SMALLEST element carrying the text, so on a page where the version cell is a
-    // download link `th:text-is(…)` matches nothing at all — which is exactly the difference
+    // download control `th:text-is(…)` matches nothing at all — which is exactly the difference
     // between this table and the npm package page's, where the version is the header's own text.
-    flow.waitFor("tbody th[scope=\"row\"] a:text-is('" + version + "')");
+    // Since qits-543 that control is a download BUTTON, not an anchor — a plain href cannot carry
+    // the bearer the download needs — so the selector matches either element.
+    flow.waitFor("tbody th[scope=\"row\"] :is(a,button):text-is('" + version + "')");
     flow.screenshot("the daemon's versions and their digests").as("versions-shown");
   }
 

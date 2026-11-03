@@ -93,7 +93,7 @@ public class ScreenshotExploreIT {
     // :text-is is exact, so the `ci-screenshots` type badge in the row's second cell cannot shadow
     // the repository link in its header — and `ci-videos` cannot be matched by a prefix.
     flow.click("tbody th a:text-is('" + ScreenshotPublishIT.REPOSITORY + "')");
-    flow.waitFor("tbody th[scope=\"row\"].mono a:text-is('" + shortened + "')");
+    flow.waitFor("tbody th[scope=\"row\"].mono :is(a,button):text-is('" + shortened + "')");
     flow.screenshot("the repository's captured artifacts").as("records-listed");
 
     // The filter form: a datetime-local input takes the `YYYY-MM-DDTHH:mm` spelling and nothing
@@ -101,14 +101,16 @@ public class ScreenshotExploreIT {
     // selector matching both would be ambiguous rather than wrong.
     flow.fill("form.filters input[name=\"createdAfter\"]", CREATED_AFTER);
     flow.click("form.filters button[type=\"submit\"]");
-    flow.waitFor("tbody th[scope=\"row\"].mono a:text-is('" + shortened + "')");
+    flow.waitFor("tbody th[scope=\"row\"].mono :is(a,button):text-is('" + shortened + "')");
     flow.screenshot("the artifacts captured since the window opened").as("filters-applied");
 
     // The metadata cell of THIS row, not of any row: the repository holds other captures, so
     // `:has()` narrows the assertion to the record this chain published rather than to whichever
-    // one the table happened to print first.
+    // one the table happened to print first. The digest text sits on the row header's control —
+    // an anchor or, since qits-543, a download button — so `:has()` matches either.
     flow.expectText(
-        "tbody tr:has(a:text-is('" + shortened + "')) td.metadata", ScreenshotPublishIT.FLOW);
+        "tbody tr:has(:is(a,button):text-is('" + shortened + "')) td.metadata",
+        ScreenshotPublishIT.FLOW);
     flow.screenshot("the record, with the metadata its run declared").as("record-shown");
   }
 
