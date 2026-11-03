@@ -14,6 +14,12 @@ import org.junit.jupiter.api.Test;
  * static and pure precisely so this suite costs nothing (AGENTS.md's test-profile budget rule: a
  * profile is a whole Quarkus app). Asserting the same property through a log handler would need a
  * running application to say something a string comparison already says.
+ *
+ * <p>Three call sites pass it a name today — the gate-off accept, the {@code ALLOW_ANONYMOUS}
+ * accept (unreachable in the shipped surface list) and a validated bearer's principal — since
+ * qits-543 removed the fourth, the forwarded pair's. The function itself stays general: {@code how}
+ * is any word a caller wants rendered beside the name, which is what the test below still proves
+ * with a made-up one.
  */
 class PublishGuardPublisherTest {
 
@@ -40,10 +46,10 @@ class PublishGuardPublisherTest {
   }
 
   @Test
-  void aNamedPublisherIsItsNameAndTheForwardedPairSaysSo() {
+  void aNamedPublisherIsItsNameAndHowItArrivedCanBeSaidToo() {
     assertEquals("dyn-ci-run-1f2e", PublishGuard.publisher("dyn-ci-run-1f2e", null));
     assertEquals(
-        "dyn-ci-run-1f2e (forwarded)", PublishGuard.publisher("dyn-ci-run-1f2e", "forwarded"));
+        "dyn-ci-run-1f2e (gate off)", PublishGuard.publisher("dyn-ci-run-1f2e", "gate off"));
   }
 
   @Test

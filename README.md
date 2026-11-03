@@ -271,10 +271,9 @@ daemons, docs, SBOMs), and judges the identity the caller presents:
 |---|---|
 | bearer with `qits:ci-run` — a CI run, e.g. `docker push` after the edge's token exchange | accepted |
 | bearer with `qits:admin`, `qits:agent` or `qits:system` | 403 |
-| forwarded `X-Qits-User`/`X-Qits-Roles` without `qits:ci-run` — a browser session through the edge | 403 |
 | a JWT this service does not accept (other audience, expired, foreign key) | 401 |
 | HTTP Basic — the edge passes a client's `id:secret` through unchanged, and the store cannot check it | 401 |
-| no credential, or a bearer that is not a JWT (npm's `_authToken` ceremony) | **401 on every surface** — with a Bearer challenge on `/v2`, plain on the other five |
+| no credential, or a bearer that is not a JWT (npm's `_authToken` ceremony, or a forwarded `X-Qits-User`/`X-Qits-Roles` pair, which this guard no longer reads at all) | **401 on every surface** — with a Bearer challenge on `/v2`, plain on the other five |
 
 That last row was a rollout rather than a switch, and since 2026-09-21 it is **closed on all six**.
 A surface could only be flipped once every publisher that still wrote to it presented the run's
@@ -306,8 +305,10 @@ dyn-workspace-… holds [qits:agent, …]`) rather than the 404 an uncredentiale
 reached — proof that maven sends the header preemptively and that the guard reads it as an identity.
 **With `qits.auth.machine.required` off nothing is
 refused on any surface**: the OIDC tenant follows the same key, so there would be nothing to
-validate the credential a refusal demands. A bearer is judged only while that gate is on; the
-forwarded pair and Basic are judged always. `PublishGuardTest` proves the role table and the
+validate the credential a refusal demands. A bearer is judged only while that gate is on; Basic is
+judged always. **The forwarded `X-Qits-User`/`X-Qits-Roles` pair is not read here at all (owner
+ruling 2026-10-18, qits-543)** — a caller presenting only that pair, whatever role it claims, is
+judged exactly as one presenting no credential. `PublishGuardTest` proves the role table and the
 anonymous row over all six wires at once — including that a refused maven, npm or docs publish
 **stores nothing**, not merely that it answered 401 — and asserts the whole surface map, so a row
 going back to `ALLOW_ANONYMOUS` is an edit that breaks a test rather than a tidy-up.
@@ -321,10 +322,10 @@ its posture lived entirely inside a parameterised table of six, where a careless
 widening could have moved it with no file saying so.
 
 **Every publish is logged, accepted or refused.** A refusal has always said why, at `WARN`; an
-accept says at `INFO` which surface it landed on and who published it — the forwarded user name
-(marked `forwarded`), the principal of a validated bearer, or the literal `anonymous` where this
-service has no name for the caller (marked `gate off` when the machine-token gate is what made it
-nameless). No token and no `Authorization` header is ever written. That line is how the last
+accept says at `INFO` which surface it landed on and who published it — the principal of a
+validated bearer, or the literal `anonymous` where this service has no name for the caller (marked
+`gate off` when the machine-token gate is what made it nameless). No token and no `Authorization`
+header is ever written. That line is how the last
 surfaces were counted down before they were flipped, since the publishers that would have broken
 were otherwise invisible from both ends: nothing here recorded an accept, there is no access log in
 the shipped configuration, and a release recipe whose token mint failed degrades to an anonymous

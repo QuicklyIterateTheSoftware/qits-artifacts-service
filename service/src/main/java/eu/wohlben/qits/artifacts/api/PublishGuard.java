@@ -16,7 +16,6 @@ import io.vertx.ext.web.RoutingContext;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Observes;
 import jakarta.inject.Inject;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -27,9 +26,17 @@ import org.jboss.logging.Logger;
 /**
  * Only CI publishes (USER RULING 2026-09-13). On the six wire publish routes, a caller that
  * presents an identity must be a CI run: its roles must hold {@code qits:ci-run}. Every other
- * presented identity is refused — a person ({@code qits:admin}) by bearer or by the forwarded
- * {@code X-Qits-*} pair, an agent ({@code qits:agent}), and a platform service ({@code
- * qits:system}), which is an explicit exception to the open calling model.
+ * presented identity is refused — a person ({@code qits:admin}) by bearer, an agent ({@code
+ * qits:agent}), and a platform service ({@code qits:system}), which is an explicit exception to the
+ * open calling model.
+ *
+ * <p><b>The verified bearer is the only identity this guard reads (owner ruling 2026-10-18,
+ * qits-543).</b> It used to also believe the forwarded {@code X-Qits-User}/{@code X-Qits-Roles}
+ * pair — anything on qits-net could send it, and the edge asserted it for a signed-in person — as
+ * an alternative to a validated JWT. Now every caller is judged on the deferred {@link
+ * SecurityIdentity} alone: this class reads no {@code qits.auth.forward.*} key and no {@code
+ * X-Qits-*} header. A caller with no bearer, or one that fails validation, is the anonymous
+ * publisher below, whatever headers it also sent.
  *
  * <p>The publish routes are {@code POST}/{@code PATCH}/{@code PUT} on {@code /v2/…} and {@code
  * PUT} on {@code /artifacts/npm/…}, {@code /artifacts/maven/…}, {@code /artifacts/daemons/…},
@@ -103,9 +110,8 @@ import org.jboss.logging.Logger;
  * 401 beside it is attributable rather than a mystery.
  *
  * <p>A bearer is judged only while the machine-token gate {@code qits.auth.machine.required} is
- * on, because with it off there is no OIDC tenant to validate one. The forwarded pair is judged
- * either way: it needs no validation, it is believed the way {@code ForwardAuthMechanism} believes
- * it.
+ * on, because with it off there is no OIDC tenant to validate one — see the gate-off branch below,
+ * which is the only path left that accepts a publish with no verified identity at all.
  *
  * <p><b>Why a filter and not a handler on each route.</b> The npm, maven and {@code /v2} routes
  * are registered by the qits-registries jars; this service cannot put a handler into their chains.
@@ -207,12 +213,6 @@ public class PublishGuard {
           // `qits-publish sbom submit`, from the composed postlude.
           new Surface("/artifacts/sboms/", Set.of(HttpMethod.PUT), Anonymous.REFUSE));
 
-  @ConfigProperty(name = "qits.auth.forward.user-header")
-  String userHeader;
-
-  @ConfigProperty(name = "qits.auth.forward.roles-header")
-  String rolesHeader;
-
   /**
    * The advertised realm, empty unless a deployment overrides it — {@link RegistryChallenge} says
    * why deriving it from the inbound request is the default, and {@link RegistryTokenEndpoint}
@@ -255,22 +255,6 @@ public class PublishGuard {
     Surface surface = surfaceOf(rc.request().method(), path);
     if (surface == null) {
       rc.next();
-      return;
-    }
-
-    // The forwarded pair first: the edge asserts it for a signed-in person, and anything on
-    // qits-net can send it. Either way it names an identity, and that identity must be a CI run.
-    // It is TERMINAL either way: a pair naming a CI run has been judged, and falling through to be
-    // judged a second time would turn a request the edge already authenticated into an anonymous
-    // one the moment a surface flips.
-    String user = rc.request().getHeader(userHeader);
-    if (user != null && !user.isBlank()) {
-      Set<String> roles = roles(rc.request().getHeader(rolesHeader));
-      if (!roles.contains(CI_RUN)) {
-        refuse(rc, 403, "only a CI run publishes; " + user + " holds " + roles);
-        return;
-      }
-      accept(rc, surface, publisher(user, "forwarded"));
       return;
     }
 
@@ -473,19 +457,5 @@ public class PublishGuard {
     }
     String token = authorization.substring(7).strip();
     return JWT.matcher(token).matches() ? token : null;
-  }
-
-  static Set<String> roles(String header) {
-    Set<String> roles = new LinkedHashSet<>();
-    if (header == null) {
-      return roles;
-    }
-    for (String role : header.split(",")) {
-      String read = role.strip();
-      if (!read.isEmpty()) {
-        roles.add(read);
-      }
-    }
-    return roles;
   }
 }

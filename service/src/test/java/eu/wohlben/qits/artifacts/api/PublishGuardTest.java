@@ -37,11 +37,12 @@ import org.junit.jupiter.params.provider.EnumSource;
  * Only a CI run publishes (USER RULING 2026-09-13): {@link PublishGuard} on all six wires, with the
  * machine-token gate on.
  *
- * <p>Every identity here is explicit — a {@link MachineTokens} bearer or a forwarded pair. The
- * {@code %test} dev user never answers, because the guard reads the headers and the token itself.
- * Each refused case expects a status the wire's own handler never gives for that request (403, or
- * 401), and each accepted case is a real publish of real content, so neither half can pass for the
- * wrong reason.
+ * <p>Every identity here is explicit — a {@link MachineTokens} bearer. The {@code %test} dev user
+ * never answers, because the guard reads the deferred {@link
+ * io.quarkus.security.identity.SecurityIdentity} and nothing else: no {@code qits.auth.forward.*}
+ * key, no {@code X-Qits-*} header (owner ruling 2026-10-18, qits-543). Each refused case expects a
+ * status the wire's own handler never gives for that request (403, or 401), and each accepted case
+ * is a real publish of real content, so neither half can pass for the wrong reason.
  *
  * <p><b>The anonymous caller is refused on every one of the six wires</b>, since 2026-09-21: the
  * rollout that closed them one at a time finished when {@code npm} and {@code docs} flipped, and
@@ -129,26 +130,16 @@ class PublishGuardTest {
 
   @ParameterizedTest
   @EnumSource(Wire.class)
-  void aPersonsBrowserSessionIsRefused(Wire wire) {
-    // What the edge forwards for a signed-in person: the X-Qits pair, roles from introspection.
-    assertStatus(403, wires.publish(wire, forwarded("alice", "qits:admin")));
-  }
-
-  @ParameterizedTest
-  @EnumSource(Wire.class)
-  void aForwardedServiceOrAgentIsRefused(Wire wire) {
-    assertStatus(403, wires.publish(wire, forwarded("dev-qits-ci", "qits:system")));
-    assertStatus(403, wires.publish(wire, forwarded("dyn-workspace-1", "qits:agent")));
-  }
-
-  @ParameterizedTest
-  @EnumSource(Wire.class)
-  void aForwardedCiRunPublishes(Wire wire) {
-    // The role decides, not the channel. The edge never asserts this pair; anything on qits-net
-    // could. The branch is terminal: a pair naming a CI run has been judged, and on a flipped
-    // surface a fallthrough would judge it a second time as a caller with no bearer — a 401 for a
-    // request the edge already authenticated.
-    assertAccepted(wires.publish(wire, forwarded("dyn-ci-run-1", "qits:ci-run")));
+  void aForwardedPairCarriesNoIdentityHereAnyMore(Wire wire) {
+    // qits-543 (owner ruling 2026-10-18): this guard no longer reads qits.auth.forward.* at all, so
+    // the X-Qits-User/X-Qits-Roles pair is exactly as good as no header — whoever it names and
+    // whatever role it claims, including qits:ci-run, which used to publish through it. The request
+    // carries no Authorization header either, so it lands in the same anonymous branch every other
+    // uncredentialed publish does, and the surface's own 401 (or 401-with-challenge on /v2) answers.
+    assertStatus(401, wires.publish(wire, forwarded("alice", "qits:admin")));
+    assertStatus(401, wires.publish(wire, forwarded("dev-qits-ci", "qits:system")));
+    assertStatus(401, wires.publish(wire, forwarded("dyn-workspace-1", "qits:agent")));
+    assertStatus(401, wires.publish(wire, forwarded("dyn-ci-run-1", "qits:ci-run")));
   }
 
   @ParameterizedTest
