@@ -47,9 +47,10 @@ import org.junit.jupiter.api.Test;
  * <p><b>Excluded by name</b>, because none is a qits REST contract: the registries' upstream
  * clients (the maven, npm and OCI proxies, whose caches are qits-mirror's and are excluded from
  * bean discovery here) live in the registries jars, not in these modules, so the scan never sees
- * them; and the OpenTelemetry exporter's OTLP posts to qits-observability ({@code
- * quarkus.otel.exporter.otlp.endpoint}), a telemetry stream every service sends and no pact
- * describes. There is no other exclusion.
+ * them; and the OTLP exports to qits-observability through the edge ({@code
+ * qits.telemetry.endpoint}, qits-telemetry-core's CDI exporters as of epic qits-428), a telemetry
+ * stream every service sends and no pact describes — those beans live in that jar, not in these
+ * modules, so the scan never sees them either. There is no other exclusion.
  */
 class OutboundCallsGuardTest {
 
