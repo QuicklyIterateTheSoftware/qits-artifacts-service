@@ -59,7 +59,7 @@
     </modules>
 
     <properties>
-        <qits.auth-core.version>2026.1031.63225</qits.auth-core.version>
+        <qits.auth-core.version>2026.1105.105731</qits.auth-core.version>
         <!-- The platform's shared rules, test scope only (qits-1754). ProviderStateCoverageTest is
              what this repo takes it for. Published by qits-integrations-quarkus, like qits-auth-core
              above. -->
@@ -141,7 +141,7 @@
         <qits.ci-golden-masters.version>2026.1102.180015</qits.ci-golden-masters.version>
         <qits.maintenance-golden-masters.version>2026.1031.22002</qits.maintenance-golden-masters.version>
         <qits.workspaces-golden-masters.version>2026.1102.193613</qits.workspaces-golden-masters.version>
-        <qits.projects-golden-masters.version>2026.1105.84836</qits.projects-golden-masters.version>
+        <qits.projects-golden-masters.version>2026.1105.180851</qits.projects-golden-masters.version>
         <qits.idp-golden-masters.version>2026.1027.165632</qits.idp-golden-masters.version>
         <qits.maven.repository.url>https://registry.qits.wohlben.eu/artifacts/maven/maven</qits.maven.repository.url>
         <maven.compiler.release>25</maven.compiler.release>
