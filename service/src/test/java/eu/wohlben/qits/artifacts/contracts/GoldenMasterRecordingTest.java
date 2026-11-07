@@ -472,6 +472,12 @@ class GoldenMasterRecordingTest {
 
   @Inject ProviderStates states;
 
+  /**
+   * The committed index's frozen params, slug → param → frozen value: what pins a param's frozen id
+   * numbers ({@link Freezer#seed(Map, Map)}), read once before recording.
+   */
+  private Map<String, Map<String, String>> committedParams = Map.of();
+
   @Test
   void goldenMastersMatchTheProvider() throws IOException {
     Path dir = GoldenFiles.repositoryRoot().resolve("golden-masters");
@@ -483,6 +489,8 @@ class GoldenMasterRecordingTest {
     // slug -> recorded state, sorted by slug; operations sorted by operationId below
     Map<String, ObjectNode> indexStates = new TreeMap<>();
     Map<String, Map<String, ObjectNode>> indexOperations = new TreeMap<>();
+
+    committedParams = committedParams(dir.resolve("index.json"));
 
     for (Interaction interaction : INTERACTIONS) {
       checkDeclared(interaction, declared, failures);
@@ -725,7 +733,12 @@ class GoldenMasterRecordingTest {
       headers.put(name, value);
     }
 
-    Freezer freezer = new Freezer().seed(params.values()).uniqueTokens(setup.uniqueTokens());
+    Freezer freezer =
+        new Freezer()
+            .seed(
+                params,
+                committedParams.getOrDefault(ProviderStates.slug(interaction.state()), Map.of()))
+            .uniqueTokens(setup.uniqueTokens());
     ObjectNode frozenParams = JsonNodeFactory.instance.objectNode();
     params.forEach((k, v) -> frozenParams.put(k, freezer.freezeParam(v)));
 
@@ -944,5 +957,22 @@ class GoldenMasterRecordingTest {
           .sorted()
           .toList();
     }
+  }
+
+  /**
+   * slug → frozen params of every state in the committed index ({@code states[].slug}, {@code
+   * states[].params}); empty when there is no index yet.
+   */
+  static Map<String, Map<String, String>> committedParams(Path index) throws IOException {
+    if (!Files.isRegularFile(index)) {
+      return Map.of();
+    }
+    Map<String, Map<String, String>> out = new TreeMap<>();
+    for (JsonNode state : JSON.readTree(index.toFile()).path("states")) {
+      Map<String, String> params = new TreeMap<>();
+      state.path("params").fields().forEachRemaining(p -> params.put(p.getKey(), p.getValue().asText()));
+      out.put(state.path("slug").asText(), params);
+    }
+    return out;
   }
 }
