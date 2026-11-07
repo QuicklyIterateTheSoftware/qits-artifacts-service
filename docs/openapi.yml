@@ -600,6 +600,40 @@ paths:
         "200":
           description: "{name, tags:[tag]}; an empty list for a name nothing was pushed\
             \ under."
+  /artifacts/api/applications/{application}/purge:
+    post:
+      operationId: purgeApplication
+      parameters:
+      - name: application
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+        required: false
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApplicationPurgeReport"
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+        "400":
+          description: Bad Request
+      summary: Purge
+      tags:
+      - Application Purge Controller
+      security:
+      - SecurityScheme:
+        - qits:system
   /artifacts/api/gc/plan:
     post:
       operationId: planGcWithSuppliedPins
@@ -767,6 +801,15 @@ paths:
         - qits:ci-run
 components:
   schemas:
+    ApplicationPurgeReport:
+      type: object
+      properties:
+        application:
+          type: string
+        removed:
+          type: array
+          items:
+            $ref: "#/components/schemas/PurgedPackage"
     DaemonSummary:
       type: object
       properties:
@@ -1082,6 +1125,19 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/DaemonSummary"
+    PurgedPackage:
+      type: object
+      properties:
+        type:
+          type: string
+        repository:
+          type: string
+        name:
+          type: string
+        versions:
+          type: array
+          items:
+            type: string
     StoreSummary:
       type: object
       properties:

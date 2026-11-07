@@ -295,4 +295,9 @@ class ConsumerPactVerificationTest {
   Map<String, String> anUnfileablePin() {
     return states.params(ProviderStates.AN_UNFILEABLE_PIN);
   }
+
+  @State(ProviderStates.AN_APPLICATION_WITH_PUBLISHED_ARTIFACTS)
+  Map<String, String> anApplicationWithPublishedArtifacts() {
+    return states.params(ProviderStates.AN_APPLICATION_WITH_PUBLISHED_ARTIFACTS);
+  }
 }

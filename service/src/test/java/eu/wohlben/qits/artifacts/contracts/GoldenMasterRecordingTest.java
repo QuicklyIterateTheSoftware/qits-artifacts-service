@@ -466,6 +466,15 @@ class GoldenMasterRecordingTest {
               .json("application/json", ProviderStates.GC_PINS_UNFILEABLE)
               .drop(STORE_WIDE_LISTS)
               .zeroNumbers()
+              .build(),
+          // --- the decommission of a retired application (qits-1941)
+          op(
+                  ProviderStates.AN_APPLICATION_WITH_PUBLISHED_ARTIFACTS,
+                  "purgeApplication",
+                  "POST",
+                  "/artifacts/api/applications/{application}/purge",
+                  200)
+              .json("application/json", ProviderStates.PURGE_BODY)
               .build());
 
   private static final Pattern TEMPLATE_PARAM = Pattern.compile("\\{([^}]+)}");
@@ -695,13 +704,13 @@ class GoldenMasterRecordingTest {
     }
     if (interaction.path().startsWith("/artifacts/api/")) {
       // A recorded call names no caller of its own, so the suite names one rather than leaning on a
-      // forward-auth dev user (epic qits-543, qits-1358): a sweep is the platform's (qits:system),
-      // every read a signed-in operator's. The header is sent, not recorded, so the golden master
-      // stays the consumer's shape; the open wires never ask for an identity.
+      // forward-auth dev user (epic qits-543, qits-1358): a sweep and a purge are the platform's
+      // (qits:system), every read a signed-in operator's. The header is sent, not recorded, so the
+      // golden master stays the consumer's shape; the open wires never ask for an identity.
       request =
           request.header(
               "Authorization",
-              interaction.path().endsWith("/sweep")
+              interaction.path().endsWith("/sweep") || interaction.path().endsWith("/purge")
                   ? SuiteBearers.platform()
                   : SuiteBearers.operator());
     }

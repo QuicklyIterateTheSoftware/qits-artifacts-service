@@ -47,10 +47,15 @@ public class AdminWriteGuard implements ContainerRequestFilter {
    * construction instead of by remembering. (A deployment shipping a blank token still runs the
    * guard as a no-op — the standing posture until the platform's auth story lands.)
    *
+   * <p>{@code applications} holds the one door that deletes more than a sweep may — {@code POST
+   * /applications/{application}/purge} (qits-1941), past every pin and grace — so it is listed with
+   * its first resource rather than after it.
+   *
    * <p>{@code mirror-upstreams} was here and is gone with the controller: which public registry a
    * cache dials on a miss is qits-platform-mirror's decision now, and so is guarding it.
    */
-  private static final Set<String> GUARDED_PREFIXES = Set.of("repositories", "store", "gc");
+  private static final Set<String> GUARDED_PREFIXES =
+      Set.of("repositories", "store", "gc", "applications");
 
   @Inject MachineAuth machineAuth;
 

@@ -20,8 +20,11 @@ import jakarta.inject.Inject;
  * its files, and offering anything narrower would be offering a way to leave a version serving 404s
  * for its own assets.
  *
- * <p><b>The owner is {@code DocsGcAdapter.delete} and nothing else.</b> Which versions die is the own
- * engine's rule; this only knows how a version is removed.
+ * <p><b>The owners are {@code DocsGcAdapter.delete} and {@code ApplicationPurge}, both in the
+ * {@code gc} module, and nothing else.</b> Which versions die is the own engine's rule, or — for the
+ * second, since qits-1941 — the decision that an application is retired; this only knows how a
+ * version is removed. The purge was given this door rather than one of its own so a decommission
+ * leaves the store through the same funnel a sweep does, cascades included.
  */
 @ApplicationScoped
 public class DocsRegistryCollection {

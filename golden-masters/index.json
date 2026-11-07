@@ -804,6 +804,36 @@
       ]
     },
     {
+      "name": "an application with published artifacts",
+      "slug": "an-application-with-published-artifacts",
+      "params": {
+        "application": "contract-application",
+        "repository": "contract-application-service"
+      },
+      "dependsOn": [],
+      "operations": [
+        {
+          "operationId": "purgeApplication",
+          "method": "POST",
+          "path": "/artifacts/api/applications/{application}/purge",
+          "contentType": "application/json",
+          "body": {
+            "repositories": [
+              "contract-application-service"
+            ]
+          },
+          "status": 200,
+          "file": "an-application-with-published-artifacts/purgeApplication.json",
+          "frozen": {
+            "ids": [],
+            "instants": [],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        }
+      ]
+    },
+    {
       "name": "an image pushed under a tag",
       "slug": "an-image-pushed-under-a-tag",
       "params": {

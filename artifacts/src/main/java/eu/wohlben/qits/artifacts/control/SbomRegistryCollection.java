@@ -12,8 +12,10 @@ import jakarta.inject.Inject;
  * package-private because it is the only way an {@code sbom_document} row ever leaves this service,
  * and there is no client-facing delete on {@code /artifacts/sboms} for it to become one.
  *
- * <p><b>The owner is {@code SbomGcAdapter.delete} and nothing else.</b> Which documents die is the
- * own engine's rule; this only knows how a row is removed.
+ * <p><b>The owners are {@code SbomGcAdapter.delete} and {@code ApplicationPurge}, both in the
+ * {@code gc} module, and nothing else.</b> Which documents die is the own engine's rule, or — for
+ * the second, since qits-1941 — the decision that an application is retired; this only knows how a
+ * row is removed.
  */
 @ApplicationScoped
 public class SbomRegistryCollection {

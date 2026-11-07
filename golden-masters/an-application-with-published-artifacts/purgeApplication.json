@@ -1,0 +1,21 @@
+{
+  "application": "contract-application",
+  "removed": [
+    {
+      "type": "docs",
+      "repository": "docs",
+      "name": "@contracts/contract-application",
+      "versions": [
+        "2100.1.0"
+      ]
+    },
+    {
+      "type": "maven",
+      "repository": "maven",
+      "name": "eu.wohlben.qits:contract-application-golden-masters",
+      "versions": [
+        "2100.1.0"
+      ]
+    }
+  ]
+}

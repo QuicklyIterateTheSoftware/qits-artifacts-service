@@ -709,6 +709,16 @@ Two things are npm's alone, and the plan is explicit that docker needs neither:
   costs nothing for a hosted tag and is what let both OCI types come through one door: an auxiliary
   row cleaned inside the funnel cannot be forgotten by a caller.
 
+**`POST /applications/{application}/purge` is a decommission, not a sweep (qits-1941).**
+`gc/ApplicationPurge` removes everything a retired application and the repositories the body names
+published — docs sites, maven artifacts (golden masters and pacts on both sides included), npm
+packages, the image and their SBOMs — through the same per-type collection doors the adapters use,
+and asks no pin, belt or grace: retiring the application is the decision. There is no ownership
+column, so every match is an **equality on a naming convention** and never a prefix
+(`qits-system` is a prefix of other repositories); the class javadoc is the rule table. It leaves
+blobs to `BlobSweep`, is idempotent (a second call answers `removed: []`), and is `qits:system`
+only. `ApplicationPurgeTest` pins the matching against look-alike names.
+
 No strategy is left whose whole rule is "nothing dies" — `maven-packages` was the last, and the
 settlement priced it with every other own type.
 
@@ -1081,7 +1091,7 @@ the new store up either way, and the next release publishes clean.
 ## What not to "fix"
 
 - `AdminWriteGuard` matches on `getUriInfo().getPath()` against a **set** of prefixes —
-  `repositories`, `store` and `gc` (`mirror-upstreams` was a fourth and went with its controller) — relative to the JAX-RS base, so it holds
+  `repositories`, `store`, `gc` and `applications` (`mirror-upstreams` was a fourth and went with its controller) — relative to the JAX-RS base, so it holds
   whatever `quarkus.rest.path` is. It was `artifacts` until the resource `@Path`s dropped that segment (the gateway segment
   carries it now). **A resource added outside those prefixes is unguarded** — extend the set, do not
   assume it is covered. `store` holds only the read-only store summary today and is listed so that

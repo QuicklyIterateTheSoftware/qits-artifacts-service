@@ -159,6 +159,32 @@ class AdminWriteGuardTest {
   }
 
   @Test
+  void thePurgeIsGuardedLikeTheSweeps() {
+    // `applications` joined the prefix set with its first door (qits-1941), which deletes past
+    // every pin and grace: no token is a 401, a person's token a 403, the platform's a receipt —
+    // empty here, because nothing was ever published for the name.
+    String purge = "/artifacts/api/applications/guard-probe-application/purge";
+    given().contentType(ContentType.JSON).body("{}").when().post(purge).then().statusCode(401);
+    given()
+        .header("Authorization", bearer(MachineTokens.forAdmin()))
+        .contentType(ContentType.JSON)
+        .body("{}")
+        .when()
+        .post(purge)
+        .then()
+        .statusCode(403);
+    given()
+        .header("Authorization", bearer(MachineTokens.forSystem()))
+        .contentType(ContentType.JSON)
+        .body("{}")
+        .when()
+        .post(purge)
+        .then()
+        .statusCode(200)
+        .body("removed", org.hamcrest.Matchers.empty());
+  }
+
+  @Test
   void theMachineIdentityMayPostTheGcPlanItIsAllowedToSweep() {
     // qits-platform-orchestrator authenticates as qits:system and never holds
     // qits:admin, so a qits:admin-only POST /gc/plan would 403 the one caller the route exists for

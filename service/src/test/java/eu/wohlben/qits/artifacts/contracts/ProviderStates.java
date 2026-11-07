@@ -79,6 +79,9 @@ public class ProviderStates {
   public static final String AN_NPM_CONTENT_HASH = "a content hash recorded for an npm package";
   public static final String THE_CLI_AS_A_DAEMON = "the qits CLI published as a daemon";
   public static final String AN_UNFILEABLE_PIN = "a registry handed a pin it cannot file";
+  // qits-1941: the decommission of a retired application
+  public static final String AN_APPLICATION_WITH_PUBLISHED_ARTIFACTS =
+      "an application with published artifacts";
 
   /** The daemon repository every deployment carries, and the one consumers name. */
   static final String DAEMONS = ArtifactsRepositorySeeder.DAEMONS;
@@ -191,6 +194,20 @@ public class ProviderStates {
   static final String IMAGE_TAG = "2100.1.0";
 
   /**
+   * The retired application the purge state publishes for, and the repository its request names.
+   * Their packages: the contract docs site {@code @contracts/<application>} and the golden-masters
+   * coordinate {@code eu.wohlben.qits:<application>-golden-masters}, each at one version.
+   */
+  static final String PURGE_APPLICATION = "contract-application";
+
+  static final String PURGE_REPOSITORY = PURGE_APPLICATION + "-service";
+  static final String PURGE_SITE = "@contracts/" + PURGE_APPLICATION;
+  static final String PURGE_ARTIFACT = PURGE_APPLICATION + "-golden-masters";
+
+  /** The body the purge is called with: the application's one repository. */
+  public static final String PURGE_BODY = "{\"repositories\":[\"" + PURGE_REPOSITORY + "\"]}";
+
+  /**
    * The six pin documents qits-orchestrator supplies to the plan and the sweep, each in its
    * source's own shape. None of them names the contract daemon, so its versions are unpinned.
    */
@@ -260,6 +277,7 @@ public class ProviderStates {
     states.put(AN_NPM_CONTENT_HASH, this::anNpmContentHash);
     states.put(THE_CLI_AS_A_DAEMON, this::theCliAsADaemon);
     states.put(AN_UNFILEABLE_PIN, this::anUnfileablePin);
+    states.put(AN_APPLICATION_WITH_PUBLISHED_ARTIFACTS, this::anApplicationWithPublishedArtifacts);
   }
 
   /** Every state name this provider answers for. */
@@ -311,7 +329,7 @@ public class ProviderStates {
                   .list(
                       "repository = ?1 and name in ?2",
                       DOCS,
-                      List.of(DOCS_SITE, CHANGELOG_SITE))
+                      List.of(DOCS_SITE, CHANGELOG_SITE, PURGE_SITE))
                   .forEach(docsSites::delete);
               // The registries' tables live in the same persistence unit as the daemon rows.
               var entityManager = daemonBinaries.getEntityManager();
@@ -319,17 +337,20 @@ public class ProviderStates {
               entityManager
                   .createNativeQuery(
                       "delete from maven_artifact where repository = ?1 and (path like ?2 or path"
-                          + " like ?3)")
+                          + " like ?3 or path like ?4)")
                   .setParameter(1, ArtifactsRepositorySeeder.MAVEN)
                   .setParameter(2, group + MAVEN_ARTIFACT + "/%")
                   .setParameter(3, group + MAVEN_ABSENT_ARTIFACT + "/%")
+                  .setParameter(4, group + PURGE_ARTIFACT + "/%")
                   .executeUpdate();
               entityManager
                   .createNativeQuery(
-                      "delete from content_hash where repository = ?1 and package_name in (?2, ?3)")
+                      "delete from content_hash where repository = ?1 and package_name in (?2, ?3,"
+                          + " ?4)")
                   .setParameter(1, ArtifactsRepositorySeeder.MAVEN)
                   .setParameter(2, MAVEN_GROUP + ":" + MAVEN_ARTIFACT)
                   .setParameter(3, MAVEN_GROUP + ":" + MAVEN_ABSENT_ARTIFACT)
+                  .setParameter(4, MAVEN_GROUP + ":" + PURGE_ARTIFACT)
                   .executeUpdate();
               for (String table :
                   List.of("npm_dist_tag", "npm_version", "npm_version_tombstone")) {
@@ -635,6 +656,27 @@ public class ProviderStates {
    */
   private Setup anUnfileablePin() {
     return new Setup(new TreeMap<>(), List.of());
+  }
+
+  /**
+   * A retired application's packages, published as its release pipeline publishes them: its
+   * contract docs site and its golden-masters pom. The purge takes both, and the recorded answer
+   * names exactly those two — every other state's rows are on names no purge rule matches.
+   */
+  private Setup anApplicationWithPublishedArtifacts() {
+    publishDocs(PURGE_SITE, DOCS_VERSION, DOCS_BUNDLE, DOCS_BRANCH);
+    expect(
+        201,
+        given()
+            .urlEncodingEnabled(false)
+            .contentType("application/xml")
+            .body(mavenPom(PURGE_ARTIFACT).getBytes(StandardCharsets.UTF_8))
+            .put(mavenPomPath(PURGE_ARTIFACT)),
+        "the golden-masters pom deploy");
+    Map<String, String> params = new TreeMap<>();
+    params.put("application", PURGE_APPLICATION);
+    params.put("repository", PURGE_REPOSITORY);
+    return new Setup(params, List.of());
   }
 
   // --- the registry protocols: maven, npm, OCI --------------------------------------------------
