@@ -69,13 +69,6 @@
           "kind" : "returns"
         },
         {
-          "operationId" : "GcPlanController.repositorySweep",
-          "method" : "POST",
-          "path" : "/gc/repositories/{repository}/sweep",
-          "dto" : "eu.wohlben.qits.artifacts.gc.dto.GcRepositorySweepReport",
-          "kind" : "returns"
-        },
-        {
           "operationId" : "getGcPlan",
           "method" : "GET",
           "path" : "/gc/plan",
@@ -97,31 +90,10 @@
           "kind" : "returns"
         },
         {
-          "operationId" : "purgeApplication",
-          "method" : "POST",
-          "path" : "/applications/{application}/purge",
-          "dto" : "eu.wohlben.qits.artifacts.gc.dto.PurgedPackage",
-          "kind" : "returns"
-        },
-        {
           "operationId" : "sweepGc",
           "method" : "POST",
           "path" : "/gc/sweep",
           "dto" : "eu.wohlben.qits.artifacts.gc.dto.GcIdentity",
-          "kind" : "returns"
-        },
-        {
-          "operationId" : "sweepGc",
-          "method" : "POST",
-          "path" : "/gc/sweep",
-          "dto" : "eu.wohlben.qits.artifacts.gc.dto.GcSweepReport",
-          "kind" : "returns"
-        },
-        {
-          "operationId" : "sweepGc",
-          "method" : "POST",
-          "path" : "/gc/sweep",
-          "dto" : "eu.wohlben.qits.artifacts.gc.dto.GcTypeSweepResult",
           "kind" : "returns"
         }
       ]
@@ -259,27 +231,6 @@
           "kind" : "returns"
         },
         {
-          "operationId" : "GcPlanController.repositoryPlan",
-          "method" : "GET",
-          "path" : "/gc/repositories/{repository}/plan",
-          "dto" : "eu.wohlben.qits.artifacts.gc.dto.GcRepositoryPlanReport",
-          "kind" : "returns"
-        },
-        {
-          "operationId" : "GcPlanController.repositoryPlan",
-          "method" : "GET",
-          "path" : "/gc/repositories/{repository}/plan",
-          "dto" : "eu.wohlben.qits.artifacts.gc.dto.GcSweepPlan",
-          "kind" : "returns"
-        },
-        {
-          "operationId" : "GcPlanController.repositoryPlan",
-          "method" : "GET",
-          "path" : "/gc/repositories/{repository}/plan",
-          "dto" : "eu.wohlben.qits.artifacts.gc.dto.GcUntouchablePool",
-          "kind" : "returns"
-        },
-        {
           "operationId" : "GcPlanController.repositorySweep",
           "method" : "POST",
           "path" : "/gc/repositories/{repository}/sweep",
@@ -287,66 +238,10 @@
           "kind" : "returns"
         },
         {
-          "operationId" : "GcPlanController.repositorySweep",
-          "method" : "POST",
-          "path" : "/gc/repositories/{repository}/sweep",
-          "dto" : "eu.wohlben.qits.artifacts.gc.dto.GcRepositorySweepReport",
-          "kind" : "returns"
-        },
-        {
-          "operationId" : "GcPlanController.repositorySweep",
-          "method" : "POST",
-          "path" : "/gc/repositories/{repository}/sweep",
-          "dto" : "eu.wohlben.qits.artifacts.gc.dto.GcSweepOutcome",
-          "kind" : "returns"
-        },
-        {
-          "operationId" : "GcPlanController.repositorySweep",
-          "method" : "POST",
-          "path" : "/gc/repositories/{repository}/sweep",
-          "dto" : "eu.wohlben.qits.artifacts.gc.dto.GcUntouchablePool",
-          "kind" : "returns"
-        },
-        {
           "operationId" : "getGcPlan",
           "method" : "GET",
           "path" : "/gc/plan",
           "dto" : "eu.wohlben.qits.artifacts.gc.dto.GcIdentity",
-          "kind" : "returns"
-        },
-        {
-          "operationId" : "getGcPlan",
-          "method" : "GET",
-          "path" : "/gc/plan",
-          "dto" : "eu.wohlben.qits.artifacts.gc.dto.GcPlanReport",
-          "kind" : "returns"
-        },
-        {
-          "operationId" : "getGcPlan",
-          "method" : "GET",
-          "path" : "/gc/plan",
-          "dto" : "eu.wohlben.qits.artifacts.gc.dto.GcRepositoryPlanSummary",
-          "kind" : "returns"
-        },
-        {
-          "operationId" : "getGcPlan",
-          "method" : "GET",
-          "path" : "/gc/plan",
-          "dto" : "eu.wohlben.qits.artifacts.gc.dto.GcSweepPlan",
-          "kind" : "returns"
-        },
-        {
-          "operationId" : "getGcPlan",
-          "method" : "GET",
-          "path" : "/gc/plan",
-          "dto" : "eu.wohlben.qits.artifacts.gc.dto.GcTypePlan",
-          "kind" : "returns"
-        },
-        {
-          "operationId" : "getGcPlan",
-          "method" : "GET",
-          "path" : "/gc/plan",
-          "dto" : "eu.wohlben.qits.artifacts.gc.dto.GcUntouchablePool",
           "kind" : "returns"
         },
         {
@@ -364,13 +259,6 @@
           "kind" : "returns"
         },
         {
-          "operationId" : "listDaemonVersions",
-          "method" : "GET",
-          "path" : "/repositories/{repo}/daemons/{daemon}/versions",
-          "dto" : "eu.wohlben.qits.artifacts.dto.DaemonVersionSummary",
-          "kind" : "returns"
-        },
-        {
           "operationId" : "listDaemons",
           "method" : "GET",
           "path" : "/repositories/{repo}/daemons",
@@ -378,13 +266,6 @@
           "kind" : "returns"
         },
         {
-          "operationId" : "listDaemons",
-          "method" : "GET",
-          "path" : "/repositories/{repo}/daemons",
-          "dto" : "eu.wohlben.qits.artifacts.dto.DaemonSummary",
-          "kind" : "returns"
-        },
-        {
           "operationId" : "planGcWithSuppliedPins",
           "method" : "POST",
           "path" : "/gc/plan",
@@ -392,73 +273,10 @@
           "kind" : "returns"
         },
         {
-          "operationId" : "planGcWithSuppliedPins",
-          "method" : "POST",
-          "path" : "/gc/plan",
-          "dto" : "eu.wohlben.qits.artifacts.gc.dto.GcPlanReport",
-          "kind" : "returns"
-        },
-        {
-          "operationId" : "planGcWithSuppliedPins",
-          "method" : "POST",
-          "path" : "/gc/plan",
-          "dto" : "eu.wohlben.qits.artifacts.gc.dto.GcRepositoryPlanSummary",
-          "kind" : "returns"
-        },
-        {
-          "operationId" : "planGcWithSuppliedPins",
-          "method" : "POST",
-          "path" : "/gc/plan",
-          "dto" : "eu.wohlben.qits.artifacts.gc.dto.GcSweepPlan",
-          "kind" : "returns"
-        },
-        {
-          "operationId" : "planGcWithSuppliedPins",
-          "method" : "POST",
-          "path" : "/gc/plan",
-          "dto" : "eu.wohlben.qits.artifacts.gc.dto.GcTypePlan",
-          "kind" : "returns"
-        },
-        {
-          "operationId" : "planGcWithSuppliedPins",
-          "method" : "POST",
-          "path" : "/gc/plan",
-          "dto" : "eu.wohlben.qits.artifacts.gc.dto.GcUntouchablePool",
-          "kind" : "returns"
-        },
-        {
           "operationId" : "sweepGc",
           "method" : "POST",
           "path" : "/gc/sweep",
           "dto" : "eu.wohlben.qits.artifacts.gc.dto.GcIdentity",
-          "kind" : "returns"
-        },
-        {
-          "operationId" : "sweepGc",
-          "method" : "POST",
-          "path" : "/gc/sweep",
-          "dto" : "eu.wohlben.qits.artifacts.gc.dto.GcSweepOutcome",
-          "kind" : "returns"
-        },
-        {
-          "operationId" : "sweepGc",
-          "method" : "POST",
-          "path" : "/gc/sweep",
-          "dto" : "eu.wohlben.qits.artifacts.gc.dto.GcSweepReport",
-          "kind" : "returns"
-        },
-        {
-          "operationId" : "sweepGc",
-          "method" : "POST",
-          "path" : "/gc/sweep",
-          "dto" : "eu.wohlben.qits.artifacts.gc.dto.GcTypeSweepResult",
-          "kind" : "returns"
-        },
-        {
-          "operationId" : "sweepGc",
-          "method" : "POST",
-          "path" : "/gc/sweep",
-          "dto" : "eu.wohlben.qits.artifacts.gc.dto.GcUntouchablePool",
           "kind" : "returns"
         }
       ]
@@ -577,13 +395,6 @@
           "kind" : "returns"
         },
         {
-          "operationId" : "DocsBrowseController.versions",
-          "method" : "GET",
-          "path" : "/repositories/{repo}/docs/{site:.+}/versions",
-          "dto" : "eu.wohlben.qits.artifacts.dto.DocsVersionSummary",
-          "kind" : "returns"
-        },
-        {
           "operationId" : "GcPlanController.repositories",
           "method" : "GET",
           "path" : "/gc/repositories",
@@ -598,27 +409,6 @@
           "kind" : "returns"
         },
         {
-          "operationId" : "GcPlanController.repositoryPlan",
-          "method" : "GET",
-          "path" : "/gc/repositories/{repository}/plan",
-          "dto" : "eu.wohlben.qits.artifacts.gc.dto.GcRepositoryPlanReport",
-          "kind" : "returns"
-        },
-        {
-          "operationId" : "GcPlanController.repositoryPlan",
-          "method" : "GET",
-          "path" : "/gc/repositories/{repository}/plan",
-          "dto" : "eu.wohlben.qits.artifacts.gc.dto.GcSweepPlan",
-          "kind" : "returns"
-        },
-        {
-          "operationId" : "GcPlanController.repositoryPlan",
-          "method" : "GET",
-          "path" : "/gc/repositories/{repository}/plan",
-          "dto" : "eu.wohlben.qits.artifacts.gc.dto.GcUntouchablePool",
-          "kind" : "returns"
-        },
-        {
           "operationId" : "GcPlanController.repositorySweep",
           "method" : "POST",
           "path" : "/gc/repositories/{repository}/sweep",
@@ -626,66 +416,10 @@
           "kind" : "returns"
         },
         {
-          "operationId" : "GcPlanController.repositorySweep",
-          "method" : "POST",
-          "path" : "/gc/repositories/{repository}/sweep",
-          "dto" : "eu.wohlben.qits.artifacts.gc.dto.GcRepositorySweepReport",
-          "kind" : "returns"
-        },
-        {
-          "operationId" : "GcPlanController.repositorySweep",
-          "method" : "POST",
-          "path" : "/gc/repositories/{repository}/sweep",
-          "dto" : "eu.wohlben.qits.artifacts.gc.dto.GcSweepOutcome",
-          "kind" : "returns"
-        },
-        {
-          "operationId" : "GcPlanController.repositorySweep",
-          "method" : "POST",
-          "path" : "/gc/repositories/{repository}/sweep",
-          "dto" : "eu.wohlben.qits.artifacts.gc.dto.GcUntouchablePool",
-          "kind" : "returns"
-        },
-        {
           "operationId" : "getGcPlan",
           "method" : "GET",
           "path" : "/gc/plan",
           "dto" : "eu.wohlben.qits.artifacts.gc.dto.GcIdentity",
-          "kind" : "returns"
-        },
-        {
-          "operationId" : "getGcPlan",
-          "method" : "GET",
-          "path" : "/gc/plan",
-          "dto" : "eu.wohlben.qits.artifacts.gc.dto.GcPlanReport",
-          "kind" : "returns"
-        },
-        {
-          "operationId" : "getGcPlan",
-          "method" : "GET",
-          "path" : "/gc/plan",
-          "dto" : "eu.wohlben.qits.artifacts.gc.dto.GcRepositoryPlanSummary",
-          "kind" : "returns"
-        },
-        {
-          "operationId" : "getGcPlan",
-          "method" : "GET",
-          "path" : "/gc/plan",
-          "dto" : "eu.wohlben.qits.artifacts.gc.dto.GcSweepPlan",
-          "kind" : "returns"
-        },
-        {
-          "operationId" : "getGcPlan",
-          "method" : "GET",
-          "path" : "/gc/plan",
-          "dto" : "eu.wohlben.qits.artifacts.gc.dto.GcTypePlan",
-          "kind" : "returns"
-        },
-        {
-          "operationId" : "getGcPlan",
-          "method" : "GET",
-          "path" : "/gc/plan",
-          "dto" : "eu.wohlben.qits.artifacts.gc.dto.GcUntouchablePool",
           "kind" : "returns"
         },
         {
@@ -703,73 +437,10 @@
           "kind" : "returns"
         },
         {
-          "operationId" : "planGcWithSuppliedPins",
-          "method" : "POST",
-          "path" : "/gc/plan",
-          "dto" : "eu.wohlben.qits.artifacts.gc.dto.GcPlanReport",
-          "kind" : "returns"
-        },
-        {
-          "operationId" : "planGcWithSuppliedPins",
-          "method" : "POST",
-          "path" : "/gc/plan",
-          "dto" : "eu.wohlben.qits.artifacts.gc.dto.GcRepositoryPlanSummary",
-          "kind" : "returns"
-        },
-        {
-          "operationId" : "planGcWithSuppliedPins",
-          "method" : "POST",
-          "path" : "/gc/plan",
-          "dto" : "eu.wohlben.qits.artifacts.gc.dto.GcSweepPlan",
-          "kind" : "returns"
-        },
-        {
-          "operationId" : "planGcWithSuppliedPins",
-          "method" : "POST",
-          "path" : "/gc/plan",
-          "dto" : "eu.wohlben.qits.artifacts.gc.dto.GcTypePlan",
-          "kind" : "returns"
-        },
-        {
-          "operationId" : "planGcWithSuppliedPins",
-          "method" : "POST",
-          "path" : "/gc/plan",
-          "dto" : "eu.wohlben.qits.artifacts.gc.dto.GcUntouchablePool",
-          "kind" : "returns"
-        },
-        {
           "operationId" : "sweepGc",
           "method" : "POST",
           "path" : "/gc/sweep",
           "dto" : "eu.wohlben.qits.artifacts.gc.dto.GcIdentity",
-          "kind" : "returns"
-        },
-        {
-          "operationId" : "sweepGc",
-          "method" : "POST",
-          "path" : "/gc/sweep",
-          "dto" : "eu.wohlben.qits.artifacts.gc.dto.GcSweepOutcome",
-          "kind" : "returns"
-        },
-        {
-          "operationId" : "sweepGc",
-          "method" : "POST",
-          "path" : "/gc/sweep",
-          "dto" : "eu.wohlben.qits.artifacts.gc.dto.GcSweepReport",
-          "kind" : "returns"
-        },
-        {
-          "operationId" : "sweepGc",
-          "method" : "POST",
-          "path" : "/gc/sweep",
-          "dto" : "eu.wohlben.qits.artifacts.gc.dto.GcTypeSweepResult",
-          "kind" : "returns"
-        },
-        {
-          "operationId" : "sweepGc",
-          "method" : "POST",
-          "path" : "/gc/sweep",
-          "dto" : "eu.wohlben.qits.artifacts.gc.dto.GcUntouchablePool",
           "kind" : "returns"
         }
       ]
@@ -858,24 +529,10 @@
           "kind" : "returns"
         },
         {
-          "operationId" : "DocsBrowseController.sites",
-          "method" : "GET",
-          "path" : "/repositories/{repo}/docs",
-          "dto" : "eu.wohlben.qits.artifacts.dto.DocsSiteSummary",
-          "kind" : "returns"
-        },
-        {
           "operationId" : "DocsBrowseController.versions",
           "method" : "GET",
           "path" : "/repositories/{repo}/docs/{site:.+}/versions",
           "dto" : "eu.wohlben.qits.artifacts.api.DocsBrowseController$ListDocsVersionsResponse",
-          "kind" : "returns"
-        },
-        {
-          "operationId" : "DocsBrowseController.versions",
-          "method" : "GET",
-          "path" : "/repositories/{repo}/docs/{site:.+}/versions",
-          "dto" : "eu.wohlben.qits.artifacts.dto.DocsVersionSummary",
           "kind" : "returns"
         },
         {
@@ -890,13 +547,6 @@
           "method" : "POST",
           "path" : "/gc/repositories/{repository}/sweep",
           "dto" : "eu.wohlben.qits.artifacts.gc.dto.GcIdentity",
-          "kind" : "returns"
-        },
-        {
-          "operationId" : "GcPlanController.repositorySweep",
-          "method" : "POST",
-          "path" : "/gc/repositories/{repository}/sweep",
-          "dto" : "eu.wohlben.qits.artifacts.gc.dto.GcRepositorySweepReport",
           "kind" : "returns"
         },
         {
@@ -921,31 +571,10 @@
           "kind" : "returns"
         },
         {
-          "operationId" : "purgeApplication",
-          "method" : "POST",
-          "path" : "/applications/{application}/purge",
-          "dto" : "eu.wohlben.qits.artifacts.gc.dto.PurgedPackage",
-          "kind" : "returns"
-        },
-        {
           "operationId" : "sweepGc",
           "method" : "POST",
           "path" : "/gc/sweep",
           "dto" : "eu.wohlben.qits.artifacts.gc.dto.GcIdentity",
-          "kind" : "returns"
-        },
-        {
-          "operationId" : "sweepGc",
-          "method" : "POST",
-          "path" : "/gc/sweep",
-          "dto" : "eu.wohlben.qits.artifacts.gc.dto.GcSweepReport",
-          "kind" : "returns"
-        },
-        {
-          "operationId" : "sweepGc",
-          "method" : "POST",
-          "path" : "/gc/sweep",
-          "dto" : "eu.wohlben.qits.artifacts.gc.dto.GcTypeSweepResult",
           "kind" : "returns"
         }
       ]
@@ -1071,27 +700,6 @@
           "kind" : "returns"
         },
         {
-          "operationId" : "GcPlanController.repositoryPlan",
-          "method" : "GET",
-          "path" : "/gc/repositories/{repository}/plan",
-          "dto" : "eu.wohlben.qits.artifacts.gc.dto.GcRepositoryPlanReport",
-          "kind" : "returns"
-        },
-        {
-          "operationId" : "GcPlanController.repositoryPlan",
-          "method" : "GET",
-          "path" : "/gc/repositories/{repository}/plan",
-          "dto" : "eu.wohlben.qits.artifacts.gc.dto.GcSweepPlan",
-          "kind" : "returns"
-        },
-        {
-          "operationId" : "GcPlanController.repositoryPlan",
-          "method" : "GET",
-          "path" : "/gc/repositories/{repository}/plan",
-          "dto" : "eu.wohlben.qits.artifacts.gc.dto.GcUntouchablePool",
-          "kind" : "returns"
-        },
-        {
           "operationId" : "GcPlanController.repositorySweep",
           "method" : "POST",
           "path" : "/gc/repositories/{repository}/sweep",
@@ -1099,66 +707,10 @@
           "kind" : "returns"
         },
         {
-          "operationId" : "GcPlanController.repositorySweep",
-          "method" : "POST",
-          "path" : "/gc/repositories/{repository}/sweep",
-          "dto" : "eu.wohlben.qits.artifacts.gc.dto.GcRepositorySweepReport",
-          "kind" : "returns"
-        },
-        {
-          "operationId" : "GcPlanController.repositorySweep",
-          "method" : "POST",
-          "path" : "/gc/repositories/{repository}/sweep",
-          "dto" : "eu.wohlben.qits.artifacts.gc.dto.GcSweepOutcome",
-          "kind" : "returns"
-        },
-        {
-          "operationId" : "GcPlanController.repositorySweep",
-          "method" : "POST",
-          "path" : "/gc/repositories/{repository}/sweep",
-          "dto" : "eu.wohlben.qits.artifacts.gc.dto.GcUntouchablePool",
-          "kind" : "returns"
-        },
-        {
           "operationId" : "getGcPlan",
           "method" : "GET",
           "path" : "/gc/plan",
           "dto" : "eu.wohlben.qits.artifacts.gc.dto.GcIdentity",
-          "kind" : "returns"
-        },
-        {
-          "operationId" : "getGcPlan",
-          "method" : "GET",
-          "path" : "/gc/plan",
-          "dto" : "eu.wohlben.qits.artifacts.gc.dto.GcPlanReport",
-          "kind" : "returns"
-        },
-        {
-          "operationId" : "getGcPlan",
-          "method" : "GET",
-          "path" : "/gc/plan",
-          "dto" : "eu.wohlben.qits.artifacts.gc.dto.GcRepositoryPlanSummary",
-          "kind" : "returns"
-        },
-        {
-          "operationId" : "getGcPlan",
-          "method" : "GET",
-          "path" : "/gc/plan",
-          "dto" : "eu.wohlben.qits.artifacts.gc.dto.GcSweepPlan",
-          "kind" : "returns"
-        },
-        {
-          "operationId" : "getGcPlan",
-          "method" : "GET",
-          "path" : "/gc/plan",
-          "dto" : "eu.wohlben.qits.artifacts.gc.dto.GcTypePlan",
-          "kind" : "returns"
-        },
-        {
-          "operationId" : "getGcPlan",
-          "method" : "GET",
-          "path" : "/gc/plan",
-          "dto" : "eu.wohlben.qits.artifacts.gc.dto.GcUntouchablePool",
           "kind" : "returns"
         },
         {
@@ -1176,41 +728,6 @@
           "kind" : "returns"
         },
         {
-          "operationId" : "planGcWithSuppliedPins",
-          "method" : "POST",
-          "path" : "/gc/plan",
-          "dto" : "eu.wohlben.qits.artifacts.gc.dto.GcPlanReport",
-          "kind" : "returns"
-        },
-        {
-          "operationId" : "planGcWithSuppliedPins",
-          "method" : "POST",
-          "path" : "/gc/plan",
-          "dto" : "eu.wohlben.qits.artifacts.gc.dto.GcRepositoryPlanSummary",
-          "kind" : "returns"
-        },
-        {
-          "operationId" : "planGcWithSuppliedPins",
-          "method" : "POST",
-          "path" : "/gc/plan",
-          "dto" : "eu.wohlben.qits.artifacts.gc.dto.GcSweepPlan",
-          "kind" : "returns"
-        },
-        {
-          "operationId" : "planGcWithSuppliedPins",
-          "method" : "POST",
-          "path" : "/gc/plan",
-          "dto" : "eu.wohlben.qits.artifacts.gc.dto.GcTypePlan",
-          "kind" : "returns"
-        },
-        {
-          "operationId" : "planGcWithSuppliedPins",
-          "method" : "POST",
-          "path" : "/gc/plan",
-          "dto" : "eu.wohlben.qits.artifacts.gc.dto.GcUntouchablePool",
-          "kind" : "returns"
-        },
-        {
           "operationId" : "purgeApplication",
           "method" : "POST",
           "path" : "/applications/{application}/purge",
@@ -1218,45 +735,10 @@
           "kind" : "returns"
         },
         {
-          "operationId" : "purgeApplication",
-          "method" : "POST",
-          "path" : "/applications/{application}/purge",
-          "dto" : "eu.wohlben.qits.artifacts.gc.dto.PurgedPackage",
-          "kind" : "returns"
-        },
-        {
           "operationId" : "sweepGc",
           "method" : "POST",
           "path" : "/gc/sweep",
           "dto" : "eu.wohlben.qits.artifacts.gc.dto.GcIdentity",
-          "kind" : "returns"
-        },
-        {
-          "operationId" : "sweepGc",
-          "method" : "POST",
-          "path" : "/gc/sweep",
-          "dto" : "eu.wohlben.qits.artifacts.gc.dto.GcSweepOutcome",
-          "kind" : "returns"
-        },
-        {
-          "operationId" : "sweepGc",
-          "method" : "POST",
-          "path" : "/gc/sweep",
-          "dto" : "eu.wohlben.qits.artifacts.gc.dto.GcSweepReport",
-          "kind" : "returns"
-        },
-        {
-          "operationId" : "sweepGc",
-          "method" : "POST",
-          "path" : "/gc/sweep",
-          "dto" : "eu.wohlben.qits.artifacts.gc.dto.GcTypeSweepResult",
-          "kind" : "returns"
-        },
-        {
-          "operationId" : "sweepGc",
-          "method" : "POST",
-          "path" : "/gc/sweep",
-          "dto" : "eu.wohlben.qits.artifacts.gc.dto.GcUntouchablePool",
           "kind" : "returns"
         }
       ]
