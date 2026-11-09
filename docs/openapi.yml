@@ -17,6 +17,10 @@ paths:
       responses:
         "200":
           description: "The catalog, {sites:[{name, versionCount, latestVersion, latestPublishedAt}]}."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DocsSiteCatalog"
   /artifacts/docs/{repository}/{site}:
     get:
       operationId: listDocsVersions
@@ -31,12 +35,17 @@ paths:
       - name: site
         in: path
         required: true
+        allowReserved: true
         schema:
           type: string
       responses:
         "200":
           description: "{name, versions:[{name, version, fileCount, totalBytes, publishedAt,\
             \ metadata?}]}; an empty list when a filter matches nothing."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DocsVersionList"
         "404":
           description: No such site.
   /artifacts/docs/{repository}/{site}/-/{version}:
@@ -52,6 +61,7 @@ paths:
       - name: site
         in: path
         required: true
+        allowReserved: true
         schema:
           type: string
       - name: version
@@ -63,6 +73,10 @@ paths:
         "200":
           description: "{name, version, fileCount, totalBytes, publishedAt, metadata?,\
             \ files:[path]}."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DocsVersionDetail"
         "404":
           description: No such version.
     put:
@@ -78,6 +92,7 @@ paths:
       - name: site
         in: path
         required: true
+        allowReserved: true
         schema:
           type: string
       - name: version
@@ -111,6 +126,7 @@ paths:
       - name: site
         in: path
         required: true
+        allowReserved: true
         schema:
           type: string
       - name: version
@@ -121,11 +137,19 @@ paths:
       - name: path
         in: path
         required: true
+        allowReserved: true
         schema:
           type: string
       responses:
         "200":
-          description: The file's bytes.
+          description: "The file's bytes, as published. Content-Type is the media\
+            \ type its extension names (text/html; charset=utf-8, application/json,\
+            \ font/woff2, ...)."
+          content:
+            '*/*':
+              schema:
+                type: string
+                format: binary
         "404":
           description: No such file.
   /artifacts/sboms/{packageType}/{packageName}/-/{version}:
@@ -801,6 +825,102 @@ paths:
         - qits:ci-run
 components:
   schemas:
+    DocsSiteCatalog:
+      type: object
+      required:
+      - sites
+      properties:
+        sites:
+          type: array
+          items:
+            $ref: "#/components/schemas/DocsCatalogEntry"
+    DocsCatalogEntry:
+      type: object
+      required:
+      - name
+      - versionCount
+      - latestVersion
+      - latestPublishedAt
+      properties:
+        name:
+          type: string
+        versionCount:
+          type: integer
+          format: int32
+        latestVersion:
+          type: string
+        latestPublishedAt:
+          type: string
+          format: date-time
+    DocsVersionList:
+      type: object
+      required:
+      - name
+      - versions
+      properties:
+        name:
+          type: string
+        versions:
+          type: array
+          items:
+            $ref: "#/components/schemas/DocsVersionEntry"
+    DocsVersionEntry:
+      type: object
+      required:
+      - name
+      - version
+      - fileCount
+      - totalBytes
+      - publishedAt
+      properties:
+        name:
+          type: string
+        version:
+          type: string
+        fileCount:
+          type: integer
+          format: int32
+        totalBytes:
+          type: integer
+          format: int64
+        publishedAt:
+          type: string
+          format: date-time
+        metadata:
+          type: object
+          additionalProperties:
+            type: string
+    DocsVersionDetail:
+      type: object
+      required:
+      - name
+      - version
+      - fileCount
+      - totalBytes
+      - publishedAt
+      - files
+      properties:
+        name:
+          type: string
+        version:
+          type: string
+        fileCount:
+          type: integer
+          format: int32
+        totalBytes:
+          type: integer
+          format: int64
+        publishedAt:
+          type: string
+          format: date-time
+        metadata:
+          type: object
+          additionalProperties:
+            type: string
+        files:
+          type: array
+          items:
+            type: string
     ApplicationPurgeReport:
       type: object
       properties:
@@ -1187,4 +1307,4 @@ components:
       description: Authentication
 info:
   title: qits-artifacts API
-  version: 2026.1018.73956
+  version: 2026.1109.44929

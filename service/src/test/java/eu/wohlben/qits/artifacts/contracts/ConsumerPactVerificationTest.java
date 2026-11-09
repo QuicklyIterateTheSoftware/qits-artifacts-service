@@ -221,6 +221,21 @@ class ConsumerPactVerificationTest {
     return states.params(ProviderStates.A_DOCS_SITE_WITH_A_CONTENT_HASH);
   }
 
+  @State(ProviderStates.A_ROUTES_BUNDLE)
+  Map<String, String> aRoutesBundle() {
+    return states.params(ProviderStates.A_ROUTES_BUNDLE);
+  }
+
+  @State(ProviderStates.A_ROUTES_BUNDLE_FREEZE)
+  Map<String, String> aRoutesBundleFreeze() {
+    return states.params(ProviderStates.A_ROUTES_BUNDLE_FREEZE);
+  }
+
+  @State(ProviderStates.A_ROUTES_BUNDLE_FONT)
+  Map<String, String> aRoutesBundleFont() {
+    return states.params(ProviderStates.A_ROUTES_BUNDLE_FONT);
+  }
+
   @State(ProviderStates.CHANGELOGS)
   Map<String, String> changelogs() {
     return states.params(ProviderStates.CHANGELOGS);

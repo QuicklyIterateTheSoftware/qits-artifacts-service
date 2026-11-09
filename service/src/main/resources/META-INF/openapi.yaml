@@ -12,7 +12,9 @@
 #
 # A {site}, {packageName}, {name} or {path} may hold slashes (@changelog/<repository>, @scope/name,
 # qits/<image>, a maven group path), which an OpenAPI path parameter cannot express; the routes
-# accept them all the same.
+# accept them all the same. The docs doors' {site} and {path} say so with allowReserved: true (qits-1951), which a
+# generated client reads as "send the slashes and the @ literally" — an encoded %40routes%2F… names
+# no site and answers 404.
 openapi: 3.1.0
 paths:
   /artifacts/docs/{repository}:
@@ -22,16 +24,22 @@ paths:
       parameters:
         - { name: repository, in: path, required: true, schema: { type: string } }
       responses:
-        "200": { description: "The catalog, {sites:[{name, versionCount, latestVersion, latestPublishedAt}]}." }
+        "200":
+          description: "The catalog, {sites:[{name, versionCount, latestVersion, latestPublishedAt}]}."
+          content:
+            application/json: { schema: { $ref: "#/components/schemas/DocsSiteCatalog" } }
   /artifacts/docs/{repository}/{site}:
     get:
       operationId: listDocsVersions
       summary: The versions of one docs site, newest first. meta.<key>=<value> query parameters filter by metadata.
       parameters:
         - { name: repository, in: path, required: true, schema: { type: string } }
-        - { name: site, in: path, required: true, schema: { type: string } }
+        - { name: site, in: path, required: true, allowReserved: true, schema: { type: string } }
       responses:
-        "200": { description: "{name, versions:[{name, version, fileCount, totalBytes, publishedAt, metadata?}]}; an empty list when a filter matches nothing." }
+        "200":
+          description: "{name, versions:[{name, version, fileCount, totalBytes, publishedAt, metadata?}]}; an empty list when a filter matches nothing."
+          content:
+            application/json: { schema: { $ref: "#/components/schemas/DocsVersionList" } }
         "404": { description: "No such site." }
   /artifacts/docs/{repository}/{site}/-/{version}:
     get:
@@ -39,17 +47,20 @@ paths:
       summary: One version of a docs site, with the paths of its files.
       parameters:
         - { name: repository, in: path, required: true, schema: { type: string } }
-        - { name: site, in: path, required: true, schema: { type: string } }
+        - { name: site, in: path, required: true, allowReserved: true, schema: { type: string } }
         - { name: version, in: path, required: true, schema: { type: string } }
       responses:
-        "200": { description: "{name, version, fileCount, totalBytes, publishedAt, metadata?, files:[path]}." }
+        "200":
+          description: "{name, version, fileCount, totalBytes, publishedAt, metadata?, files:[path]}."
+          content:
+            application/json: { schema: { $ref: "#/components/schemas/DocsVersionDetail" } }
         "404": { description: "No such version." }
     put:
       operationId: putDocs
       summary: Publishes one version of a docs site from a .tar.gz bundle. X-Artifacts-Meta-<key> headers set its metadata.
       parameters:
         - { name: repository, in: path, required: true, schema: { type: string } }
-        - { name: site, in: path, required: true, schema: { type: string } }
+        - { name: site, in: path, required: true, allowReserved: true, schema: { type: string } }
         - { name: version, in: path, required: true, schema: { type: string } }
       requestBody:
         required: true
@@ -64,11 +75,14 @@ paths:
       summary: One file of a docs version, as stored, with its media type and ETag.
       parameters:
         - { name: repository, in: path, required: true, schema: { type: string } }
-        - { name: site, in: path, required: true, schema: { type: string } }
+        - { name: site, in: path, required: true, allowReserved: true, schema: { type: string } }
         - { name: version, in: path, required: true, schema: { type: string } }
-        - { name: path, in: path, required: true, schema: { type: string } }
+        - { name: path, in: path, required: true, allowReserved: true, schema: { type: string } }
       responses:
-        "200": { description: "The file's bytes." }
+        "200":
+          description: "The file's bytes, as published. Content-Type is the media type its extension names (text/html; charset=utf-8, application/json, font/woff2, ...)."
+          content:
+            "*/*": { schema: { type: string, format: binary } }
         "404": { description: "No such file." }
   /artifacts/sboms/{packageType}/{packageName}/-/{version}:
     get:
@@ -276,3 +290,47 @@ paths:
         - { name: last, in: query, schema: { type: string } }
       responses:
         "200": { description: "{name, tags:[tag]}; an empty list for a name nothing was pushed under." }
+components:
+  schemas:
+    # The docs wire's JSON answers (qits-1951), as DocsRoutes writes them. metadata is present only
+    # when the version was published with at least one X-Artifacts-Meta-<key> header.
+    DocsSiteCatalog:
+      type: object
+      required: [sites]
+      properties:
+        sites: { type: array, items: { $ref: "#/components/schemas/DocsCatalogEntry" } }
+    DocsCatalogEntry:
+      type: object
+      required: [name, versionCount, latestVersion, latestPublishedAt]
+      properties:
+        name: { type: string }
+        versionCount: { type: integer, format: int32 }
+        latestVersion: { type: string }
+        latestPublishedAt: { type: string, format: date-time }
+    DocsVersionList:
+      type: object
+      required: [name, versions]
+      properties:
+        name: { type: string }
+        versions: { type: array, items: { $ref: "#/components/schemas/DocsVersionEntry" } }
+    DocsVersionEntry:
+      type: object
+      required: [name, version, fileCount, totalBytes, publishedAt]
+      properties:
+        name: { type: string }
+        version: { type: string }
+        fileCount: { type: integer, format: int32 }
+        totalBytes: { type: integer, format: int64 }
+        publishedAt: { type: string, format: date-time }
+        metadata: { type: object, additionalProperties: { type: string } }
+    DocsVersionDetail:
+      type: object
+      required: [name, version, fileCount, totalBytes, publishedAt, files]
+      properties:
+        name: { type: string }
+        version: { type: string }
+        fileCount: { type: integer, format: int32 }
+        totalBytes: { type: integer, format: int64 }
+        publishedAt: { type: string, format: date-time }
+        metadata: { type: object, additionalProperties: { type: string } }
+        files: { type: array, items: { type: string } }

@@ -1,0 +1,19 @@
+{
+  "name": "@routes/qits-landing",
+  "version": "2026.1109.73025",
+  "fileCount": 5,
+  "totalBytes": 3038,
+  "publishedAt": "2026-01-01T00:00:00Z",
+  "metadata": {
+    "content.hash": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+    "git.commit.hash": "ffffffffffffffffffffffffffffffffffffffff",
+    "git.repository.name": "qits-landing-app"
+  },
+  "files": [
+    "assets/inter-latin-400-normal.woff2",
+    "manifest.json",
+    "src/app/layout/page-layout/page-layout.browser.spec.ts/slots.html",
+    "src/app/routes/projects/[slug]/repositories/project-repositories.page.browser.spec.ts/error.html",
+    "src/app/routes/projects/[slug]/repositories/project-repositories.page.browser.spec.ts/loaded.html"
+  ]
+}

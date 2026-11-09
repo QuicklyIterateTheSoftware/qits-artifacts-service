@@ -438,6 +438,139 @@
       ]
     },
     {
+      "name": "a published routes bundle",
+      "slug": "a-published-routes-bundle",
+      "params": {
+        "path": "manifest.json",
+        "site": "@routes/qits-landing",
+        "version": "2026.1109.73025"
+      },
+      "dependsOn": [],
+      "operations": [
+        {
+          "operationId": "getDocsFile",
+          "method": "GET",
+          "path": "/artifacts/docs/docs/{site}/-/{version}/{path}",
+          "status": 200,
+          "file": "a-published-routes-bundle/getDocsFile.json",
+          "headers": {
+            "Content-Length": "1886",
+            "Content-Type": "application/json",
+            "ETag": "\"d2d7eb8e88efbce21767fa4d40679724d7de53212bcaaec39a4bc2b904e9c451\""
+          },
+          "frozen": {
+            "ids": [],
+            "instants": [],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        },
+        {
+          "operationId": "getDocsVersion",
+          "method": "GET",
+          "path": "/artifacts/docs/docs/{site}/-/{version}",
+          "status": 200,
+          "file": "a-published-routes-bundle/getDocsVersion.json",
+          "frozen": {
+            "ids": [],
+            "instants": [
+              "$.publishedAt"
+            ],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        },
+        {
+          "operationId": "listDocsSites",
+          "method": "GET",
+          "path": "/artifacts/docs/docs",
+          "status": 200,
+          "file": "a-published-routes-bundle/listDocsSites.json",
+          "frozen": {
+            "ids": [],
+            "instants": [
+              "$.sites[*].latestPublishedAt"
+            ],
+            "strings": [],
+            "listFilteredTo": "$.sites"
+          }
+        },
+        {
+          "operationId": "listDocsVersions",
+          "method": "GET",
+          "path": "/artifacts/docs/docs/{site}",
+          "status": 200,
+          "file": "a-published-routes-bundle/listDocsVersions.json",
+          "frozen": {
+            "ids": [],
+            "instants": [
+              "$.versions[*].publishedAt"
+            ],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        }
+      ]
+    },
+    {
+      "name": "a published routes bundle font",
+      "slug": "a-published-routes-bundle-font",
+      "params": {
+        "path": "assets/inter-latin-400-normal.woff2",
+        "site": "@routes/qits-landing",
+        "version": "2026.1109.73025"
+      },
+      "dependsOn": [],
+      "operations": [
+        {
+          "operationId": "getDocsFile",
+          "method": "GET",
+          "path": "/artifacts/docs/docs/{site}/-/{version}/{path}",
+          "status": 200,
+          "headers": {
+            "Content-Length": "10",
+            "Content-Type": "font/woff2",
+            "ETag": "\"6b724e7b0530e208fd6ba12c9242a49bfbe6a93dc289a1f45ac4bd81621456ca\""
+          },
+          "frozen": {
+            "ids": [],
+            "instants": [],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        }
+      ]
+    },
+    {
+      "name": "a published routes bundle freeze",
+      "slug": "a-published-routes-bundle-freeze",
+      "params": {
+        "path": "src/app/routes/projects/[slug]/repositories/project-repositories.page.browser.spec.ts/loaded.html",
+        "site": "@routes/qits-landing",
+        "version": "2026.1109.73025"
+      },
+      "dependsOn": [],
+      "operations": [
+        {
+          "operationId": "getDocsFile",
+          "method": "GET",
+          "path": "/artifacts/docs/docs/{site}/-/{version}/{path}",
+          "status": 200,
+          "headers": {
+            "Content-Length": "387",
+            "Content-Type": "text/html; charset=utf-8",
+            "ETag": "\"de24c510694f3ed4c359515c101ee3b466a3295547218c3338c4c5910a9366d0\""
+          },
+          "frozen": {
+            "ids": [],
+            "instants": [],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        }
+      ]
+    },
+    {
       "name": "a registry handed a pin it cannot file",
       "slug": "a-registry-handed-a-pin-it-cannot-file",
       "params": {},
