@@ -810,9 +810,12 @@ wires stay open with the gate off.
   nothing builds a branch. Two pipelines are left — `ci-event-release-request.yml`, the QA pipeline
   above, which reacts to a release request's octopus fold (`release/<id>`) and is discovered at
   `main`'s head so a fold cannot edit the CI that gates it; and `ci-event-release.yml`, which builds
-  the release tag on `SCMRelease` and publishes the CalVer coordinate. The maintenance bump train's
-  release call is not a trigger here either: it opens a release REQUEST against qits-projects, with
-  its own credential, on the push that creates the bump.
+  the release tag on `SCMRelease` and publishes the CalVer coordinate. A dependency bump is not a
+  trigger here either: it is a release-request automation. qits-maintenance's `dependency-bump` kind
+  commits onto `maintenance/automations/dependency-bump/<request id>`, parented on the request's
+  fold, and that branch joins the request as a source; a bump owed while no request is open gets an
+  unattended request of its own. Because the bump commit sits on the fold, a source pushed with
+  rewritten history drops that branch, and the bump regenerates (qits-1971).
 - **Every module's suite runs on a REAL PostgreSQL**, spawned as a child process from zonky binaries
   that resolve as ordinary Maven artifacts. Not a container: the clone-alone rule forbids one, and
   the store's only engine is postgres now — `bytea`, an advisory lock, a partial index and an
