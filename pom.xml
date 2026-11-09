@@ -140,10 +140,10 @@
              every other pin; do not hand-edit them to chase a release. -->
         <qits.deployments-golden-masters.version>2026.1010.145913</qits.deployments-golden-masters.version>
         <qits.ci-golden-masters.version>2026.1107.84029</qits.ci-golden-masters.version>
-        <qits.maintenance-golden-masters.version>2026.1108.24102</qits.maintenance-golden-masters.version>
-        <qits.workspaces-golden-masters.version>2026.1107.164336</qits.workspaces-golden-masters.version>
-        <qits.projects-golden-masters.version>2026.1107.185639</qits.projects-golden-masters.version>
-        <qits.idp-golden-masters.version>2026.1108.62139</qits.idp-golden-masters.version>
+        <qits.maintenance-golden-masters.version>2026.1108.232519</qits.maintenance-golden-masters.version>
+        <qits.workspaces-golden-masters.version>2026.1108.230857</qits.workspaces-golden-masters.version>
+        <qits.projects-golden-masters.version>2026.1109.1559</qits.projects-golden-masters.version>
+        <qits.idp-golden-masters.version>2026.1109.13349</qits.idp-golden-masters.version>
         <qits.maven.repository.url>https://registry.qits.wohlben.eu/artifacts/maven/maven</qits.maven.repository.url>
         <maven.compiler.release>25</maven.compiler.release>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
