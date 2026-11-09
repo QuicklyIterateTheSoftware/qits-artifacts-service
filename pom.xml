@@ -132,7 +132,7 @@
         <qits.bootstrap-cli-pacts-qits-artifacts-service.version>2026.1023.225504</qits.bootstrap-cli-pacts-qits-artifacts-service.version>
         <qits.maintenance-service-pacts-qits-artifacts-service.version>2026.1019.73752</qits.maintenance-service-pacts-qits-artifacts-service.version>
         <qits.orchestrator-service-pacts-qits-artifacts-service.version>2026.1019.92500</qits.orchestrator-service-pacts-qits-artifacts-service.version>
-        <qits.platform-access-monorepo-pacts-qits-artifacts-service.version>2026.1103.101116</qits.platform-access-monorepo-pacts-qits-artifacts-service.version>
+        <qits.platform-access-monorepo-pacts-qits-artifacts-service.version>2026.1109.54009</qits.platform-access-monorepo-pacts-qits-artifacts-service.version>
         <qits.deployments-service-pacts-qits-artifacts-service.version>2026.1107.180656</qits.deployments-service-pacts-qits-artifacts-service.version>
         <!-- THE PROVIDERS' GOLDEN MASTERS this service's OWN consumer pacts read (contracts/consumer,
              qits-1149): what each pin source and the idp record for their provider states. Test
