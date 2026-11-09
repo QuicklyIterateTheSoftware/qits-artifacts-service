@@ -381,6 +381,16 @@ class GoldenMasterRecordingTest {
               .raw()
               .headers("Content-Length", "Content-Type", "ETag")
               .build(),
+          // --- the contracts bundle: qits-landing-app's entity map read (qits-1950) — the state
+          // also publishes the routes bundle, so the catalog has two sites to answer with, and
+          // listDocsSites is recorded unfiltered (no params.values() of this state's own site name
+          // mention the routes site) to keep both. entities.json is JSON, so unlike the routes
+          // bundle's font and freeze files, its body is recorded too.
+          op(ProviderStates.A_CONTRACTS_BUNDLE, "listDocsSites", "GET", DOCS_SITES, 200).build(),
+          op(ProviderStates.A_CONTRACTS_BUNDLE, "listDocsVersions", "GET", DOCS_SITE, 200).build(),
+          op(ProviderStates.A_CONTRACTS_BUNDLE, "getDocsFile", "GET", DOCS_FILE, 200)
+              .headers("Content-Length", "Content-Type", "ETag")
+              .build(),
           // --- changelogs: qits-maintenance (ChangelogClient), the qits CLI (bump-message)
           op(ProviderStates.CHANGELOGS, "listDocsVersions", "GET", CHANGELOG_SITE, 200).build(),
           op(ProviderStates.CHANGELOGS, "getDocsFile", "GET", CHANGELOG_FILE, 200)
