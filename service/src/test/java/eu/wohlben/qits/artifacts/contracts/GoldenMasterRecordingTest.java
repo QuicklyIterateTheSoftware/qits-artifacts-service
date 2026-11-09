@@ -471,6 +471,21 @@ class GoldenMasterRecordingTest {
           op(ProviderStates.A_STORE_WITH_CONTENT, "getStoreSummary", "GET", "/artifacts/api/store/summary", 200)
               .zeroNumbers()
               .build(),
+          // the GET is the plan's own read of live pins, never the orchestrator's supplied set —
+          // recorded with every source silent, which is the fail-safe answer a reviewer actually
+          // needs to see rather than one this suite has to stub.
+          op(ProviderStates.PIN_SOURCES_SILENT, "getGcPlan", "GET", "/artifacts/api/gc/plan", 200)
+              .drop(STORE_WIDE_LISTS)
+              .drop("sweep")
+              .zeroNumbers()
+              .blank(
+                  "$.summary.headline",
+                  "$.summary.reclaimable",
+                  "$.summary.types[*]",
+                  "$.pins[*].url",
+                  "$.pins[*].outcome",
+                  "$.pinFailures[*]")
+              .build(),
           op(ProviderStates.UNPINNED_IDENTITIES, "planGcWithSuppliedPins", "POST", "/artifacts/api/gc/plan", 200)
               .json("application/json", ProviderStates.GC_PINS)
               .drop(STORE_WIDE_LISTS)

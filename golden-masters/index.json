@@ -703,6 +703,44 @@
       ]
     },
     {
+      "name": "a registry whose pin sources do not answer",
+      "slug": "a-registry-whose-pin-sources-do-not-answer",
+      "params": {},
+      "dependsOn": [],
+      "operations": [
+        {
+          "operationId": "getGcPlan",
+          "method": "GET",
+          "path": "/artifacts/api/gc/plan",
+          "status": 200,
+          "file": "a-registry-whose-pin-sources-do-not-answer/getGcPlan.json",
+          "frozen": {
+            "ids": [],
+            "instants": [
+              "$.generatedAt",
+              "$.pins[*].readAt"
+            ],
+            "strings": [],
+            "volatile": [
+              "$.summary.headline",
+              "$.summary.reclaimable",
+              "$.summary.types[*]",
+              "$.pins[*].url",
+              "$.pins[*].outcome",
+              "$.pinFailures[*]",
+              "$.summary.identitiesCondemned",
+              "$.summary.blobsSweepable",
+              "$.summary.reclaimableBytes",
+              "$.summary.withheldByGraceWindow",
+              "$.pins[*].tookMillis",
+              "$.pins[*].pinCount"
+            ],
+            "listFilteredTo": null
+          }
+        }
+      ]
+    },
+    {
       "name": "a registry with unpinned identities",
       "slug": "a-registry-with-unpinned-identities",
       "params": {},

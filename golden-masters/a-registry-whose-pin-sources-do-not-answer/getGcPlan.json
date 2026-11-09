@@ -1,0 +1,84 @@
+{
+  "summary": {
+    "executable": false,
+    "headline": "",
+    "identitiesCondemned": 0,
+    "blobsSweepable": 0,
+    "reclaimableBytes": 0,
+    "reclaimable": "",
+    "withheldByGraceWindow": 0,
+    "types": [
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      ""
+    ]
+  },
+  "generatedAt": "2026-01-01T00:00:00Z",
+  "dryRun": true,
+  "graceWindow": "PT6H",
+  "executable": false,
+  "pinFailures": [
+    "",
+    "",
+    "",
+    "",
+    ""
+  ],
+  "pins": [
+    {
+      "source": "qits-platform-deployments",
+      "url": "",
+      "answered": false,
+      "outcome": "",
+      "readAt": "2026-01-01T00:00:00Z",
+      "tookMillis": 0,
+      "pinCount": 0,
+      "keeps": []
+    },
+    {
+      "source": "qits-ci",
+      "url": "",
+      "answered": false,
+      "outcome": "",
+      "readAt": "2026-01-01T00:00:00Z",
+      "tookMillis": 0,
+      "pinCount": 0,
+      "keeps": []
+    },
+    {
+      "source": "qits-platform-maintenance",
+      "url": "",
+      "answered": false,
+      "outcome": "",
+      "readAt": "2026-01-01T00:00:00Z",
+      "tookMillis": 0,
+      "pinCount": 0,
+      "keeps": []
+    },
+    {
+      "source": "qits-workspaces",
+      "url": "",
+      "answered": false,
+      "outcome": "",
+      "readAt": "2026-01-01T00:00:00Z",
+      "tookMillis": 0,
+      "pinCount": 0,
+      "keeps": []
+    },
+    {
+      "source": "qits-projects",
+      "url": "",
+      "answered": false,
+      "outcome": "",
+      "readAt": "2026-01-01T00:00:00Z",
+      "tookMillis": 0,
+      "pinCount": 0,
+      "keeps": []
+    }
+  ]
+}
