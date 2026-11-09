@@ -1,0 +1,105 @@
+{
+  "formatVersion": 1,
+  "application": "qits-projects",
+  "entities": [
+    {
+      "entity": "eu.wohlben.qits.entities.domain.Project",
+      "table": "project",
+      "marking": "domain",
+      "reason": null,
+      "projectionOf": null,
+      "knownGap": null,
+      "dtos": [
+        {
+          "type": "eu.wohlben.qits.entities.dto.ProjectDto",
+          "kind": "mapper",
+          "via": null,
+          "site": "ProjectMapper.toDto(Project)"
+        }
+      ],
+      "operations": [
+        {
+          "operationId": "listProjects",
+          "method": "GET",
+          "path": "/projects",
+          "dto": "eu.wohlben.qits.entities.dto.ProjectDto",
+          "kind": "returns"
+        },
+        {
+          "operationId": "getProject",
+          "method": "GET",
+          "path": "/projects/{projectId}",
+          "dto": "eu.wohlben.qits.entities.dto.ProjectDto",
+          "kind": "returns"
+        }
+      ]
+    },
+    {
+      "entity": "eu.wohlben.qits.entities.domain.Repository",
+      "table": "repository",
+      "marking": "domain",
+      "reason": null,
+      "projectionOf": null,
+      "knownGap": null,
+      "dtos": [
+        {
+          "type": "eu.wohlben.qits.entities.dto.RepositoryDto",
+          "kind": "mapper",
+          "via": null,
+          "site": "RepositoryMapper.toDto(Repository)"
+        }
+      ],
+      "operations": [
+        {
+          "operationId": "listProjectRepositories",
+          "method": "GET",
+          "path": "/projects/{projectId}/repositories",
+          "dto": "eu.wohlben.qits.entities.dto.RepositoryDto",
+          "kind": "returns"
+        }
+      ]
+    },
+    {
+      "entity": "eu.wohlben.qits.entities.entity.WorkEntity",
+      "table": "work_entity",
+      "marking": "domain",
+      "reason": null,
+      "projectionOf": null,
+      "knownGap": null,
+      "dtos": [
+        {
+          "type": "eu.wohlben.qits.entities.dto.WorkDto",
+          "kind": "mapper",
+          "via": null,
+          "site": "WorkMapper.toDto(WorkEntity)"
+        }
+      ],
+      "operations": [
+        {
+          "operationId": "getWork",
+          "method": "GET",
+          "path": "/work/{qualifiedId}",
+          "dto": "eu.wohlben.qits.entities.dto.WorkDto",
+          "kind": "returns"
+        },
+        {
+          "operationId": "deleteWork",
+          "method": "DELETE",
+          "path": "/work/{qualifiedId}",
+          "dto": null,
+          "kind": "deletes"
+        }
+      ]
+    },
+    {
+      "entity": "eu.wohlben.qits.entities.domain.LegacyPlacement",
+      "table": "legacy_placement",
+      "marking": "technical",
+      "reason": "bookkeeping of a retired layout",
+      "projectionOf": null,
+      "knownGap": null,
+      "dtos": [],
+      "operations": []
+    }
+  ]
+}

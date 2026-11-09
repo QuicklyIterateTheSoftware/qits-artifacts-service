@@ -350,6 +350,66 @@
       ]
     },
     {
+      "name": "a published contracts bundle with an entity map",
+      "slug": "a-published-contracts-bundle-with-an-entity-map",
+      "params": {
+        "path": "entities.json",
+        "site": "@contracts/qits-projects",
+        "version": "2100.1.0"
+      },
+      "dependsOn": [],
+      "operations": [
+        {
+          "operationId": "getDocsFile",
+          "method": "GET",
+          "path": "/artifacts/docs/docs/{site}/-/{version}/{path}",
+          "status": 200,
+          "file": "a-published-contracts-bundle-with-an-entity-map/getDocsFile.json",
+          "headers": {
+            "Content-Length": "2754",
+            "Content-Type": "application/json",
+            "ETag": "\"911effd3e103c734b9973aeccf2c658ffdbd0af17a9163835aff6e97cfe5344e\""
+          },
+          "frozen": {
+            "ids": [],
+            "instants": [],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        },
+        {
+          "operationId": "listDocsSites",
+          "method": "GET",
+          "path": "/artifacts/docs/docs",
+          "status": 200,
+          "file": "a-published-contracts-bundle-with-an-entity-map/listDocsSites.json",
+          "frozen": {
+            "ids": [],
+            "instants": [
+              "$.sites[*].latestPublishedAt"
+            ],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        },
+        {
+          "operationId": "listDocsVersions",
+          "method": "GET",
+          "path": "/artifacts/docs/docs/{site}",
+          "status": 200,
+          "file": "a-published-contracts-bundle-with-an-entity-map/listDocsVersions.json",
+          "frozen": {
+            "ids": [],
+            "instants": [
+              "$.versions[*].publishedAt"
+            ],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        }
+      ]
+    },
+    {
       "name": "a published docs site",
       "slug": "a-published-docs-site",
       "params": {

@@ -1,0 +1,16 @@
+{
+  "sites": [
+    {
+      "name": "@contracts/qits-projects",
+      "versionCount": 1,
+      "latestVersion": "2100.1.0",
+      "latestPublishedAt": "2026-01-01T00:00:00Z"
+    },
+    {
+      "name": "@routes/qits-landing",
+      "versionCount": 1,
+      "latestVersion": "2026.1109.73025",
+      "latestPublishedAt": "2026-01-01T00:00:00Z"
+    }
+  ]
+}

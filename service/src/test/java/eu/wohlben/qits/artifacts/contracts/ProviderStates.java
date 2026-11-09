@@ -71,6 +71,10 @@ public class ProviderStates {
   public static final String A_ROUTES_BUNDLE = "a published routes bundle";
   public static final String A_ROUTES_BUNDLE_FREEZE = "a published routes bundle freeze";
   public static final String A_ROUTES_BUNDLE_FONT = "a published routes bundle font";
+  // qits-1950: qits-landing-app reads a contracts bundle's entity map. The routes bundle is
+  // published alongside it (the same publish {@link #aRoutesBundle} does) so listDocsSites has
+  // two sites to answer with, the way a shared docs repository really does.
+  public static final String A_CONTRACTS_BUNDLE = "a published contracts bundle with an entity map";
   public static final String CHANGELOGS = "a repository with published changelogs";
   public static final String NO_CHANGELOG = "a repository with no changelog";
   public static final String A_CONTENT_HASH = "a content hash recorded for the coordinate";
@@ -286,6 +290,152 @@ public class ProviderStates {
               ROUTES_COMPONENT_FREEZE, utf8(freezeHtml(ROUTES_COMPONENT_FREEZE, "Slots")),
               ROUTES_FONT, ROUTES_FONT_BYTES));
 
+  // --- the contracts bundle (qits-1950) -------------------------------------------------------
+
+  /**
+   * The site a service's own release publishes its {@code docs/entities.json} entity map under —
+   * one per application, named {@code @contracts/<application>}, the same convention {@link
+   * #PURGE_SITE} uses for the purge state. qits-landing-app reads the newest version of it, the
+   * way it reads {@link #ROUTES_SITE}.
+   */
+  static final String CONTRACTS_SITE = "@contracts/qits-projects";
+
+  static final String CONTRACTS_ENTITIES_PATH = "entities.json";
+
+  /**
+   * The metadata the entity map's publish carries: a content hash, the commit and the repository
+   * the map came from — the same shape {@link #ROUTES_METADATA} uses, with its own fixed hash and
+   * commit so the two bundles are never mistaken for one another in a recorded answer.
+   */
+  static final Map<String, String> CONTRACTS_METADATA =
+      Map.of(
+          DOCS_CONTENT_HASH_KEY,
+          "sha256:" + "b".repeat(64),
+          "git.commit.hash",
+          "a".repeat(40),
+          "git.repository.name",
+          "qits-projects-service");
+
+  /**
+   * The entity map {@code docs/entities.json} carries (the entity-exposure-adoption shape,
+   * qits-1945): four entities — two touched by the routes bundle's own golden master
+   * ({@code Project}, read by {@code listProjects}; {@code Repository}, read by {@code
+   * listProjectRepositories} — both already recorded off {@link #ROUTES_MANIFEST_JSON}), one
+   * domain entity the routes bundle never reaches ({@code WorkEntity}), and one {@code @Technical}
+   * entity with a reason and no operations ({@code LegacyPlacement}).
+   */
+  static final String CONTRACTS_ENTITIES_JSON =
+      """
+      {
+        "formatVersion": 1,
+        "application": "qits-projects",
+        "entities": [
+          {
+            "entity": "eu.wohlben.qits.entities.domain.Project",
+            "table": "project",
+            "marking": "domain",
+            "reason": null,
+            "projectionOf": null,
+            "knownGap": null,
+            "dtos": [
+              {
+                "type": "eu.wohlben.qits.entities.dto.ProjectDto",
+                "kind": "mapper",
+                "via": null,
+                "site": "ProjectMapper.toDto(Project)"
+              }
+            ],
+            "operations": [
+              {
+                "operationId": "listProjects",
+                "method": "GET",
+                "path": "/projects",
+                "dto": "eu.wohlben.qits.entities.dto.ProjectDto",
+                "kind": "returns"
+              },
+              {
+                "operationId": "getProject",
+                "method": "GET",
+                "path": "/projects/{projectId}",
+                "dto": "eu.wohlben.qits.entities.dto.ProjectDto",
+                "kind": "returns"
+              }
+            ]
+          },
+          {
+            "entity": "eu.wohlben.qits.entities.domain.Repository",
+            "table": "repository",
+            "marking": "domain",
+            "reason": null,
+            "projectionOf": null,
+            "knownGap": null,
+            "dtos": [
+              {
+                "type": "eu.wohlben.qits.entities.dto.RepositoryDto",
+                "kind": "mapper",
+                "via": null,
+                "site": "RepositoryMapper.toDto(Repository)"
+              }
+            ],
+            "operations": [
+              {
+                "operationId": "listProjectRepositories",
+                "method": "GET",
+                "path": "/projects/{projectId}/repositories",
+                "dto": "eu.wohlben.qits.entities.dto.RepositoryDto",
+                "kind": "returns"
+              }
+            ]
+          },
+          {
+            "entity": "eu.wohlben.qits.entities.entity.WorkEntity",
+            "table": "work_entity",
+            "marking": "domain",
+            "reason": null,
+            "projectionOf": null,
+            "knownGap": null,
+            "dtos": [
+              {
+                "type": "eu.wohlben.qits.entities.dto.WorkDto",
+                "kind": "mapper",
+                "via": null,
+                "site": "WorkMapper.toDto(WorkEntity)"
+              }
+            ],
+            "operations": [
+              {
+                "operationId": "getWork",
+                "method": "GET",
+                "path": "/work/{qualifiedId}",
+                "dto": "eu.wohlben.qits.entities.dto.WorkDto",
+                "kind": "returns"
+              },
+              {
+                "operationId": "deleteWork",
+                "method": "DELETE",
+                "path": "/work/{qualifiedId}",
+                "dto": null,
+                "kind": "deletes"
+              }
+            ]
+          },
+          {
+            "entity": "eu.wohlben.qits.entities.domain.LegacyPlacement",
+            "table": "legacy_placement",
+            "marking": "technical",
+            "reason": "bookkeeping of a retired layout",
+            "projectionOf": null,
+            "knownGap": null,
+            "dtos": [],
+            "operations": []
+          }
+        ]
+      }
+      """;
+
+  /** The contracts bundle: just {@code entities.json}, packed byte-stable like every other bundle. */
+  static final byte[] CONTRACTS_BUNDLE = tarGz(Map.of(CONTRACTS_ENTITIES_PATH, CONTRACTS_ENTITIES_JSON));
+
   static final String HASH_TYPE = "maven";
   static final String HASH_GROUP = "eu.wohlben.qits";
   static final String HASH_ARTIFACT = "contract-artifact";
@@ -390,6 +540,7 @@ public class ProviderStates {
     states.put(A_ROUTES_BUNDLE, () -> aRoutesBundle(ROUTES_MANIFEST));
     states.put(A_ROUTES_BUNDLE_FREEZE, () -> aRoutesBundle(ROUTES_FREEZE));
     states.put(A_ROUTES_BUNDLE_FONT, () -> aRoutesBundle(ROUTES_FONT));
+    states.put(A_CONTRACTS_BUNDLE, this::aContractsBundle);
     states.put(CHANGELOGS, this::changelogs);
     states.put(NO_CHANGELOG, this::noChangelog);
     states.put(A_CONTENT_HASH, this::aContentHash);
@@ -459,7 +610,8 @@ public class ProviderStates {
                   .list(
                       "repository = ?1 and name in ?2",
                       DOCS,
-                      List.of(DOCS_SITE, CHANGELOG_SITE, PURGE_SITE, ROUTES_SITE))
+                      List.of(
+                          DOCS_SITE, CHANGELOG_SITE, PURGE_SITE, ROUTES_SITE, CONTRACTS_SITE))
                   .forEach(docsSites::delete);
               // The registries' tables live in the same persistence unit as the daemon rows.
               var entityManager = daemonBinaries.getEntityManager();
@@ -705,6 +857,22 @@ public class ProviderStates {
         + "</style></head><body><main><h1>"
         + heading
         + "</h1><a href=\"/projects/qits/work\">Work</a></main></body></html>\n";
+  }
+
+  /**
+   * qits-projects-service's entity map, {@link #CONTRACTS_SITE} at the contracts version, alongside
+   * the routes bundle — the same publish {@link #aRoutesBundle} does, so {@code listDocsSites}
+   * answers with both sites, the way a shared docs repository really does. The {@code path} param
+   * is always {@link #CONTRACTS_ENTITIES_PATH}: the bundle holds that one file.
+   */
+  private Setup aContractsBundle() {
+    publishDocs(ROUTES_SITE, ROUTES_VERSION, ROUTES_BUNDLE, ROUTES_METADATA);
+    publishDocs(CONTRACTS_SITE, DOCS_VERSION, CONTRACTS_BUNDLE, CONTRACTS_METADATA);
+    Map<String, String> params = new TreeMap<>();
+    params.put("path", CONTRACTS_ENTITIES_PATH);
+    params.put("site", CONTRACTS_SITE);
+    params.put("version", DOCS_VERSION);
+    return new Setup(params, List.of());
   }
 
   /** One changelog bundle for one repository, under the {@code @changelog/} scope. */
