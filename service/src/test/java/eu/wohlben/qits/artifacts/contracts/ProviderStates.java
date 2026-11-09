@@ -62,6 +62,9 @@ public class ProviderStates {
   public static final String A_DOCS_SITE = "a published docs site";
   public static final String A_DOCS_SITE_FROM_TWO_BRANCHES =
       "a docs site published from two branches";
+  // qits-1948: `qits artifacts publish docs submit --if-changed`
+  public static final String A_DOCS_SITE_WITH_A_CONTENT_HASH =
+      "a docs site published with a content hash";
   public static final String CHANGELOGS = "a repository with published changelogs";
   public static final String NO_CHANGELOG = "a repository with no changelog";
   public static final String A_CONTENT_HASH = "a content hash recorded for the coordinate";
@@ -148,6 +151,20 @@ public class ProviderStates {
 
   /** The metadata a docs publish carries: the branch, as {@code X-Artifacts-Meta-<key>}. */
   static final String BRANCH_KEY = "git.branch.name";
+
+  /**
+   * The metadata key {@code qits artifacts publish docs submit --if-changed} stores its bundle's
+   * hash under and reads back from the newest version, to skip a publish of unchanged content
+   * (qits-1948). The service gives it no meaning: it is one more {@code X-Artifacts-Meta-<key>}.
+   */
+  static final String DOCS_CONTENT_HASH_KEY = "content.hash";
+
+  /**
+   * The hash that state publishes under {@link #DOCS_CONTENT_HASH_KEY}: fixed, so the recorded
+   * metadata is byte-stable, and in the {@code sha256:<hex>} shape the CLI computes. Not the
+   * bundle's real digest — the service never checks it, and the consumer only compares strings.
+   */
+  public static final String DOCS_CONTENT_HASH = "sha256:" + "d".repeat(64);
 
   /** The repository whose changelogs the changelog states publish, under {@code @changelog/}. */
   static final String CHANGELOG_REPOSITORY = "contract-repository";
@@ -261,6 +278,7 @@ public class ProviderStates {
     states.put(NO_DOCS, this::noDocs);
     states.put(A_DOCS_SITE, this::aDocsSite);
     states.put(A_DOCS_SITE_FROM_TWO_BRANCHES, this::aDocsSiteFromTwoBranches);
+    states.put(A_DOCS_SITE_WITH_A_CONTENT_HASH, this::aDocsSiteWithAContentHash);
     states.put(CHANGELOGS, this::changelogs);
     states.put(NO_CHANGELOG, this::noChangelog);
     states.put(A_CONTENT_HASH, this::aContentHash);
@@ -526,6 +544,24 @@ public class ProviderStates {
     return new Setup(params, List.of());
   }
 
+  /**
+   * One version of one site, published from {@code main} with a content hash in its metadata: what
+   * {@code --if-changed} finds when the site's newest version holds the content it is about to
+   * publish (qits-1948). The {@code hash} param is that value, for the consumer to send back.
+   */
+  private Setup aDocsSiteWithAContentHash() {
+    publishDocs(
+        DOCS_SITE,
+        DOCS_VERSION,
+        DOCS_BUNDLE,
+        Map.of(BRANCH_KEY, DOCS_BRANCH, DOCS_CONTENT_HASH_KEY, DOCS_CONTENT_HASH));
+    Map<String, String> params = new TreeMap<>();
+    params.put("hash", DOCS_CONTENT_HASH);
+    params.put("site", DOCS_SITE);
+    params.put("version", DOCS_VERSION);
+    return new Setup(params, List.of());
+  }
+
   /** One changelog bundle for one repository, under the {@code @changelog/} scope. */
   private Setup changelogs() {
     publishDocs(CHANGELOG_SITE, CHANGELOG_VERSION, CHANGELOG_BUNDLE, DOCS_BRANCH);
@@ -538,12 +574,17 @@ public class ProviderStates {
   }
 
   private void publishDocs(String site, String version, byte[] bundle, String branch) {
+    publishDocs(site, version, bundle, Map.of(BRANCH_KEY, branch));
+  }
+
+  /** A docs publish carrying each {@code metadata} entry as an {@code X-Artifacts-Meta-<key>}. */
+  private void publishDocs(
+      String site, String version, byte[] bundle, Map<String, String> metadata) {
+    var request = given().urlEncodingEnabled(false).contentType("application/gzip");
+    metadata.forEach((key, value) -> request.header("X-Artifacts-Meta-" + key, value));
     expect(
         201,
-        given()
-            .urlEncodingEnabled(false)
-            .contentType("application/gzip")
-            .header("X-Artifacts-Meta-" + BRANCH_KEY, branch)
+        request
             .body(bundle)
             .put("/artifacts/docs/" + DOCS + "/" + site + "/-/" + version),
         "the docs publish of " + site + "@" + version);

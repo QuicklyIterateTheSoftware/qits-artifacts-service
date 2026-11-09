@@ -216,6 +216,11 @@ class ConsumerPactVerificationTest {
     return states.params(ProviderStates.A_DOCS_SITE_FROM_TWO_BRANCHES);
   }
 
+  @State(ProviderStates.A_DOCS_SITE_WITH_A_CONTENT_HASH)
+  Map<String, String> aDocsSiteWithAContentHash() {
+    return states.params(ProviderStates.A_DOCS_SITE_WITH_A_CONTENT_HASH);
+  }
+
   @State(ProviderStates.CHANGELOGS)
   Map<String, String> changelogs() {
     return states.params(ProviderStates.CHANGELOGS);

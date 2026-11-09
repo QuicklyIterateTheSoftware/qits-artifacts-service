@@ -250,6 +250,33 @@
       ]
     },
     {
+      "name": "a docs site published with a content hash",
+      "slug": "a-docs-site-published-with-a-content-hash",
+      "params": {
+        "hash": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "site": "contract-docs-site",
+        "version": "2100.1.0"
+      },
+      "dependsOn": [],
+      "operations": [
+        {
+          "operationId": "listDocsVersions",
+          "method": "GET",
+          "path": "/artifacts/docs/docs/{site}",
+          "status": 200,
+          "file": "a-docs-site-published-with-a-content-hash/listDocsVersions.json",
+          "frozen": {
+            "ids": [],
+            "instants": [
+              "$.versions[*].publishedAt"
+            ],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        }
+      ]
+    },
+    {
       "name": "a maven artifact published at a version",
       "slug": "a-maven-artifact-published-at-a-version",
       "params": {

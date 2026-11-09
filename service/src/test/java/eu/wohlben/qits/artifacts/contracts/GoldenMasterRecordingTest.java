@@ -359,6 +359,9 @@ class GoldenMasterRecordingTest {
           op(ProviderStates.A_DOCS_SITE_FROM_TWO_BRANCHES, "listDocsVersions", "GET", DOCS_SITE, 200)
               .query("meta.git.branch.name", "main")
               .build(),
+          // the qits CLI's `publish docs submit --if-changed`: the newest version's content.hash
+          op(ProviderStates.A_DOCS_SITE_WITH_A_CONTENT_HASH, "listDocsVersions", "GET", DOCS_SITE, 200)
+              .build(),
           // --- changelogs: qits-maintenance (ChangelogClient), the qits CLI (bump-message)
           op(ProviderStates.CHANGELOGS, "listDocsVersions", "GET", CHANGELOG_SITE, 200).build(),
           op(ProviderStates.CHANGELOGS, "getDocsFile", "GET", CHANGELOG_FILE, 200)
