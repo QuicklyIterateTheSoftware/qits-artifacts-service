@@ -27,6 +27,7 @@ import java.time.Duration;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.TreeMap;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 /**
@@ -359,9 +360,12 @@ public class DocsRoutes {
             .put("publishedAt", site.publishedAt().toString());
     // Only when present, so a version published before metadata existed keeps its exact wire
     // shape. A JsonObject over the map, never a DTO — the native-image rule of this whole stack.
+    // Keys sorted: the stored map is a Map.copyOf, whose iteration order is salted per JVM, so
+    // two or more keys came out in a different order on every start (qits-1948 caught it as a
+    // golden master that re-recorded differently each run).
     if (!site.metadata().isEmpty()) {
       JsonObject metadata = new JsonObject();
-      site.metadata().forEach(metadata::put);
+      new TreeMap<>(site.metadata()).forEach(metadata::put);
       described.put("metadata", metadata);
     }
     return described;
