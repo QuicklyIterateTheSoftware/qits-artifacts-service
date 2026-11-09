@@ -362,6 +362,25 @@ class GoldenMasterRecordingTest {
           // the qits CLI's `publish docs submit --if-changed`: the newest version's content.hash
           op(ProviderStates.A_DOCS_SITE_WITH_A_CONTENT_HASH, "listDocsVersions", "GET", DOCS_SITE, 200)
               .build(),
+          // --- the routes bundle: qits-landing-app (qits-1951) — the catalog, the site's versions,
+          // the newest version's file list, then its files: the manifest (JSON, so recorded), a
+          // freeze page and the font it loads (raw bytes: status and headers only)
+          op(ProviderStates.A_ROUTES_BUNDLE, "listDocsSites", "GET", DOCS_SITES, 200)
+              .filtered("$.sites", "site")
+              .build(),
+          op(ProviderStates.A_ROUTES_BUNDLE, "listDocsVersions", "GET", DOCS_SITE, 200).build(),
+          op(ProviderStates.A_ROUTES_BUNDLE, "getDocsVersion", "GET", DOCS_VERSION, 200).build(),
+          op(ProviderStates.A_ROUTES_BUNDLE, "getDocsFile", "GET", DOCS_FILE, 200)
+              .headers("Content-Length", "Content-Type", "ETag")
+              .build(),
+          op(ProviderStates.A_ROUTES_BUNDLE_FREEZE, "getDocsFile", "GET", DOCS_FILE, 200)
+              .raw()
+              .headers("Content-Length", "Content-Type", "ETag")
+              .build(),
+          op(ProviderStates.A_ROUTES_BUNDLE_FONT, "getDocsFile", "GET", DOCS_FILE, 200)
+              .raw()
+              .headers("Content-Length", "Content-Type", "ETag")
+              .build(),
           // --- changelogs: qits-maintenance (ChangelogClient), the qits CLI (bump-message)
           op(ProviderStates.CHANGELOGS, "listDocsVersions", "GET", CHANGELOG_SITE, 200).build(),
           op(ProviderStates.CHANGELOGS, "getDocsFile", "GET", CHANGELOG_FILE, 200)
@@ -944,9 +963,32 @@ class GoldenMasterRecordingTest {
         throw new IllegalStateException(
             "Path " + template + " names {" + m.group(1) + "}, which the state does not return");
       }
-      m.appendReplacement(out, Matcher.quoteReplacement(value));
+      m.appendReplacement(out, Matcher.quoteReplacement(pathEncoded(value)));
     }
     m.appendTail(out);
+    return out.toString();
+  }
+
+  /**
+   * A param value as it goes on the wire: literal wherever RFC 3986 allows it in a path — the
+   * slashes of a docs {@code path} and the {@code @} of a scoped site included, which the routes
+   * need unencoded — and percent-encoded (UTF-8) everywhere else. The params stay the raw values:
+   * a routes bundle's freeze sits under {@code [slug]/}, and a {@code [} is not a path character
+   * (the edge answers 400 to it), so the call sends {@code %5Bslug%5D} and the route decodes it.
+   */
+  static String pathEncoded(String value) {
+    StringBuilder out = new StringBuilder();
+    for (byte b : value.getBytes(StandardCharsets.UTF_8)) {
+      char c = (char) (b & 0xff);
+      if ((c >= 'a' && c <= 'z')
+          || (c >= 'A' && c <= 'Z')
+          || (c >= '0' && c <= '9')
+          || "-._~!$&'()*+,;=:@/%".indexOf(c) >= 0) {
+        out.append(c);
+      } else {
+        out.append('%').append(String.format("%02X", b & 0xff));
+      }
+    }
     return out.toString();
   }
 

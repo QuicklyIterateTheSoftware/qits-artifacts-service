@@ -65,6 +65,12 @@ public class ProviderStates {
   // qits-1948: `qits artifacts publish docs submit --if-changed`
   public static final String A_DOCS_SITE_WITH_A_CONTENT_HASH =
       "a docs site published with a content hash";
+  // qits-1951: the landing app's routes bundle. Three states over the same bundle, one per file the
+  // consumer reads, because a state records one answer per operation and getDocsFile is one
+  // operation: the state's {path} param is what picks the file.
+  public static final String A_ROUTES_BUNDLE = "a published routes bundle";
+  public static final String A_ROUTES_BUNDLE_FREEZE = "a published routes bundle freeze";
+  public static final String A_ROUTES_BUNDLE_FONT = "a published routes bundle font";
   public static final String CHANGELOGS = "a repository with published changelogs";
   public static final String NO_CHANGELOG = "a repository with no changelog";
   public static final String A_CONTENT_HASH = "a content hash recorded for the coordinate";
@@ -178,6 +184,102 @@ public class ProviderStates {
   static final byte[] CHANGELOG_BUNDLE =
       tarGz(Map.of("CHANGELOG.md", "# Changelog\n\n## 2100.1.0\n\n- A contract entry.\n"));
 
+  // --- the routes bundle (qits-1951) ----------------------------------------------------------
+
+  /**
+   * The site qits-landing-app publishes its route map and its screenshot freezes under: {@code
+   * manifest.json} at the root, one {@code .html} freeze per screenshot test at {@code
+   * <spec>/<name>.html}, and the fonts the freezes load at {@code assets/}. The landing app reads
+   * the newest version of it (qits-1951).
+   */
+  static final String ROUTES_SITE = "@routes/qits-landing";
+
+  static final String ROUTES_VERSION = "2026.1109.73025";
+  static final String ROUTES_MANIFEST = "manifest.json";
+  static final String ROUTES_FREEZE_SPEC =
+      "src/app/routes/projects/[slug]/repositories/project-repositories.page.browser.spec.ts";
+  static final String ROUTES_FREEZE = ROUTES_FREEZE_SPEC + "/loaded.html";
+  static final String ROUTES_ERROR_FREEZE = ROUTES_FREEZE_SPEC + "/error.html";
+  static final String ROUTES_COMPONENT_SPEC =
+      "src/app/layout/page-layout/page-layout.browser.spec.ts";
+  static final String ROUTES_COMPONENT_FREEZE = ROUTES_COMPONENT_SPEC + "/slots.html";
+  static final String ROUTES_FONT = "assets/inter-latin-400-normal.woff2";
+
+  /**
+   * The metadata the landing app's publish carries — fixed stand-ins in the live shape: no branch,
+   * a content hash, the commit and the repository the bundle came from.
+   */
+  static final Map<String, String> ROUTES_METADATA =
+      Map.of(
+          DOCS_CONTENT_HASH_KEY,
+          "sha256:" + "e".repeat(64),
+          "git.commit.hash",
+          "f".repeat(40),
+          "git.repository.name",
+          "qits-landing-app");
+
+  /**
+   * The route map, in the shape the landing app writes it: the nested route tree ({@code path},
+   * {@code fullPath}, {@code redirectTo} on a redirect, {@code children} on a parent), every freeze
+   * with the golden-master records its test replayed ({@code route} is null for a component
+   * freeze), and {@code byRoute} — each route that has freezes, by full path, to their files.
+   */
+  static final String ROUTES_MANIFEST_JSON =
+      """
+      {"routes":[{"path":"","fullPath":"","children":[\
+      {"path":"","fullPath":"","redirectTo":"projects"},\
+      {"path":"projects","fullPath":"projects"},\
+      {"path":"projects/:slug/repositories","fullPath":"projects/:slug/repositories"},\
+      {"path":"projects/:slug/workspaces","fullPath":"projects/:slug/workspaces",\
+      "redirectTo":"projects/:slug/agents"},\
+      {"path":"**","fullPath":"**"}]}],\
+      "freezes":[\
+      {"file":"%1$s","spec":"%2$s",\
+      "test":"PageLayoutComponent (screenshots) > fills every slot","name":"slots","route":null,\
+      "records":[]},\
+      {"file":"%3$s","spec":"%4$s",\
+      "test":"ProjectRepositoriesPage (screenshots) > marks the page as loading, then as failed to load",\
+      "name":"error","route":"projects/:slug/repositories",\
+      "records":[{"provider":"qits-projects-service","state":"a project exists",\
+      "operationId":"listProjects"}]},\
+      {"file":"%5$s","spec":"%4$s",\
+      "test":"ProjectRepositoriesPage (screenshots) > lists the project's repositories",\
+      "name":"loaded","route":"projects/:slug/repositories",\
+      "records":[{"provider":"qits-projects-service","state":"a project exists",\
+      "operationId":"listProjects"},\
+      {"provider":"qits-projects-service","state":"a project with repositories",\
+      "operationId":"listProjectRepositories"}]}],\
+      "byRoute":{"projects/:slug/repositories":["%3$s","%5$s"]}}
+      """
+          .formatted(
+              ROUTES_COMPONENT_FREEZE,
+              ROUTES_COMPONENT_SPEC,
+              ROUTES_ERROR_FREEZE,
+              ROUTES_FREEZE_SPEC,
+              ROUTES_FREEZE);
+
+  /**
+   * Stands in for the Inter font the freezes load: the woff2 magic and a few bytes, NOT a real
+   * font. Nothing here or in a consumer decodes it; what is recorded is its media type and length.
+   */
+  static final byte[] ROUTES_FONT_BYTES = {
+    'w', 'O', 'F', '2', 0x00, 0x01, 0x00, 0x00, (byte) 0xca, (byte) 0xfe
+  };
+
+  /**
+   * The routes bundle: the manifest, three small freezes and the font. Each freeze is a standalone
+   * page as the landing app writes one — inline {@code <style>}, no script — whose {@code
+   * @font-face} reaches the bundle root with one {@code ../} per directory the freeze sits in.
+   */
+  static final byte[] ROUTES_BUNDLE =
+      tarGzBytes(
+          Map.of(
+              ROUTES_MANIFEST, utf8(ROUTES_MANIFEST_JSON),
+              ROUTES_FREEZE, utf8(freezeHtml(ROUTES_FREEZE, "qits-landing-app")),
+              ROUTES_ERROR_FREEZE, utf8(freezeHtml(ROUTES_ERROR_FREEZE, "Could not load")),
+              ROUTES_COMPONENT_FREEZE, utf8(freezeHtml(ROUTES_COMPONENT_FREEZE, "Slots")),
+              ROUTES_FONT, ROUTES_FONT_BYTES));
+
   static final String HASH_TYPE = "maven";
   static final String HASH_GROUP = "eu.wohlben.qits";
   static final String HASH_ARTIFACT = "contract-artifact";
@@ -279,6 +381,9 @@ public class ProviderStates {
     states.put(A_DOCS_SITE, this::aDocsSite);
     states.put(A_DOCS_SITE_FROM_TWO_BRANCHES, this::aDocsSiteFromTwoBranches);
     states.put(A_DOCS_SITE_WITH_A_CONTENT_HASH, this::aDocsSiteWithAContentHash);
+    states.put(A_ROUTES_BUNDLE, () -> aRoutesBundle(ROUTES_MANIFEST));
+    states.put(A_ROUTES_BUNDLE_FREEZE, () -> aRoutesBundle(ROUTES_FREEZE));
+    states.put(A_ROUTES_BUNDLE_FONT, () -> aRoutesBundle(ROUTES_FONT));
     states.put(CHANGELOGS, this::changelogs);
     states.put(NO_CHANGELOG, this::noChangelog);
     states.put(A_CONTENT_HASH, this::aContentHash);
@@ -347,7 +452,7 @@ public class ProviderStates {
                   .list(
                       "repository = ?1 and name in ?2",
                       DOCS,
-                      List.of(DOCS_SITE, CHANGELOG_SITE, PURGE_SITE))
+                      List.of(DOCS_SITE, CHANGELOG_SITE, PURGE_SITE, ROUTES_SITE))
                   .forEach(docsSites::delete);
               // The registries' tables live in the same persistence unit as the daemon rows.
               var entityManager = daemonBinaries.getEntityManager();
@@ -560,6 +665,39 @@ public class ProviderStates {
     params.put("site", DOCS_SITE);
     params.put("version", DOCS_VERSION);
     return new Setup(params, List.of());
+  }
+
+  /**
+   * The landing app's routes bundle, {@link #ROUTES_SITE} at {@link #ROUTES_VERSION} with its
+   * publish metadata, as the site's only (so newest) version. The {@code path} param names the one
+   * file of it this state's {@code getDocsFile} reads.
+   */
+  private Setup aRoutesBundle(String path) {
+    publishDocs(ROUTES_SITE, ROUTES_VERSION, ROUTES_BUNDLE, ROUTES_METADATA);
+    Map<String, String> params = new TreeMap<>();
+    params.put("path", path);
+    params.put("site", ROUTES_SITE);
+    params.put("version", ROUTES_VERSION);
+    return new Setup(params, List.of());
+  }
+
+  /**
+   * One screenshot freeze as the landing app writes it: a standalone page, inline style only, the
+   * font reached relative to the freeze's own directory, and an in-app link left as the app wrote
+   * it.
+   */
+  static String freezeHtml(String file, String heading) {
+    String toRoot = "../".repeat((int) file.chars().filter(c -> c == '/').count());
+    return "<!doctype html>\n"
+        + "<html lang=\"en\"><head><meta charset=\"utf-8\"><style>\n"
+        + "@font-face { font-family: \"Inter Test\"; font-weight: 400; src: url(\""
+        + toRoot
+        + ROUTES_FONT
+        + "\") format(\"woff2\"); }\n"
+        + "body { margin: 0px; font-family: \"Inter Test\", sans-serif; }\n"
+        + "</style></head><body><main><h1>"
+        + heading
+        + "</h1><a href=\"/projects/qits/work\">Work</a></main></body></html>\n";
   }
 
   /** One changelog bundle for one repository, under the {@code @changelog/} scope. */
@@ -934,12 +1072,28 @@ public class ProviderStates {
     return storedGzip(tar(files));
   }
 
+  /** {@link #tarGz} of files given as bytes, for a bundle holding a binary file. */
+  static byte[] tarGzBytes(Map<String, byte[]> files) {
+    return storedGzip(tarBytes(files));
+  }
+
+  private static byte[] utf8(String text) {
+    return text.getBytes(StandardCharsets.UTF_8);
+  }
+
   /** The tar {@link #tarGz} gzips: fixed entry order, mtime, owner and mode. */
   static byte[] tar(Map<String, String> files) {
+    Map<String, byte[]> bytes = new TreeMap<>();
+    files.forEach((path, text) -> bytes.put(path, utf8(text)));
+    return tarBytes(bytes);
+  }
+
+  /** {@link #tar} of files given as bytes. */
+  static byte[] tarBytes(Map<String, byte[]> files) {
     ByteArrayOutputStream out = new ByteArrayOutputStream();
     try (TarArchiveOutputStream tar = new TarArchiveOutputStream(out)) {
-      for (Map.Entry<String, String> file : new TreeMap<>(files).entrySet()) {
-        byte[] content = file.getValue().getBytes(StandardCharsets.UTF_8);
+      for (Map.Entry<String, byte[]> file : new TreeMap<>(files).entrySet()) {
+        byte[] content = file.getValue();
         TarArchiveEntry entry = new TarArchiveEntry(file.getKey(), true);
         entry.setSize(content.length);
         entry.setModTime(new Date(0));

@@ -1,0 +1,17 @@
+{
+  "name": "@routes/qits-landing",
+  "versions": [
+    {
+      "name": "@routes/qits-landing",
+      "version": "2026.1109.73025",
+      "fileCount": 5,
+      "totalBytes": 3038,
+      "publishedAt": "2026-01-01T00:00:00Z",
+      "metadata": {
+        "content.hash": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "git.commit.hash": "ffffffffffffffffffffffffffffffffffffffff",
+        "git.repository.name": "qits-landing-app"
+      }
+    }
+  ]
+}

@@ -1,0 +1,81 @@
+{
+  "routes": [
+    {
+      "path": "",
+      "fullPath": "",
+      "children": [
+        {
+          "path": "",
+          "fullPath": "",
+          "redirectTo": "projects"
+        },
+        {
+          "path": "projects",
+          "fullPath": "projects"
+        },
+        {
+          "path": "projects/:slug/repositories",
+          "fullPath": "projects/:slug/repositories"
+        },
+        {
+          "path": "projects/:slug/workspaces",
+          "fullPath": "projects/:slug/workspaces",
+          "redirectTo": "projects/:slug/agents"
+        },
+        {
+          "path": "**",
+          "fullPath": "**"
+        }
+      ]
+    }
+  ],
+  "freezes": [
+    {
+      "file": "src/app/layout/page-layout/page-layout.browser.spec.ts/slots.html",
+      "spec": "src/app/layout/page-layout/page-layout.browser.spec.ts",
+      "test": "PageLayoutComponent (screenshots) > fills every slot",
+      "name": "slots",
+      "route": null,
+      "records": []
+    },
+    {
+      "file": "src/app/routes/projects/[slug]/repositories/project-repositories.page.browser.spec.ts/error.html",
+      "spec": "src/app/routes/projects/[slug]/repositories/project-repositories.page.browser.spec.ts",
+      "test": "ProjectRepositoriesPage (screenshots) > marks the page as loading, then as failed to load",
+      "name": "error",
+      "route": "projects/:slug/repositories",
+      "records": [
+        {
+          "provider": "qits-projects-service",
+          "state": "a project exists",
+          "operationId": "listProjects"
+        }
+      ]
+    },
+    {
+      "file": "src/app/routes/projects/[slug]/repositories/project-repositories.page.browser.spec.ts/loaded.html",
+      "spec": "src/app/routes/projects/[slug]/repositories/project-repositories.page.browser.spec.ts",
+      "test": "ProjectRepositoriesPage (screenshots) > lists the project's repositories",
+      "name": "loaded",
+      "route": "projects/:slug/repositories",
+      "records": [
+        {
+          "provider": "qits-projects-service",
+          "state": "a project exists",
+          "operationId": "listProjects"
+        },
+        {
+          "provider": "qits-projects-service",
+          "state": "a project with repositories",
+          "operationId": "listProjectRepositories"
+        }
+      ]
+    }
+  ],
+  "byRoute": {
+    "projects/:slug/repositories": [
+      "src/app/routes/projects/[slug]/repositories/project-repositories.page.browser.spec.ts/error.html",
+      "src/app/routes/projects/[slug]/repositories/project-repositories.page.browser.spec.ts/loaded.html"
+    ]
+  }
+}
