@@ -38,7 +38,9 @@ import org.junit.jupiter.api.extension.ExtendWith;
  * <p><b>The pinned pacts</b> are in {@code service/pom.xml}: qits-docs-service's (its {@code
  * DocsUpstream} reads of the docs sites), qits-ci-service's ({@code HttpArtifactPresence}'s
  * newest-content-hash read of a release), qits-bootstrap-cli's, qits-maintenance-service's,
- * qits-orchestrator-service's (the scheduled GC) and qits-platform-access-cli's. {@link
+ * qits-orchestrator-service's (the scheduled GC), qits-platform-access-cli's,
+ * qits-deployments-service's and qits-landing-app's (the UI builder's reads of the {@code
+ * @routes/qits-landing} bundle, qits-1951). {@link
  * ClasspathPactLoader#REQUIRED} is true, so a classpath that lost them fails rather than verifying
  * nothing. A newly published consumer pact against this provider is pinned there the same way.
  *

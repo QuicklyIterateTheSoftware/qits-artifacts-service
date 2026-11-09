@@ -134,6 +134,7 @@
         <qits.orchestrator-service-pacts-qits-artifacts-service.version>2026.1019.92500</qits.orchestrator-service-pacts-qits-artifacts-service.version>
         <qits.platform-access-monorepo-pacts-qits-artifacts-service.version>2026.1109.54009</qits.platform-access-monorepo-pacts-qits-artifacts-service.version>
         <qits.deployments-service-pacts-qits-artifacts-service.version>2026.1107.180656</qits.deployments-service-pacts-qits-artifacts-service.version>
+        <qits.landing-app-pacts-qits-artifacts-service.version>2026.1109.110308</qits.landing-app-pacts-qits-artifacts-service.version>
         <!-- THE PROVIDERS' GOLDEN MASTERS this service's OWN consumer pacts read (contracts/consumer,
              qits-1149): what each pin source and the idp record for their provider states. Test
              scope, read off the classpath by ProviderGoldenMasters. Moved by qits-maintenance like
@@ -374,6 +375,13 @@
                 <groupId>${project.groupId}</groupId>
                 <artifactId>qits-deployments-service-pacts-qits-artifacts-service</artifactId>
                 <version>${qits.deployments-service-pacts-qits-artifacts-service.version}</version>
+            </dependency>
+            <dependency>
+                <!-- Test scope at every declaration site: a consumer's pact, verified by
+                     ConsumerPactVerificationTest. -->
+                <groupId>${project.groupId}</groupId>
+                <artifactId>qits-landing-app-pacts-qits-artifacts-service</artifactId>
+                <version>${qits.landing-app-pacts-qits-artifacts-service.version}</version>
             </dependency>
             <dependency>
                 <!-- Test scope at every declaration site: recordings a test reads, never code. -->
