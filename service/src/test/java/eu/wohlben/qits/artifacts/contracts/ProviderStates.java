@@ -76,6 +76,12 @@ public class ProviderStates {
   public static final String A_CONTENT_HASH = "a content hash recorded for the coordinate";
   public static final String A_STORE_WITH_CONTENT = "a registry store with content";
   public static final String UNPINNED_IDENTITIES = "a registry with unpinned identities";
+  /**
+   * The {@code %test} profile points every one of the five live pin urls at {@code localhost:1}, so
+   * a plan read with no supplied pins — the {@code GET}, never the {@code POST}'s twin — finds every
+   * source unreachable and every pin-dependent type refuses.
+   */
+  public static final String PIN_SOURCES_SILENT = "a registry whose pin sources do not answer";
   public static final String A_MAVEN_ARTIFACT = "a maven artifact published at a version";
   public static final String NO_MAVEN_ARTIFACT = "no maven artifact published at the version";
   public static final String AN_NPM_PACKAGE = "an npm package published at a version";
@@ -389,6 +395,7 @@ public class ProviderStates {
     states.put(A_CONTENT_HASH, this::aContentHash);
     states.put(A_STORE_WITH_CONTENT, this::aStoreWithContent);
     states.put(UNPINNED_IDENTITIES, this::unpinnedIdentities);
+    states.put(PIN_SOURCES_SILENT, this::pinSourcesSilent);
     states.put(A_MAVEN_ARTIFACT, this::aMavenArtifact);
     states.put(NO_MAVEN_ARTIFACT, this::noMavenArtifact);
     states.put(AN_NPM_PACKAGE, this::anNpmPackage);
@@ -825,6 +832,17 @@ public class ProviderStates {
    * grace window, so a plan counts them and a sweep withholds them: nothing is deleted.
    */
   private Setup unpinnedIdentities() {
+    seedTwoDaemonVersions();
+    return new Setup(new TreeMap<>(), List.of());
+  }
+
+  /**
+   * Seeded the same as {@link #unpinnedIdentities()} — the point is not what the census finds, it is
+   * that nothing gets to plan against it. The {@code %test} pin urls all name {@code localhost:1}, so
+   * {@code GET /gc/plan}'s own read of live pins answers from no source at all and every
+   * pin-dependent type refuses with "live pins unavailable".
+   */
+  private Setup pinSourcesSilent() {
     seedTwoDaemonVersions();
     return new Setup(new TreeMap<>(), List.of());
   }

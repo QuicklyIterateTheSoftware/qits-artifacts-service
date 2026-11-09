@@ -261,6 +261,11 @@ class ConsumerPactVerificationTest {
     return states.params(ProviderStates.UNPINNED_IDENTITIES);
   }
 
+  @State(ProviderStates.PIN_SOURCES_SILENT)
+  Map<String, String> pinSourcesSilent() {
+    return states.params(ProviderStates.PIN_SOURCES_SILENT);
+  }
+
   @State(ProviderStates.A_MAVEN_ARTIFACT)
   Map<String, String> aMavenArtifact() {
     return states.params(ProviderStates.A_MAVEN_ARTIFACT);
