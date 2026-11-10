@@ -134,7 +134,7 @@
         <qits.orchestrator-service-pacts-qits-artifacts-service.version>2026.1019.92500</qits.orchestrator-service-pacts-qits-artifacts-service.version>
         <qits.platform-access-monorepo-pacts-qits-artifacts-service.version>2026.1109.54009</qits.platform-access-monorepo-pacts-qits-artifacts-service.version>
         <qits.deployments-service-pacts-qits-artifacts-service.version>2026.1107.180656</qits.deployments-service-pacts-qits-artifacts-service.version>
-        <qits.landing-app-pacts-qits-artifacts-service.version>2026.1109.180418</qits.landing-app-pacts-qits-artifacts-service.version>
+        <qits.landing-app-pacts-qits-artifacts-service.version>2026.1110.23733</qits.landing-app-pacts-qits-artifacts-service.version>
         <!-- THE PROVIDERS' GOLDEN MASTERS this service's OWN consumer pacts read (contracts/consumer,
              qits-1149): what each pin source and the idp record for their provider states. Test
              scope, read off the classpath by ProviderGoldenMasters. Moved by qits-maintenance like
@@ -142,8 +142,8 @@
         <qits.deployments-golden-masters.version>2026.1109.191811</qits.deployments-golden-masters.version>
         <qits.ci-golden-masters.version>2026.1109.132507</qits.ci-golden-masters.version>
         <qits.maintenance-golden-masters.version>2026.1108.232519</qits.maintenance-golden-masters.version>
-        <qits.workspaces-golden-masters.version>2026.1108.230857</qits.workspaces-golden-masters.version>
-        <qits.projects-golden-masters.version>2026.1109.121314</qits.projects-golden-masters.version>
+        <qits.workspaces-golden-masters.version>2026.1109.230415</qits.workspaces-golden-masters.version>
+        <qits.projects-golden-masters.version>2026.1110.31824</qits.projects-golden-masters.version>
         <qits.idp-golden-masters.version>2026.1109.13349</qits.idp-golden-masters.version>
         <qits.maven.repository.url>https://registry.qits.wohlben.eu/artifacts/maven/maven</qits.maven.repository.url>
         <maven.compiler.release>25</maven.compiler.release>
