@@ -782,7 +782,7 @@
           "path": "/artifacts/docs/docs/{site}/-/{version}/{path}",
           "status": 200,
           "file": "a-published-routes-bundle-with-kinds-and-viewports/getDocsFile.json",
-          "headers": {
+          "responseHeaders": {
             "Content-Length": "4099",
             "Content-Type": "application/json",
             "ETag": "\"c848d8a67feb1d987aba97056c60db53ef513ebb5730f30214be31e9b327e10c\""
