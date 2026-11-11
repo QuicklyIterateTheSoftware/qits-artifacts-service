@@ -82,23 +82,7 @@ class ConsumerPactVerificationTest {
     }
   }
 
-  /**
-   * qits-landing-app 2026.1110.23733 (qits-2014) bound its ER-diagram read's Markdown body by Pact's
-   * content-type matcher, which sniffs Markdown as {@code text/plain} whatever the docs store's
-   * {@code Content-Type} says; the next landing release binds the header only.
-   */
-  private static final String MARKDOWN_BODY_SNIFFED =
-      "the body is bound by a content-type matcher that sniffs Markdown as text/plain; fixed in"
-          + " the landing release after 2026.1110.23733 (qits-2014)";
-
-  static final List<KnownWrong> KNOWN_WRONG =
-      List.of(
-          new KnownWrong(
-              "qits-landing-app",
-              "2026.1110.23733",
-              "show-entity: getDocsFile",
-              ProviderStates.CHANGELOGS,
-              MARKDOWN_BODY_SNIFFED));
+  static final List<KnownWrong> KNOWN_WRONG = List.of();
 
   @Inject ProviderStates states;
 
