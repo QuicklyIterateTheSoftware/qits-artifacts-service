@@ -1,0 +1,29 @@
+{
+  "formatVersion": 1,
+  "provider": "qits-projects",
+  "states": [
+    {
+      "name": "a project exists",
+      "slug": "a-project-exists",
+      "params": {
+        "projectSlug": "qits"
+      },
+      "dependsOn": [],
+      "operations": [
+        {
+          "operationId": "listProjects",
+          "method": "GET",
+          "path": "/projects/api/projects",
+          "status": 200,
+          "file": "a-project-exists/listProjects.json",
+          "frozen": {
+            "ids": [],
+            "instants": [],
+            "strings": [],
+            "listFilteredTo": "$.entries"
+          }
+        }
+      ]
+    }
+  ]
+}

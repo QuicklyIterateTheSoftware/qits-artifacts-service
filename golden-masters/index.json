@@ -147,7 +147,7 @@
           "method": "GET",
           "path": "/artifacts/daemons/{daemon}/{version}",
           "status": 200,
-          "headers": {
+          "responseHeaders": {
             "Content-Length": "24"
           },
           "frozen": {
@@ -162,7 +162,7 @@
           "method": "HEAD",
           "path": "/artifacts/daemons/{daemon}/{version}",
           "status": 200,
-          "headers": {
+          "responseHeaders": {
             "Content-Length": "24",
             "Docker-Content-Digest": "sha256:6caecc97403739b2273c00a43c649e5efdebddde20a0ed27ed4fe356a1344aa4",
             "ETag": "\"6caecc97403739b2273c00a43c649e5efdebddde20a0ed27ed4fe356a1344aa4\""
@@ -293,7 +293,7 @@
           "method": "GET",
           "path": "/artifacts/maven/maven/{groupPath}/{artifact}/{version}/{artifact}-{version}.pom",
           "status": 200,
-          "headers": {
+          "responseHeaders": {
             "Content-Length": "206"
           },
           "frozen": {
@@ -308,7 +308,7 @@
           "method": "GET",
           "path": "/artifacts/maven/maven/{groupPath}/{artifact}/maven-metadata.xml",
           "status": 200,
-          "headers": {
+          "responseHeaders": {
             "Content-Type": "application/xml; charset=utf-8"
           },
           "frozen": {
@@ -337,8 +337,143 @@
           "method": "GET",
           "path": "/artifacts/maven/maven/{groupPath}/{artifact}/{version}/{artifact}-{version}.jar",
           "status": 200,
-          "headers": {
+          "responseHeaders": {
             "Content-Length": "22"
+          },
+          "frozen": {
+            "ids": [],
+            "instants": [],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        }
+      ]
+    },
+    {
+      "name": "a published contracts bundle a dependency points into",
+      "slug": "a-published-contracts-bundle-a-dependency-points-into",
+      "params": {
+        "path": "golden-masters/index.json",
+        "site": "@contracts/qits-projects",
+        "version": "2100.1.0"
+      },
+      "dependsOn": [],
+      "operations": [
+        {
+          "operationId": "getDocsFile",
+          "method": "GET",
+          "path": "/artifacts/docs/docs/{site}/-/{version}/{path}",
+          "status": 200,
+          "file": "a-published-contracts-bundle-a-dependency-points-into/getDocsFile.json",
+          "responseHeaders": {
+            "Content-Length": "632",
+            "Content-Type": "application/json",
+            "ETag": "\"7f21a850ef3c52123e122c77997e8b253941987e0d5b3bc0e7869afa193f1a4e\""
+          },
+          "frozen": {
+            "ids": [],
+            "instants": [],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        },
+        {
+          "operationId": "listDocsVersions",
+          "method": "GET",
+          "path": "/artifacts/docs/docs/{site}",
+          "status": 200,
+          "file": "a-published-contracts-bundle-a-dependency-points-into/listDocsVersions.json",
+          "frozen": {
+            "ids": [],
+            "instants": [
+              "$.versions[*].publishedAt"
+            ],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        }
+      ]
+    },
+    {
+      "name": "a published contracts bundle with a golden-master index",
+      "slug": "a-published-contracts-bundle-with-a-golden-master-index",
+      "params": {
+        "path": "golden-masters/index.json",
+        "site": "@contracts/qits-githost",
+        "version": "2100.1.0"
+      },
+      "dependsOn": [],
+      "operations": [
+        {
+          "operationId": "getDocsFile",
+          "method": "GET",
+          "path": "/artifacts/docs/docs/{site}/-/{version}/{path}",
+          "status": 200,
+          "file": "a-published-contracts-bundle-with-a-golden-master-index/getDocsFile.json",
+          "responseHeaders": {
+            "Content-Length": "1553",
+            "Content-Type": "application/json",
+            "ETag": "\"4c9ba61be59deeb50ddda5dc41375c4d13699fdf81cb75d7f52e746df415732d\""
+          },
+          "frozen": {
+            "ids": [],
+            "instants": [],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        },
+        {
+          "operationId": "listDocsSites",
+          "method": "GET",
+          "path": "/artifacts/docs/docs",
+          "status": 200,
+          "file": "a-published-contracts-bundle-with-a-golden-master-index/listDocsSites.json",
+          "frozen": {
+            "ids": [],
+            "instants": [
+              "$.sites[*].latestPublishedAt"
+            ],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        },
+        {
+          "operationId": "listDocsVersions",
+          "method": "GET",
+          "path": "/artifacts/docs/docs/{site}",
+          "status": 200,
+          "file": "a-published-contracts-bundle-with-a-golden-master-index/listDocsVersions.json",
+          "frozen": {
+            "ids": [],
+            "instants": [
+              "$.versions[*].publishedAt"
+            ],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        }
+      ]
+    },
+    {
+      "name": "a published contracts bundle with a projection entity",
+      "slug": "a-published-contracts-bundle-with-a-projection-entity",
+      "params": {
+        "path": "entities.json",
+        "site": "@contracts/qits-githost",
+        "version": "2100.1.0"
+      },
+      "dependsOn": [],
+      "operations": [
+        {
+          "operationId": "getDocsFile",
+          "method": "GET",
+          "path": "/artifacts/docs/docs/{site}/-/{version}/{path}",
+          "status": 200,
+          "file": "a-published-contracts-bundle-with-a-projection-entity/getDocsFile.json",
+          "responseHeaders": {
+            "Content-Length": "1085",
+            "Content-Type": "application/json",
+            "ETag": "\"0858a8db63e31b78488252b80d73685ae9d255f405ef941cd2a392569e80f25c\""
           },
           "frozen": {
             "ids": [],
@@ -365,7 +500,7 @@
           "path": "/artifacts/docs/docs/{site}/-/{version}/{path}",
           "status": 200,
           "file": "a-published-contracts-bundle-with-an-entity-map/getDocsFile.json",
-          "headers": {
+          "responseHeaders": {
             "Content-Length": "2754",
             "Content-Type": "application/json",
             "ETag": "\"911effd3e103c734b9973aeccf2c658ffdbd0af17a9163835aff6e97cfe5344e\""
@@ -424,7 +559,7 @@
           "method": "GET",
           "path": "/artifacts/docs/docs/{site}/-/{version}/{path}",
           "status": 200,
-          "headers": {
+          "responseHeaders": {
             "Content-Length": "44",
             "Content-Type": "text/html; charset=utf-8",
             "ETag": "\"b5b5c49e35d128ab5d50b2413c6bbddd2d77feeb6f6ea387d6ed9e4e12ad263b\""
@@ -513,7 +648,7 @@
           "path": "/artifacts/docs/docs/{site}/-/{version}/{path}",
           "status": 200,
           "file": "a-published-routes-bundle/getDocsFile.json",
-          "headers": {
+          "responseHeaders": {
             "Content-Length": "1886",
             "Content-Type": "application/json",
             "ETag": "\"d2d7eb8e88efbce21767fa4d40679724d7de53212bcaaec39a4bc2b904e9c451\""
@@ -587,7 +722,7 @@
           "method": "GET",
           "path": "/artifacts/docs/docs/{site}/-/{version}/{path}",
           "status": 200,
-          "headers": {
+          "responseHeaders": {
             "Content-Length": "10",
             "Content-Type": "font/woff2",
             "ETag": "\"6b724e7b0530e208fd6ba12c9242a49bfbe6a93dc289a1f45ac4bd81621456ca\""
@@ -616,10 +751,11 @@
           "method": "GET",
           "path": "/artifacts/docs/docs/{site}/-/{version}/{path}",
           "status": 200,
-          "headers": {
-            "Content-Length": "387",
+          "file": "a-published-routes-bundle-freeze/getDocsFile.html",
+          "responseHeaders": {
+            "Content-Length": "403",
             "Content-Type": "text/html; charset=utf-8",
-            "ETag": "\"de24c510694f3ed4c359515c101ee3b466a3295547218c3338c4c5910a9366d0\""
+            "ETag": "\"d855a4aa7687d464ef470a9d9e105cc0f2c4e35ddf0691b448129ed638abce65\""
           },
           "frozen": {
             "ids": [],
@@ -1032,7 +1168,7 @@
           "method": "GET",
           "path": "/artifacts/docs/docs/@changelog/{repository}/-/{version}/CHANGELOG.md",
           "status": 200,
-          "headers": {
+          "responseHeaders": {
             "Content-Length": "46",
             "Content-Type": "text/markdown; charset=utf-8",
             "ETag": "\"22967a669d2438a98534af7846e3cbb02c06bf2b2281ba29e7d9c8deed054f3d\""
@@ -1105,7 +1241,7 @@
           "method": "GET",
           "path": "/v2/{name}/manifests/{tag}",
           "status": 200,
-          "headers": {
+          "responseHeaders": {
             "Content-Type": "application/vnd.oci.image.manifest.v1+json",
             "Docker-Content-Digest": "sha256:1b91a3dfff59dad5c1d9c7e557ca94e67e96aabad34050385263cffe926ed7a2"
           },
@@ -1121,7 +1257,7 @@
           "method": "HEAD",
           "path": "/v2/{name}/manifests/{tag}",
           "status": 200,
-          "headers": {
+          "responseHeaders": {
             "Docker-Content-Digest": "sha256:1b91a3dfff59dad5c1d9c7e557ca94e67e96aabad34050385263cffe926ed7a2"
           },
           "frozen": {
@@ -1182,7 +1318,7 @@
           "method": "HEAD",
           "path": "/artifacts/npm/npm/{package}/-/{tarball}",
           "status": 200,
-          "headers": {
+          "responseHeaders": {
             "Content-Length": "2071"
           },
           "frozen": {
@@ -1226,7 +1362,7 @@
           "path": "/artifacts/sboms/{packageType}/{packageName}/-/{version}",
           "status": 200,
           "file": "an-sbom-published-for-the-coordinate/getSbom.json",
-          "headers": {
+          "responseHeaders": {
             "Content-Type": "application/vnd.cyclonedx+json; version=1.6",
             "Docker-Content-Digest": "sha256:d041a852de37bb7da84b49234b59978aa9984d0706987af57d92b5577ff2d386",
             "ETag": "\"d041a852de37bb7da84b49234b59978aa9984d0706987af57d92b5577ff2d386\""
@@ -1243,7 +1379,7 @@
           "method": "HEAD",
           "path": "/artifacts/sboms/{packageType}/{packageName}/-/{version}",
           "status": 200,
-          "headers": {
+          "responseHeaders": {
             "Content-Length": "921",
             "Docker-Content-Digest": "sha256:d041a852de37bb7da84b49234b59978aa9984d0706987af57d92b5577ff2d386",
             "ETag": "\"d041a852de37bb7da84b49234b59978aa9984d0706987af57d92b5577ff2d386\""
@@ -1749,7 +1885,7 @@
           "method": "GET",
           "path": "/artifacts/daemons/{daemon}/{version}",
           "status": 200,
-          "headers": {
+          "responseHeaders": {
             "Content-Length": "34"
           },
           "frozen": {
@@ -1764,7 +1900,7 @@
           "method": "HEAD",
           "path": "/artifacts/daemons/{daemon}/{version}",
           "status": 200,
-          "headers": {
+          "responseHeaders": {
             "Content-Length": "34",
             "Docker-Content-Digest": "sha256:a5d7dd70867a55a0ff5a50214d5688e5598b07268b2597a651dc7b1de1ba371e",
             "ETag": "\"a5d7dd70867a55a0ff5a50214d5688e5598b07268b2597a651dc7b1de1ba371e\""

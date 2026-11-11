@@ -1,0 +1,17 @@
+{
+  "name": "@contracts/qits-githost",
+  "versions": [
+    {
+      "name": "@contracts/qits-githost",
+      "version": "2100.1.0",
+      "fileCount": 5,
+      "totalBytes": 2909,
+      "publishedAt": "2026-01-01T00:00:00Z",
+      "metadata": {
+        "content.hash": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "git.commit.hash": "9999999999999999999999999999999999999999",
+        "git.repository.name": "qits-githost-service"
+      }
+    }
+  ]
+}

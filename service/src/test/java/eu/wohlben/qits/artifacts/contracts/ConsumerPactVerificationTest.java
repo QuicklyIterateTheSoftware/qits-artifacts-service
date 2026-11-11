@@ -258,6 +258,21 @@ class ConsumerPactVerificationTest {
     return states.params(ProviderStates.A_CONTRACTS_BUNDLE);
   }
 
+  @State(ProviderStates.A_CONTRACTS_BUNDLE_WITH_AN_INDEX)
+  Map<String, String> aContractsBundleWithAnIndex() {
+    return states.params(ProviderStates.A_CONTRACTS_BUNDLE_WITH_AN_INDEX);
+  }
+
+  @State(ProviderStates.A_CONTRACTS_BUNDLE_A_DEPENDENCY_POINTS_INTO)
+  Map<String, String> aContractsBundleADependencyPointsInto() {
+    return states.params(ProviderStates.A_CONTRACTS_BUNDLE_A_DEPENDENCY_POINTS_INTO);
+  }
+
+  @State(ProviderStates.A_CONTRACTS_BUNDLE_WITH_A_PROJECTION)
+  Map<String, String> aContractsBundleWithAProjection() {
+    return states.params(ProviderStates.A_CONTRACTS_BUNDLE_WITH_A_PROJECTION);
+  }
+
   @State(ProviderStates.CHANGELOGS)
   Map<String, String> changelogs() {
     return states.params(ProviderStates.CHANGELOGS);

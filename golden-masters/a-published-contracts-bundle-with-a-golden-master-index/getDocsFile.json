@@ -1,0 +1,62 @@
+{
+  "formatVersion": 1,
+  "provider": "qits-githost",
+  "states": [
+    {
+      "name": "a git project exists",
+      "slug": "a-git-project-exists",
+      "params": {
+        "project": "qits"
+      },
+      "dependsOn": [],
+      "operations": [
+        {
+          "operationId": "listGitProjects",
+          "method": "GET",
+          "path": "/githost/api/projects",
+          "status": 200,
+          "file": "a-git-project-exists/listGitProjects.json",
+          "frozen": {
+            "ids": [],
+            "instants": [],
+            "strings": [],
+            "listFilteredTo": "$.projects"
+          }
+        }
+      ]
+    },
+    {
+      "name": "a git project with a repository",
+      "slug": "a-git-project-with-a-repository",
+      "params": {
+        "project": "qits",
+        "repository": "qits-githost-service"
+      },
+      "dependsOn": [
+        "a git project exists",
+        {
+          "provider": "qits-projects",
+          "state": "a project exists"
+        }
+      ],
+      "operations": [
+        {
+          "operationId": "getGitRepository",
+          "method": "GET",
+          "path": "/githost/api/projects/{project}/repositories/{repository}",
+          "status": 200,
+          "file": "a-git-project-with-a-repository/getGitRepository.json",
+          "responseHeaders": {
+            "Content-Type": "application/json"
+          },
+          "frozen": {
+            "ids": [],
+            "instants": [],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        }
+      ]
+    }
+  ]
+}

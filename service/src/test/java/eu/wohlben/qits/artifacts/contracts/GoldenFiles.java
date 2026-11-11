@@ -71,7 +71,11 @@ public final class GoldenFiles {
     }
   }
 
-  /** The non-throwing form: {@code null} when the golden matches (or was written), else why not. */
+  /**
+   * The non-throwing form: {@code null} when the golden matches (or was written), else why not.
+   * Any text file goes through it — a {@code .json} recording and a verbatim {@code .html} one
+   * alike (qits-2041) — written and read as UTF-8, so a text recording is compared byte for byte.
+   */
   public static String check(
       Path golden, String actual, boolean update, UnaryOperator<String> comparable) {
     try {

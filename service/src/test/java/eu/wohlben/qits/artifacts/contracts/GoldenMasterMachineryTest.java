@@ -6,6 +6,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 import java.util.UUID;
@@ -163,5 +164,30 @@ class GoldenMasterMachineryTest {
     assertEquals(
         Map.of("s", Map.of("eventId", f(1))),
         GoldenMasterRecordingTest.committedParams(dir.resolve("index.json")));
+  }
+
+  // --- recorded text answers (qits-2041) ----------------------------------------------------------
+
+  @Test
+  void theStaleSweepSeesRecordedHtmlAsWellAsJson(@TempDir Path dir) throws Exception {
+    Files.createDirectories(dir.resolve("s"));
+    Files.writeString(dir.resolve("index.json"), "{}");
+    Files.writeString(dir.resolve("s/getDocsFile.html"), "<!doctype html>\n");
+    Files.writeString(dir.resolve("s/listDocsSites.json"), "{}");
+    Files.writeString(dir.resolve("s/notes.txt"), "not a recording");
+    assertEquals(
+        List.of("index.json", "s/getDocsFile.html", "s/listDocsSites.json"),
+        GoldenMasterRecordingTest.committedRecordings(dir));
+  }
+
+  @Test
+  void aTextAnswerIsRecordedUnderItsOwnExtension() {
+    GoldenMasterRecordingTest.Interaction html =
+        GoldenMasterRecordingTest.op("s", "getDocsFile", "GET", "/p", 200).textAnswer("html").build();
+    GoldenMasterRecordingTest.Interaction json =
+        GoldenMasterRecordingTest.op("s", "getDocsFile", "GET", "/p", 200).build();
+    assertEquals("getDocsFile.html", html.answerFile());
+    assertEquals(true, html.recordsAnswer());
+    assertEquals("getDocsFile.json", json.answerFile());
   }
 }
