@@ -71,6 +71,10 @@ public class ProviderStates {
   public static final String A_ROUTES_BUNDLE = "a published routes bundle";
   public static final String A_ROUTES_BUNDLE_FREEZE = "a published routes bundle freeze";
   public static final String A_ROUTES_BUNDLE_FONT = "a published routes bundle font";
+  // qits-2059: the routes bundle as a landing release carrying qits-2047 writes it — every route
+  // freeze categorised by kind and viewport — for the UI builder's kind chips and viewport switch.
+  public static final String A_ROUTES_BUNDLE_WITH_VIEWPORTS =
+      "a published routes bundle with kinds and viewports";
   // qits-1950: qits-landing-app reads a contracts bundle's entity map. The routes bundle is
   // published alongside it (the same publish {@link #aRoutesBundle} does) so listDocsSites has
   // two sites to answer with, the way a shared docs repository really does.
@@ -286,6 +290,97 @@ public class ProviderStates {
           Map.of(
               ROUTES_MANIFEST, utf8(ROUTES_MANIFEST_JSON),
               ROUTES_FREEZE, utf8(freezeHtml(ROUTES_FREEZE, "qits-landing-app")),
+              ROUTES_ERROR_FREEZE, utf8(freezeHtml(ROUTES_ERROR_FREEZE, "Could not load")),
+              ROUTES_COMPONENT_FREEZE, utf8(freezeHtml(ROUTES_COMPONENT_FREEZE, "Slots")),
+              ROUTES_FONT, ROUTES_FONT_BYTES));
+
+  // --- the routes bundle with kinds and viewports (qits-2059) ----------------------------------
+
+  /** The landing release that carries qits-2047's kind and viewport UI. */
+  static final String ROUTES_VIEWPORTS_VERSION = "2026.1111.50732";
+
+  static final String ROUTES_LOADED_PHONE_FREEZE = ROUTES_FREEZE_SPEC + "/loaded-phone.html";
+  static final String ROUTES_LOADED_TABLET_FREEZE = ROUTES_FREEZE_SPEC + "/loaded-tablet.html";
+  static final String ROUTES_LOADED_DESKTOP_FREEZE = ROUTES_FREEZE_SPEC + "/loaded-desktop.html";
+  static final String ROUTES_EMPTY_DESKTOP_FREEZE = ROUTES_FREEZE_SPEC + "/empty-desktop.html";
+
+  /**
+   * {@link #ROUTES_MANIFEST_JSON}'s route tree, with every route freeze carrying its {@code kind}
+   * ({@code DATA}, {@code NO_DATA}, {@code ERROR}) and its {@code viewport} ({@code PHONE}, {@code
+   * TABLET}, {@code DESKTOP}, or null for a freeze taken at the configured size), in the field
+   * order the live landing manifest writes. The component freeze carries neither.
+   */
+  static final String ROUTES_VIEWPORTS_MANIFEST_JSON =
+      """
+      {"routes":[{"path":"","fullPath":"","children":[\
+      {"path":"","fullPath":"","redirectTo":"projects"},\
+      {"path":"projects","fullPath":"projects"},\
+      {"path":"projects/:slug/repositories","fullPath":"projects/:slug/repositories"},\
+      {"path":"projects/:slug/workspaces","fullPath":"projects/:slug/workspaces",\
+      "redirectTo":"projects/:slug/agents"},\
+      {"path":"**","fullPath":"**"}]}],\
+      "freezes":[\
+      {"file":"%1$s","spec":"%2$s",\
+      "test":"PageLayoutComponent (screenshots) > fills every slot","name":"slots","route":null,\
+      "records":[]},\
+      {"file":"%3$s","spec":"%4$s",\
+      "test":"ProjectRepositoriesPage (screenshots) > says the project has no repositories",\
+      "name":"empty","kind":"NO_DATA","viewport":"DESKTOP","route":"projects/:slug/repositories",\
+      "records":[{"provider":"qits-projects-service","state":"a project exists",\
+      "operationId":"listProjects"},\
+      {"provider":"qits-projects-service","state":"a project without repositories",\
+      "operationId":"listProjectRepositories"}]},\
+      {"file":"%5$s","spec":"%4$s",\
+      "test":"ProjectRepositoriesPage (screenshots) > marks the page as loading, then as failed to load",\
+      "name":"error","kind":"ERROR","viewport":null,"route":"projects/:slug/repositories",\
+      "records":[{"provider":"qits-projects-service","state":"a project exists",\
+      "operationId":"listProjects"}]},\
+      {"file":"%6$s","spec":"%4$s",\
+      "test":"ProjectRepositoriesPage (screenshots) > lists the project's repositories",\
+      "name":"loaded","kind":"DATA","viewport":"PHONE","route":"projects/:slug/repositories",\
+      "records":[{"provider":"qits-projects-service","state":"a project exists",\
+      "operationId":"listProjects"},\
+      {"provider":"qits-projects-service","state":"a project with repositories",\
+      "operationId":"listProjectRepositories"}]},\
+      {"file":"%7$s","spec":"%4$s",\
+      "test":"ProjectRepositoriesPage (screenshots) > lists the project's repositories",\
+      "name":"loaded","kind":"DATA","viewport":"TABLET","route":"projects/:slug/repositories",\
+      "records":[{"provider":"qits-projects-service","state":"a project exists",\
+      "operationId":"listProjects"},\
+      {"provider":"qits-projects-service","state":"a project with repositories",\
+      "operationId":"listProjectRepositories"}]},\
+      {"file":"%8$s","spec":"%4$s",\
+      "test":"ProjectRepositoriesPage (screenshots) > lists the project's repositories",\
+      "name":"loaded","kind":"DATA","viewport":"DESKTOP","route":"projects/:slug/repositories",\
+      "records":[{"provider":"qits-projects-service","state":"a project exists",\
+      "operationId":"listProjects"},\
+      {"provider":"qits-projects-service","state":"a project with repositories",\
+      "operationId":"listProjectRepositories"}]}],\
+      "byRoute":{"projects/:slug/repositories":["%3$s","%5$s","%6$s","%7$s","%8$s"]}}
+      """
+          .formatted(
+              ROUTES_COMPONENT_FREEZE,
+              ROUTES_COMPONENT_SPEC,
+              ROUTES_EMPTY_DESKTOP_FREEZE,
+              ROUTES_FREEZE_SPEC,
+              ROUTES_ERROR_FREEZE,
+              ROUTES_LOADED_PHONE_FREEZE,
+              ROUTES_LOADED_TABLET_FREEZE,
+              ROUTES_LOADED_DESKTOP_FREEZE);
+
+  /** The routes bundle with kinds and viewports: the manifest, every freeze it names, the font. */
+  static final byte[] ROUTES_VIEWPORTS_BUNDLE =
+      tarGzBytes(
+          Map.of(
+              ROUTES_MANIFEST, utf8(ROUTES_VIEWPORTS_MANIFEST_JSON),
+              ROUTES_LOADED_PHONE_FREEZE,
+                  utf8(freezeHtml(ROUTES_LOADED_PHONE_FREEZE, "qits-landing-app")),
+              ROUTES_LOADED_TABLET_FREEZE,
+                  utf8(freezeHtml(ROUTES_LOADED_TABLET_FREEZE, "qits-landing-app")),
+              ROUTES_LOADED_DESKTOP_FREEZE,
+                  utf8(freezeHtml(ROUTES_LOADED_DESKTOP_FREEZE, "qits-landing-app")),
+              ROUTES_EMPTY_DESKTOP_FREEZE,
+                  utf8(freezeHtml(ROUTES_EMPTY_DESKTOP_FREEZE, "No repositories")),
               ROUTES_ERROR_FREEZE, utf8(freezeHtml(ROUTES_ERROR_FREEZE, "Could not load")),
               ROUTES_COMPONENT_FREEZE, utf8(freezeHtml(ROUTES_COMPONENT_FREEZE, "Slots")),
               ROUTES_FONT, ROUTES_FONT_BYTES));
@@ -540,6 +635,9 @@ public class ProviderStates {
     states.put(A_ROUTES_BUNDLE, () -> aRoutesBundle(ROUTES_MANIFEST));
     states.put(A_ROUTES_BUNDLE_FREEZE, () -> aRoutesBundle(ROUTES_FREEZE));
     states.put(A_ROUTES_BUNDLE_FONT, () -> aRoutesBundle(ROUTES_FONT));
+    states.put(
+        A_ROUTES_BUNDLE_WITH_VIEWPORTS,
+        () -> aRoutesBundle(ROUTES_VIEWPORTS_VERSION, ROUTES_VIEWPORTS_BUNDLE, ROUTES_MANIFEST));
     states.put(A_CONTRACTS_BUNDLE, this::aContractsBundle);
     states.put(CHANGELOGS, this::changelogs);
     states.put(NO_CHANGELOG, this::noChangelog);
@@ -832,11 +930,20 @@ public class ProviderStates {
    * file of it this state's {@code getDocsFile} reads.
    */
   private Setup aRoutesBundle(String path) {
-    publishDocs(ROUTES_SITE, ROUTES_VERSION, ROUTES_BUNDLE, ROUTES_METADATA);
+    return aRoutesBundle(ROUTES_VERSION, ROUTES_BUNDLE, path);
+  }
+
+  /**
+   * A routes bundle at {@code version} — the site's only (so newest) version — with the landing
+   * app's publish metadata; {@code path} names the one file of it this state's {@code getDocsFile}
+   * reads.
+   */
+  private Setup aRoutesBundle(String version, byte[] bundle, String path) {
+    publishDocs(ROUTES_SITE, version, bundle, ROUTES_METADATA);
     Map<String, String> params = new TreeMap<>();
     params.put("path", path);
     params.put("site", ROUTES_SITE);
-    params.put("version", ROUTES_VERSION);
+    params.put("version", version);
     return new Setup(params, List.of());
   }
 
@@ -1278,6 +1385,9 @@ public class ProviderStates {
   static byte[] tarBytes(Map<String, byte[]> files) {
     ByteArrayOutputStream out = new ByteArrayOutputStream();
     try (TarArchiveOutputStream tar = new TarArchiveOutputStream(out)) {
+      // A path over ustar's 100 bytes gets a PAX header, as the landing app's own tar writes it
+      // (qits-2059's freezes need it); a shorter one is written exactly as before.
+      tar.setLongFileMode(TarArchiveOutputStream.LONGFILE_POSIX);
       for (Map.Entry<String, byte[]> file : new TreeMap<>(files).entrySet()) {
         byte[] content = file.getValue();
         TarArchiveEntry entry = new TarArchiveEntry(file.getKey(), true);

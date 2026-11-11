@@ -381,6 +381,19 @@ class GoldenMasterRecordingTest {
               .raw()
               .headers("Content-Length", "Content-Type", "ETag")
               .build(),
+          // --- the routes bundle with kinds and viewports: qits-landing-app's UI builder
+          // (qits-2059) — the same reads, over a manifest whose route freezes carry kind and
+          // viewport
+          op(ProviderStates.A_ROUTES_BUNDLE_WITH_VIEWPORTS, "listDocsSites", "GET", DOCS_SITES, 200)
+              .filtered("$.sites", "site")
+              .build(),
+          op(ProviderStates.A_ROUTES_BUNDLE_WITH_VIEWPORTS, "listDocsVersions", "GET", DOCS_SITE, 200)
+              .build(),
+          op(ProviderStates.A_ROUTES_BUNDLE_WITH_VIEWPORTS, "getDocsVersion", "GET", DOCS_VERSION, 200)
+              .build(),
+          op(ProviderStates.A_ROUTES_BUNDLE_WITH_VIEWPORTS, "getDocsFile", "GET", DOCS_FILE, 200)
+              .headers("Content-Length", "Content-Type", "ETag")
+              .build(),
           // --- the contracts bundle: qits-landing-app's entity map read (qits-1950) — the state
           // also publishes the routes bundle, so the catalog has two sites to answer with, and
           // listDocsSites is recorded unfiltered (no params.values() of this state's own site name

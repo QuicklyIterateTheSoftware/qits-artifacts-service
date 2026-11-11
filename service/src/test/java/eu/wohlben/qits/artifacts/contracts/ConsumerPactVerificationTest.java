@@ -253,6 +253,11 @@ class ConsumerPactVerificationTest {
     return states.params(ProviderStates.A_ROUTES_BUNDLE_FONT);
   }
 
+  @State(ProviderStates.A_ROUTES_BUNDLE_WITH_VIEWPORTS)
+  Map<String, String> aRoutesBundleWithViewports() {
+    return states.params(ProviderStates.A_ROUTES_BUNDLE_WITH_VIEWPORTS);
+  }
+
   @State(ProviderStates.A_CONTRACTS_BUNDLE)
   Map<String, String> aContractsBundle() {
     return states.params(ProviderStates.A_CONTRACTS_BUNDLE);

@@ -631,6 +631,81 @@
       ]
     },
     {
+      "name": "a published routes bundle with kinds and viewports",
+      "slug": "a-published-routes-bundle-with-kinds-and-viewports",
+      "params": {
+        "path": "manifest.json",
+        "site": "@routes/qits-landing",
+        "version": "2026.1111.50732"
+      },
+      "dependsOn": [],
+      "operations": [
+        {
+          "operationId": "getDocsFile",
+          "method": "GET",
+          "path": "/artifacts/docs/docs/{site}/-/{version}/{path}",
+          "status": 200,
+          "file": "a-published-routes-bundle-with-kinds-and-viewports/getDocsFile.json",
+          "headers": {
+            "Content-Length": "4099",
+            "Content-Type": "application/json",
+            "ETag": "\"c848d8a67feb1d987aba97056c60db53ef513ebb5730f30214be31e9b327e10c\""
+          },
+          "frozen": {
+            "ids": [],
+            "instants": [],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        },
+        {
+          "operationId": "getDocsVersion",
+          "method": "GET",
+          "path": "/artifacts/docs/docs/{site}/-/{version}",
+          "status": 200,
+          "file": "a-published-routes-bundle-with-kinds-and-viewports/getDocsVersion.json",
+          "frozen": {
+            "ids": [],
+            "instants": [
+              "$.publishedAt"
+            ],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        },
+        {
+          "operationId": "listDocsSites",
+          "method": "GET",
+          "path": "/artifacts/docs/docs",
+          "status": 200,
+          "file": "a-published-routes-bundle-with-kinds-and-viewports/listDocsSites.json",
+          "frozen": {
+            "ids": [],
+            "instants": [
+              "$.sites[*].latestPublishedAt"
+            ],
+            "strings": [],
+            "listFilteredTo": "$.sites"
+          }
+        },
+        {
+          "operationId": "listDocsVersions",
+          "method": "GET",
+          "path": "/artifacts/docs/docs/{site}",
+          "status": 200,
+          "file": "a-published-routes-bundle-with-kinds-and-viewports/listDocsVersions.json",
+          "frozen": {
+            "ids": [],
+            "instants": [
+              "$.versions[*].publishedAt"
+            ],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        }
+      ]
+    },
+    {
       "name": "a registry handed a pin it cannot file",
       "slug": "a-registry-handed-a-pin-it-cannot-file",
       "params": {},
