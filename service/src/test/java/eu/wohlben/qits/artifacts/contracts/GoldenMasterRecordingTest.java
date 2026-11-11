@@ -19,6 +19,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Base64;
 import java.util.Collection;
 import java.util.Comparator;
@@ -56,10 +57,13 @@ import org.junit.jupiter.api.Test;
  *   <li>{@code contentType} and {@code body} — the request body of a write that takes one: a JSON
  *       value for a JSON media type, a string for any other text. A binary body (a docs bundle) is
  *       {@code bodyBase64} instead. A write that takes no body records none.
- *   <li>{@code file} — only when the answer is a JSON document. A HEAD, a 404 (plain text) and a
- *       docs file (raw bytes) record no file: the status, and {@code headers}, are the answer.
- *   <li>{@code headers} — the response headers consumers read ({@code Docker-Content-Digest},
- *       {@code ETag}, {@code Content-Type}, {@code Content-Length}).
+ *   <li>{@code file} — when the answer is a JSON document ({@code <operationId>.json}), or a text
+ *       document recorded verbatim ({@code <operationId>.<extension>}, {@link Op#textAnswer}: a
+ *       docs bundle's screenshot freeze, qits-2041). A HEAD, a 404 (plain text) and any other docs
+ *       file (raw bytes) record no file: the status, and {@code responseHeaders}, are the answer.
+ *   <li>{@code responseHeaders} — the response headers consumers read ({@code
+ *       Docker-Content-Digest}, {@code ETag}, {@code Content-Type}, {@code Content-Length}): the key
+ *       every provider's index and the consumers' golden-master reader use (qits-2041).
  *   <li>{@code frozen.volatile} — the paths whose value depends on the whole shared store rather
  *       than on the state (the store figures, the GC counts). The recording holds {@code 0} or
  *       {@code ""} there; a consumer matches them by type, as it does every unfrozen leaf.
@@ -70,7 +74,7 @@ import org.junit.jupiter.api.Test;
  * requestBody}.
  *
  * <p>It <b>compares by default</b> and fails with a unified diff per differing file — including a
- * committed {@code .json} no interaction produces any more. {@code -Dgolden.update=true} (or {@code
+ * committed {@code .json} (or recorded {@code .html}) file no interaction produces any more. {@code -Dgolden.update=true} (or {@code
  * QITS_GOLDEN_UPDATE=true}) rewrites instead, and deletes such stale files; see {@link
  * GoldenFiles}.
  */
@@ -82,6 +86,12 @@ class GoldenMasterRecordingTest {
   /** Declared first: {@link #INTERACTIONS} parses the request bodies with it. */
   private static final ObjectMapper JSON = new ObjectMapper();
   static final String PROVIDER = "qits-artifacts";
+
+  /**
+   * The extensions a recorded answer is written under — what the stale-file sweep looks for: JSON
+   * documents, and the text documents {@link Op#textAnswer} records.
+   */
+  static final Set<String> RECORDED_EXTENSIONS = Set.of("json", "html");
 
   /**
    * One recorded interaction. Build it with {@link #op}.
@@ -110,6 +120,7 @@ class GoldenMasterRecordingTest {
       byte[] binaryBody,
       int status,
       boolean recordsAnswer,
+      String answerExtension,
       List<String> headers,
       String listFilteredTo,
       String filteredOn,
@@ -120,6 +131,11 @@ class GoldenMasterRecordingTest {
 
     boolean sendsBody() {
       return jsonBody != null || textBody != null || binaryBody != null;
+    }
+
+    /** The recorded answer's file name in its state's directory. */
+    String answerFile() {
+      return operationId + "." + (answerExtension == null ? "json" : answerExtension);
     }
   }
 
@@ -136,6 +152,7 @@ class GoldenMasterRecordingTest {
     private String textBody;
     private byte[] binaryBody;
     private boolean recordsAnswer;
+    private String answerExtension;
     private final List<String> headers = new ArrayList<>();
     private String listFilteredTo;
     private String filteredOn;
@@ -183,6 +200,21 @@ class GoldenMasterRecordingTest {
     /** The answer is not a JSON document (raw file bytes): record the status and headers only. */
     Op raw() {
       recordsAnswer = false;
+      answerExtension = null;
+      return this;
+    }
+
+    /**
+     * The answer is a text document, not JSON: record its bytes verbatim, unfrozen, as {@code
+     * <operationId>.<extension>} (qits-2041: a routes bundle's {@code .html} freeze).
+     */
+    Op textAnswer(String extension) {
+      if (!RECORDED_EXTENSIONS.contains(extension) || "json".equals(extension)) {
+        throw new IllegalArgumentException(
+            "A text answer is recorded as one of " + RECORDED_EXTENSIONS + " but json: " + extension);
+      }
+      recordsAnswer = true;
+      answerExtension = extension;
       return this;
     }
 
@@ -231,6 +263,7 @@ class GoldenMasterRecordingTest {
           binaryBody,
           status,
           recordsAnswer,
+          answerExtension,
           List.copyOf(headers),
           listFilteredTo,
           filteredOn,
@@ -373,8 +406,9 @@ class GoldenMasterRecordingTest {
           op(ProviderStates.A_ROUTES_BUNDLE, "getDocsFile", "GET", DOCS_FILE, 200)
               .headers("Content-Length", "Content-Type", "ETag")
               .build(),
+          // the freeze page itself, recorded verbatim (qits-2041): the UI builder reads its links
           op(ProviderStates.A_ROUTES_BUNDLE_FREEZE, "getDocsFile", "GET", DOCS_FILE, 200)
-              .raw()
+              .textAnswer("html")
               .headers("Content-Length", "Content-Type", "ETag")
               .build(),
           op(ProviderStates.A_ROUTES_BUNDLE_FONT, "getDocsFile", "GET", DOCS_FILE, 200)
@@ -402,6 +436,29 @@ class GoldenMasterRecordingTest {
           op(ProviderStates.A_CONTRACTS_BUNDLE, "listDocsSites", "GET", DOCS_SITES, 200).build(),
           op(ProviderStates.A_CONTRACTS_BUNDLE, "listDocsVersions", "GET", DOCS_SITE, 200).build(),
           op(ProviderStates.A_CONTRACTS_BUNDLE, "getDocsFile", "GET", DOCS_FILE, 200)
+              .headers("Content-Length", "Content-Type", "ETag")
+              .build(),
+          // --- two contracts bundles: qits-landing-app's contracts, entity and UI-builder links
+          // (qits-2041). One set-up publishes qits-githost's and qits-projects' bundles beside the
+          // routes bundle; each state reads one file. listDocsSites is unfiltered: three sites.
+          op(ProviderStates.A_CONTRACTS_BUNDLE_WITH_AN_INDEX, "listDocsSites", "GET", DOCS_SITES, 200)
+              .build(),
+          op(ProviderStates.A_CONTRACTS_BUNDLE_WITH_AN_INDEX, "listDocsVersions", "GET", DOCS_SITE, 200)
+              .build(),
+          op(ProviderStates.A_CONTRACTS_BUNDLE_WITH_AN_INDEX, "getDocsFile", "GET", DOCS_FILE, 200)
+              .headers("Content-Length", "Content-Type", "ETag")
+              .build(),
+          op(
+                  ProviderStates.A_CONTRACTS_BUNDLE_A_DEPENDENCY_POINTS_INTO,
+                  "listDocsVersions",
+                  "GET",
+                  DOCS_SITE,
+                  200)
+              .build(),
+          op(ProviderStates.A_CONTRACTS_BUNDLE_A_DEPENDENCY_POINTS_INTO, "getDocsFile", "GET", DOCS_FILE, 200)
+              .headers("Content-Length", "Content-Type", "ETag")
+              .build(),
+          op(ProviderStates.A_CONTRACTS_BUNDLE_WITH_A_PROJECTION, "getDocsFile", "GET", DOCS_FILE, 200)
               .headers("Content-Length", "Content-Type", "ETag")
               .build(),
           // --- changelogs: qits-maintenance (ChangelogClient), the qits CLI (bump-message)
@@ -566,7 +623,7 @@ class GoldenMasterRecordingTest {
 
       Recorded recorded = record(interaction);
       String slug = ProviderStates.slug(interaction.state());
-      String file = slug + "/" + interaction.operationId() + ".json";
+      String file = slug + "/" + interaction.answerFile();
 
       ObjectNode state = indexStates.get(slug);
       if (state == null) {
@@ -604,7 +661,7 @@ class GoldenMasterRecordingTest {
         operation.put("file", file);
       }
       if (!recorded.headers().isEmpty()) {
-        ObjectNode headers = operation.putObject("headers");
+        ObjectNode headers = operation.putObject("responseHeaders");
         recorded.headers().forEach(headers::put);
       }
       ObjectNode frozen = operation.putObject("frozen");
@@ -628,7 +685,11 @@ class GoldenMasterRecordingTest {
 
       if (interaction.recordsAnswer()) {
         written.add(file);
-        check(dir.resolve(file), GoldenJson.render(recorded.body()), update, failures);
+        check(
+            dir.resolve(file),
+            recorded.text() != null ? recorded.text() : GoldenJson.render(recorded.body()),
+            update,
+            failures);
       }
     }
 
@@ -645,7 +706,7 @@ class GoldenMasterRecordingTest {
     written.add("index.json");
     check(dir.resolve("index.json"), GoldenJson.render(index), update, failures);
 
-    for (String stale : committedJson(dir)) {
+    for (String stale : committedRecordings(dir)) {
       if (written.contains(stale)) {
         continue;
       }
@@ -723,11 +784,13 @@ class GoldenMasterRecordingTest {
   }
 
   /**
-   * One interaction's frozen answer (null when it records none), its frozen params, what was frozen
-   * where, the response headers it records and the paths it made store-independent.
+   * One interaction's frozen answer (null when it records none or records text), its verbatim text
+   * answer (null unless {@link Op#textAnswer}), its frozen params, what was frozen where, the
+   * response headers it records and the paths it made store-independent.
    */
   record Recorded(
       JsonNode body,
+      String text,
       ObjectNode params,
       Freezer freezer,
       Map<String, String> headers,
@@ -812,7 +875,20 @@ class GoldenMasterRecordingTest {
     params.forEach((k, v) -> frozenParams.put(k, freezer.freezeParam(v)));
 
     if (!interaction.recordsAnswer()) {
-      return new Recorded(null, frozenParams, freezer, headers, List.of());
+      return new Recorded(null, null, frozenParams, freezer, headers, List.of());
+    }
+    if (interaction.answerExtension() != null) {
+      // Verbatim: the bytes as served, which GoldenFiles writes and compares as UTF-8 text.
+      byte[] bytes = response.asByteArray();
+      String text = new String(bytes, StandardCharsets.UTF_8);
+      if (!Arrays.equals(bytes, text.getBytes(StandardCharsets.UTF_8))) {
+        throw new AssertionError(
+            interaction.operationId()
+                + " in state '"
+                + interaction.state()
+                + "' answered bytes that are not UTF-8 text; record it .raw() instead");
+      }
+      return new Recorded(null, text, frozenParams, freezer, headers, List.of());
     }
     JsonNode body = JSON.readTree(raw);
     if (body.isObject()) {
@@ -828,7 +904,7 @@ class GoldenMasterRecordingTest {
             setup.uniqueTokens());
     List<String> volatilePaths = new ArrayList<>();
     body = storeIndependent(body, interaction, volatilePaths);
-    return new Recorded(freezer.freeze(body), frozenParams, freezer, headers, volatilePaths);
+    return new Recorded(freezer.freeze(body), null, frozenParams, freezer, headers, volatilePaths);
   }
 
   /**
@@ -1036,15 +1112,23 @@ class GoldenMasterRecordingTest {
     return out;
   }
 
-  /** Every committed {@code .json} under the directory, relative and {@code /}-separated. */
-  private static List<String> committedJson(Path dir) throws IOException {
+  /**
+   * Every committed recording under the directory — a file with one of the {@link
+   * #RECORDED_EXTENSIONS} — relative and {@code /}-separated.
+   */
+  static List<String> committedRecordings(Path dir) throws IOException {
     if (!Files.isDirectory(dir)) {
       return List.of();
     }
     try (Stream<Path> files = Files.walk(dir)) {
       return files
           .filter(Files::isRegularFile)
-          .filter(p -> p.getFileName().toString().endsWith(".json"))
+          .filter(
+              p -> {
+                String name = p.getFileName().toString();
+                int dot = name.lastIndexOf('.');
+                return dot >= 0 && RECORDED_EXTENSIONS.contains(name.substring(dot + 1));
+              })
           .map(p -> dir.relativize(p).toString().replace('\\', '/'))
           .sorted()
           .toList();

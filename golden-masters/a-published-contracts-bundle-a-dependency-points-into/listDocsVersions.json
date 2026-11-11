@@ -1,0 +1,17 @@
+{
+  "name": "@contracts/qits-projects",
+  "versions": [
+    {
+      "name": "@contracts/qits-projects",
+      "version": "2100.1.0",
+      "fileCount": 3,
+      "totalBytes": 3570,
+      "publishedAt": "2026-01-01T00:00:00Z",
+      "metadata": {
+        "content.hash": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "git.commit.hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "git.repository.name": "qits-projects-service"
+      }
+    }
+  ]
+}

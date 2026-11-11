@@ -79,6 +79,17 @@ public class ProviderStates {
   // published alongside it (the same publish {@link #aRoutesBundle} does) so listDocsSites has
   // two sites to answer with, the way a shared docs repository really does.
   public static final String A_CONTRACTS_BUNDLE = "a published contracts bundle with an entity map";
+  // qits-2041: qits-landing-app's contracts, entity and UI-builder links. One set-up publishes two
+  // contracts bundles — qits-githost's (a golden-master index whose states depend on a state of
+  // the other bundle, and an entity map holding a projection) and qits-projects' (the entity map
+  // above plus the index that dependency points into) — beside the routes bundle. Three states over
+  // it, one per file the consumer reads: the {path} param picks the file.
+  public static final String A_CONTRACTS_BUNDLE_WITH_AN_INDEX =
+      "a published contracts bundle with a golden-master index";
+  public static final String A_CONTRACTS_BUNDLE_A_DEPENDENCY_POINTS_INTO =
+      "a published contracts bundle a dependency points into";
+  public static final String A_CONTRACTS_BUNDLE_WITH_A_PROJECTION =
+      "a published contracts bundle with a projection entity";
   public static final String CHANGELOGS = "a repository with published changelogs";
   public static final String NO_CHANGELOG = "a repository with no changelog";
   public static final String A_CONTENT_HASH = "a content hash recorded for the coordinate";
@@ -528,8 +539,258 @@ public class ProviderStates {
       }
       """;
 
-  /** The contracts bundle: just {@code entities.json}, packed byte-stable like every other bundle. */
-  static final byte[] CONTRACTS_BUNDLE = tarGz(Map.of(CONTRACTS_ENTITIES_PATH, CONTRACTS_ENTITIES_JSON));
+  /**
+   * Where a contracts bundle carries its provider's golden-master index, the index's body files
+   * beside it under {@code golden-masters/<state-slug>/<operationId>.json} (qits-2041).
+   */
+  static final String GOLDEN_INDEX_PATH = "golden-masters/index.json";
+
+  /**
+   * qits-projects-service's golden-master index, in the shape every provider's recorder writes:
+   * one state, {@code a project exists}, recording {@code listProjects} — the state and operation
+   * the routes manifest's freeze records name, and the {@code {provider, state}} dependency
+   * {@link #GITHOST_GOLDEN_INDEX_JSON} points into. No UUID and no instant anywhere, so nothing is
+   * rewritten when it is recorded as an answer.
+   */
+  static final String PROJECTS_GOLDEN_INDEX_JSON =
+      """
+      {
+        "formatVersion": 1,
+        "provider": "qits-projects",
+        "states": [
+          {
+            "name": "a project exists",
+            "slug": "a-project-exists",
+            "params": {
+              "projectSlug": "qits"
+            },
+            "dependsOn": [],
+            "operations": [
+              {
+                "operationId": "listProjects",
+                "method": "GET",
+                "path": "/projects/api/projects",
+                "status": 200,
+                "file": "a-project-exists/listProjects.json",
+                "frozen": {
+                  "ids": [],
+                  "instants": [],
+                  "strings": [],
+                  "listFilteredTo": "$.entries"
+                }
+              }
+            ]
+          }
+        ]
+      }
+      """;
+
+  static final String PROJECTS_LIST_PROJECTS_JSON =
+      """
+      {
+        "entries": [
+          {
+            "project": {
+              "name": "qits",
+              "slug": "qits",
+              "description": "Seeded by the provider state 'a project exists'."
+            }
+          }
+        ]
+      }
+      """;
+
+  /**
+   * The contracts bundle: the entity map and the golden-master index with its one body file,
+   * packed byte-stable like every other bundle.
+   */
+  static final byte[] CONTRACTS_BUNDLE =
+      tarGz(
+          Map.of(
+              CONTRACTS_ENTITIES_PATH, CONTRACTS_ENTITIES_JSON,
+              GOLDEN_INDEX_PATH, PROJECTS_GOLDEN_INDEX_JSON,
+              "golden-masters/a-project-exists/listProjects.json", PROJECTS_LIST_PROJECTS_JSON));
+
+  // --- qits-githost's contracts bundle (qits-2041) ----------------------------------------------
+
+  /** qits-githost-service's contracts site: {@code @contracts/<application>}, as above. */
+  static final String GITHOST_CONTRACTS_SITE = "@contracts/qits-githost";
+
+  /** Its publish metadata: the live shape again, with a hash and commit of its own. */
+  static final Map<String, String> GITHOST_CONTRACTS_METADATA =
+      Map.of(
+          DOCS_CONTENT_HASH_KEY,
+          "sha256:" + "c".repeat(64),
+          "git.commit.hash",
+          "9".repeat(40),
+          "git.repository.name",
+          "qits-githost-service");
+
+  static final String GITHOST_CONTRACTS_JSON =
+      """
+      {
+        "formatVersion": 1,
+        "application": "qits-githost",
+        "version": "2100.1.0",
+        "packages": []
+      }
+      """;
+
+  /**
+   * qits-githost-service's entity map: {@code GitProject} as its real {@code docs/entities.json}
+   * writes it — a projection of {@code qits-projects:Project}, the other bundle's entity — and one
+   * domain entity whose operation, {@code getGitRepository}, {@link #GITHOST_GOLDEN_INDEX_JSON}
+   * records.
+   */
+  static final String GITHOST_ENTITIES_JSON =
+      """
+      {
+        "formatVersion": 1,
+        "application": "qits-githost",
+        "entities": [
+          {
+            "entity": "eu.wohlben.qits.githost.persistence.GitProject",
+            "table": "git_project",
+            "marking": "projection",
+            "reason": null,
+            "projectionOf": "qits-projects:Project",
+            "knownGap": null,
+            "dtos": [],
+            "operations": []
+          },
+          {
+            "entity": "eu.wohlben.qits.githost.persistence.GitRepository",
+            "table": "git_repository",
+            "marking": "domain",
+            "reason": null,
+            "projectionOf": null,
+            "knownGap": null,
+            "dtos": [
+              {
+                "type": "eu.wohlben.qits.githost.dto.GitRepositoryDto",
+                "kind": "mapper",
+                "via": null,
+                "site": "GitRepositoryMapper.toDto(GitRepository)"
+              }
+            ],
+            "operations": [
+              {
+                "operationId": "getGitRepository",
+                "method": "GET",
+                "path": "/githost/api/projects/{project}/repositories/{repository}",
+                "dto": "eu.wohlben.qits.githost.dto.GitRepositoryDto",
+                "kind": "returns"
+              }
+            ]
+          }
+        ]
+      }
+      """;
+
+  /**
+   * qits-githost-service's golden-master index: two states, the second depending on the first by
+   * name (a state of the same bundle) and on {@code a project exists} of qits-projects by {@code
+   * {provider, state}} — the dependency shape no real index on the estate records yet. No UUID and
+   * no instant anywhere.
+   */
+  static final String GITHOST_GOLDEN_INDEX_JSON =
+      """
+      {
+        "formatVersion": 1,
+        "provider": "qits-githost",
+        "states": [
+          {
+            "name": "a git project exists",
+            "slug": "a-git-project-exists",
+            "params": {
+              "project": "qits"
+            },
+            "dependsOn": [],
+            "operations": [
+              {
+                "operationId": "listGitProjects",
+                "method": "GET",
+                "path": "/githost/api/projects",
+                "status": 200,
+                "file": "a-git-project-exists/listGitProjects.json",
+                "frozen": {
+                  "ids": [],
+                  "instants": [],
+                  "strings": [],
+                  "listFilteredTo": "$.projects"
+                }
+              }
+            ]
+          },
+          {
+            "name": "a git project with a repository",
+            "slug": "a-git-project-with-a-repository",
+            "params": {
+              "project": "qits",
+              "repository": "qits-githost-service"
+            },
+            "dependsOn": [
+              "a git project exists",
+              {
+                "provider": "qits-projects",
+                "state": "a project exists"
+              }
+            ],
+            "operations": [
+              {
+                "operationId": "getGitRepository",
+                "method": "GET",
+                "path": "/githost/api/projects/{project}/repositories/{repository}",
+                "status": 200,
+                "file": "a-git-project-with-a-repository/getGitRepository.json",
+                "responseHeaders": {
+                  "Content-Type": "application/json"
+                },
+                "frozen": {
+                  "ids": [],
+                  "instants": [],
+                  "strings": [],
+                  "listFilteredTo": null
+                }
+              }
+            ]
+          }
+        ]
+      }
+      """;
+
+  static final String GITHOST_LIST_GIT_PROJECTS_JSON =
+      """
+      {
+        "projects": [
+          {
+            "slug": "qits",
+            "repositoryCount": 1
+          }
+        ]
+      }
+      """;
+
+  static final String GITHOST_GET_GIT_REPOSITORY_JSON =
+      """
+      {
+        "project": "qits",
+        "name": "qits-githost-service",
+        "defaultBranch": "main"
+      }
+      """;
+
+  /** qits-githost's contracts bundle: contracts, entity map, index and the index's two bodies. */
+  static final byte[] GITHOST_CONTRACTS_BUNDLE =
+      tarGz(
+          Map.of(
+              "contracts.json", GITHOST_CONTRACTS_JSON,
+              CONTRACTS_ENTITIES_PATH, GITHOST_ENTITIES_JSON,
+              GOLDEN_INDEX_PATH, GITHOST_GOLDEN_INDEX_JSON,
+              "golden-masters/a-git-project-exists/listGitProjects.json",
+                  GITHOST_LIST_GIT_PROJECTS_JSON,
+              "golden-masters/a-git-project-with-a-repository/getGitRepository.json",
+                  GITHOST_GET_GIT_REPOSITORY_JSON));
 
   static final String HASH_TYPE = "maven";
   static final String HASH_GROUP = "eu.wohlben.qits";
@@ -639,6 +900,15 @@ public class ProviderStates {
         A_ROUTES_BUNDLE_WITH_VIEWPORTS,
         () -> aRoutesBundle(ROUTES_VIEWPORTS_VERSION, ROUTES_VIEWPORTS_BUNDLE, ROUTES_MANIFEST));
     states.put(A_CONTRACTS_BUNDLE, this::aContractsBundle);
+    states.put(
+        A_CONTRACTS_BUNDLE_WITH_AN_INDEX,
+        () -> twoContractsBundles(GITHOST_CONTRACTS_SITE, GOLDEN_INDEX_PATH));
+    states.put(
+        A_CONTRACTS_BUNDLE_A_DEPENDENCY_POINTS_INTO,
+        () -> twoContractsBundles(CONTRACTS_SITE, GOLDEN_INDEX_PATH));
+    states.put(
+        A_CONTRACTS_BUNDLE_WITH_A_PROJECTION,
+        () -> twoContractsBundles(GITHOST_CONTRACTS_SITE, CONTRACTS_ENTITIES_PATH));
     states.put(CHANGELOGS, this::changelogs);
     states.put(NO_CHANGELOG, this::noChangelog);
     states.put(A_CONTENT_HASH, this::aContentHash);
@@ -709,7 +979,12 @@ public class ProviderStates {
                       "repository = ?1 and name in ?2",
                       DOCS,
                       List.of(
-                          DOCS_SITE, CHANGELOG_SITE, PURGE_SITE, ROUTES_SITE, CONTRACTS_SITE))
+                          DOCS_SITE,
+                          CHANGELOG_SITE,
+                          PURGE_SITE,
+                          ROUTES_SITE,
+                          CONTRACTS_SITE,
+                          GITHOST_CONTRACTS_SITE))
                   .forEach(docsSites::delete);
               // The registries' tables live in the same persistence unit as the daemon rows.
               var entityManager = daemonBinaries.getEntityManager();
@@ -963,14 +1238,15 @@ public class ProviderStates {
         + "body { margin: 0px; font-family: \"Inter Test\", sans-serif; }\n"
         + "</style></head><body><main><h1>"
         + heading
-        + "</h1><a href=\"/projects/qits/work\">Work</a></main></body></html>\n";
+        + "</h1><a href=\"/projects/qits/repositories\">Repositories</a></main></body></html>\n";
   }
 
   /**
    * qits-projects-service's entity map, {@link #CONTRACTS_SITE} at the contracts version, alongside
    * the routes bundle — the same publish {@link #aRoutesBundle} does, so {@code listDocsSites}
    * answers with both sites, the way a shared docs repository really does. The {@code path} param
-   * is always {@link #CONTRACTS_ENTITIES_PATH}: the bundle holds that one file.
+   * is always {@link #CONTRACTS_ENTITIES_PATH}, the file this state reads; the bundle's
+   * golden-master index is read through {@link #A_CONTRACTS_BUNDLE_A_DEPENDENCY_POINTS_INTO}.
    */
   private Setup aContractsBundle() {
     publishDocs(ROUTES_SITE, ROUTES_VERSION, ROUTES_BUNDLE, ROUTES_METADATA);
@@ -978,6 +1254,23 @@ public class ProviderStates {
     Map<String, String> params = new TreeMap<>();
     params.put("path", CONTRACTS_ENTITIES_PATH);
     params.put("site", CONTRACTS_SITE);
+    params.put("version", DOCS_VERSION);
+    return new Setup(params, List.of());
+  }
+
+  /**
+   * qits-githost's and qits-projects' contracts bundles, both at the contracts version, beside the
+   * routes bundle — three sites, the way a shared docs repository holds them (qits-2041). The
+   * {@code site} and {@code path} params name the one file this state's {@code getDocsFile} reads.
+   */
+  private Setup twoContractsBundles(String site, String path) {
+    publishDocs(ROUTES_SITE, ROUTES_VERSION, ROUTES_BUNDLE, ROUTES_METADATA);
+    publishDocs(CONTRACTS_SITE, DOCS_VERSION, CONTRACTS_BUNDLE, CONTRACTS_METADATA);
+    publishDocs(
+        GITHOST_CONTRACTS_SITE, DOCS_VERSION, GITHOST_CONTRACTS_BUNDLE, GITHOST_CONTRACTS_METADATA);
+    Map<String, String> params = new TreeMap<>();
+    params.put("path", path);
+    params.put("site", site);
     params.put("version", DOCS_VERSION);
     return new Setup(params, List.of());
   }

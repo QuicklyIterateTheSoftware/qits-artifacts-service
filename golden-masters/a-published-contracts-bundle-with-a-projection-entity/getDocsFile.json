@@ -1,0 +1,41 @@
+{
+  "formatVersion": 1,
+  "application": "qits-githost",
+  "entities": [
+    {
+      "entity": "eu.wohlben.qits.githost.persistence.GitProject",
+      "table": "git_project",
+      "marking": "projection",
+      "reason": null,
+      "projectionOf": "qits-projects:Project",
+      "knownGap": null,
+      "dtos": [],
+      "operations": []
+    },
+    {
+      "entity": "eu.wohlben.qits.githost.persistence.GitRepository",
+      "table": "git_repository",
+      "marking": "domain",
+      "reason": null,
+      "projectionOf": null,
+      "knownGap": null,
+      "dtos": [
+        {
+          "type": "eu.wohlben.qits.githost.dto.GitRepositoryDto",
+          "kind": "mapper",
+          "via": null,
+          "site": "GitRepositoryMapper.toDto(GitRepository)"
+        }
+      ],
+      "operations": [
+        {
+          "operationId": "getGitRepository",
+          "method": "GET",
+          "path": "/githost/api/projects/{project}/repositories/{repository}",
+          "dto": "eu.wohlben.qits.githost.dto.GitRepositoryDto",
+          "kind": "returns"
+        }
+      ]
+    }
+  ]
+}
