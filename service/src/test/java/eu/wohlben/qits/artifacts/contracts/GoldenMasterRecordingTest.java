@@ -578,6 +578,42 @@ class GoldenMasterRecordingTest {
               .drop(STORE_WIDE_LISTS)
               .zeroNumbers()
               .build(),
+          // qits-2138: the per-repository surface over the same supplied set — the listing, one
+          // repository's plan and its scoped sweep — once the pin sources are the orchestrator's
+          // alone to read. Every row but the state's is another suite's, so the lists are
+          // filtered to the state's repository and daemon and every figure is store-wide.
+          op(
+                  ProviderStates.A_REPOSITORY_WITH_UNPINNED_IDENTITIES,
+                  "planGcRepositoriesWithSuppliedPins",
+                  "POST",
+                  "/artifacts/api/gc/repositories",
+                  200)
+              .json("application/json", ProviderStates.GC_PINS)
+              .filtered("$.repositories", "repository")
+              .zeroNumbers()
+              .build(),
+          op(
+                  ProviderStates.A_REPOSITORY_WITH_UNPINNED_IDENTITIES,
+                  "planGcRepositoryWithSuppliedPins",
+                  "POST",
+                  "/artifacts/api/gc/repositories/{repository}/plan",
+                  200)
+              .json("application/json", ProviderStates.GC_PINS)
+              .filtered("$.kept", "daemon")
+              .drop("configuration", "dead", "sweep", "structural", "untouchable")
+              .zeroNumbers()
+              .build(),
+          op(
+                  ProviderStates.A_REPOSITORY_WITH_UNPINNED_IDENTITIES,
+                  "sweepGcRepository",
+                  "POST",
+                  "/artifacts/api/gc/repositories/{repository}/sweep",
+                  200)
+              .json("application/json", ProviderStates.GC_PINS)
+              .filtered("$.withheldByGraceWindow", "daemon")
+              .drop("untouchable")
+              .zeroNumbers()
+              .build(),
           // a pin the store cannot file refuses the whole run: aborted, nothing deleted
           op(ProviderStates.AN_UNFILEABLE_PIN, "sweepGc", "POST", "/artifacts/api/gc/sweep", 200)
               .json("application/json", ProviderStates.GC_PINS_UNFILEABLE)

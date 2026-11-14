@@ -287,6 +287,11 @@ class ConsumerPactVerificationTest {
     return states.params(ProviderStates.UNPINNED_IDENTITIES);
   }
 
+  @State(ProviderStates.A_REPOSITORY_WITH_UNPINNED_IDENTITIES)
+  Map<String, String> aRepositoryWithUnpinnedIdentities() {
+    return states.params(ProviderStates.A_REPOSITORY_WITH_UNPINNED_IDENTITIES);
+  }
+
   @State(ProviderStates.PIN_SOURCES_SILENT)
   Map<String, String> pinSourcesSilent() {
     return states.params(ProviderStates.PIN_SOURCES_SILENT);

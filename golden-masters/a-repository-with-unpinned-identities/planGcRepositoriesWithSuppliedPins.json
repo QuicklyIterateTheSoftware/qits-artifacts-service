@@ -1,0 +1,21 @@
+{
+  "generatedAt": "2026-01-01T00:00:00Z",
+  "executable": true,
+  "pinFailures": [],
+  "graceWindow": "PT6H",
+  "repositories": [
+    {
+      "repository": "daemons",
+      "type": "daemon-binaries",
+      "strategy": "DaemonBinariesGcStrategy",
+      "note": null,
+      "error": null,
+      "identitiesCondemned": 0,
+      "identitiesKept": 0,
+      "blobsSweepable": 0,
+      "reclaimableBytes": 0,
+      "withheldByGraceWindow": 0,
+      "withheldBytes": 0
+    }
+  ]
+}

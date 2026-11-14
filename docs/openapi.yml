@@ -709,6 +709,104 @@ paths:
         - qits:agent
         - qits:system
         - qits:ci-run
+  /artifacts/api/gc/repositories:
+    post:
+      operationId: planGcRepositoriesWithSuppliedPins
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+        required: false
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GcRepositoriesPlanResponse"
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+        "400":
+          description: Bad Request
+      summary: Repositories With Supplied Pins
+      tags:
+      - Gc Plan Controller
+      security:
+      - SecurityScheme:
+        - qits:admin
+        - qits:system
+  /artifacts/api/gc/repositories/{repository}/plan:
+    post:
+      operationId: planGcRepositoryWithSuppliedPins
+      parameters:
+      - name: repository
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+        required: false
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GcRepositoryPlanReport"
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+        "400":
+          description: Bad Request
+      summary: Repository Plan With Supplied Pins
+      tags:
+      - Gc Plan Controller
+      security:
+      - SecurityScheme:
+        - qits:admin
+        - qits:system
+  /artifacts/api/gc/repositories/{repository}/sweep:
+    post:
+      operationId: sweepGcRepository
+      parameters:
+      - name: repository
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+        required: false
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GcRepositorySweepReport"
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+        "400":
+          description: Bad Request
+      summary: Repository Sweep
+      tags:
+      - Gc Plan Controller
+      security:
+      - SecurityScheme:
+        - qits:system
   /artifacts/api/gc/sweep:
     post:
       operationId: sweepGc
@@ -1053,6 +1151,68 @@ components:
           type: array
           items:
             type: string
+    GcRepositoriesPlanResponse:
+      type: object
+      properties:
+        generatedAt:
+          $ref: "#/components/schemas/Instant"
+        executable:
+          type: boolean
+        pinFailures:
+          type: array
+          items:
+            type: string
+        graceWindow:
+          type: string
+        repositories:
+          type: array
+          items:
+            $ref: "#/components/schemas/GcRepositoryPlanSummary"
+    GcRepositoryPlanReport:
+      type: object
+      properties:
+        repository:
+          type: string
+        type:
+          type: string
+        generatedAt:
+          $ref: "#/components/schemas/Instant"
+        dryRun:
+          type: boolean
+        graceWindow:
+          type: string
+        executable:
+          type: boolean
+        pinFailures:
+          type: array
+          items:
+            type: string
+        pins:
+          type: array
+          items:
+            $ref: "#/components/schemas/GcPinSource"
+        configuration:
+          $ref: "#/components/schemas/GcTypeConfiguration"
+        strategy:
+          type: string
+        note:
+          type: string
+        error:
+          type: string
+        dead:
+          type: array
+          items:
+            $ref: "#/components/schemas/GcIdentity"
+        kept:
+          type: array
+          items:
+            $ref: "#/components/schemas/GcIdentity"
+        sweep:
+          $ref: "#/components/schemas/GcSweepPlan"
+        structural:
+          $ref: "#/components/schemas/GcSweepPlan"
+        untouchable:
+          $ref: "#/components/schemas/GcUntouchablePool"
     GcRepositoryPlanSummary:
       type: object
       properties:
@@ -1084,6 +1244,45 @@ components:
         withheldBytes:
           type: integer
           format: int64
+    GcRepositorySweepReport:
+      type: object
+      properties:
+        repository:
+          type: string
+        type:
+          type: string
+        executedAt:
+          $ref: "#/components/schemas/Instant"
+        dryRun:
+          type: boolean
+        graceWindow:
+          type: string
+        aborted:
+          type: string
+        pins:
+          type: array
+          items:
+            $ref: "#/components/schemas/GcPinSource"
+        strategy:
+          type: string
+        note:
+          type: string
+        error:
+          type: string
+        deleted:
+          type: array
+          items:
+            $ref: "#/components/schemas/GcIdentity"
+        withheldByGraceWindow:
+          type: array
+          items:
+            $ref: "#/components/schemas/GcIdentity"
+        sweep:
+          $ref: "#/components/schemas/GcSweepOutcome"
+        untouchable:
+          $ref: "#/components/schemas/GcUntouchablePool"
+        runId:
+          type: string
     GcSweepOutcome:
       type: object
       properties:
