@@ -21,6 +21,7 @@ import eu.wohlben.qits.artifacts.control.NpmPackagesProfile;
 import eu.wohlben.qits.artifacts.control.OciImagesProfile;
 import eu.wohlben.qits.blobstore.entity.RepositoryTypeProfile;
 import eu.wohlben.qits.blobstore.error.NotFoundException;
+import eu.wohlben.qits.artifacts.gc.dto.GcDiskReport;
 import eu.wohlben.qits.artifacts.gc.dto.GcIdentity;
 import eu.wohlben.qits.artifacts.gc.dto.GcPlanReport;
 import eu.wohlben.qits.artifacts.gc.dto.GcRepositoryPlanSummary;
@@ -541,6 +542,90 @@ class GcSweepExecutorTest extends GcFixture {
     assertNotNull(report.untouchable().reason(), "a census WAS taken, so the pool is a reading");
   }
 
+  @Test
+  void anExecutedSweepGivesTheDiskBackByDrainingAndDroppingTheSegmentItsDeletesEmptied()
+      throws Exception {
+    // qits-2248, the bug as the volume saw it: a run unlinked blobs, the receipt said so in bytes,
+    // and the disk never came back — PostgreSQL keeps a deleted row's space inside the table's
+    // files. The receipt's disk section is the compaction that follows the deletes, measured.
+    //
+    // The doomed binary and a survivor are stored in one segment, which is then closed by a roll;
+    // a third version lands in the new open segment. The sweep deletes the doomed one, leaving the
+    // closed segment with one small live blob in a partition sized for much more, so compaction
+    // moves the survivor into the open segment and drops the partition — its files are the disk.
+    repositoryService.ensure(DAEMON_REPO, DaemonBinariesProfile.KEY);
+    byte[] survivorBytes = filled(37, (byte) 37);
+    String doomed = store(filled(3 * 4096 + 100, (byte) 61)); // four chunks, TOASTed: real pages
+    String survivor = store(survivorBytes);
+    int closed = openSegment();
+    rollSegment();
+    String newest = store(filled(38, (byte) 38));
+    for (String blob : List.of(doomed, survivor, newest)) {
+      backdate(blob, Duration.ofDays(30));
+    }
+    daemonRow(DAEMON, "2026.601.10", doomed, daysAgo(400), null);
+    daemonRow(DAEMON, "2026.701.20", survivor, daysAgo(300), null);
+    daemonRow(DAEMON, "2026.801.30", newest, daysAgo(200), null);
+    assertEquals(1, partitionCount(closed), "the case only says anything if the segment exists");
+
+    GcSweepReport report = executor.execute(census.take(), List.of(daemonStrategy), GcPins.none());
+
+    assertEquals(List.of(doomed), report.sweep().unlinkedBlobIds());
+    GcDiskReport disk = report.disk();
+    assertNotNull(disk, "an executed sweep reports what compaction gave back");
+    assertEquals("COMPACTED", disk.state());
+    assertTrue(disk.segmentsDropped() >= 1, disk.toString());
+    assertTrue(disk.segmentsDrained() >= 1, "the survivor's segment was drained: " + disk);
+    assertEquals(0, disk.segmentsHeld(), disk.toString());
+    assertTrue(disk.bytesMoved() >= survivorBytes.length, "the survivor moved: " + disk);
+    assertTrue(
+        disk.blobTablesBytesAfter() < disk.blobTablesBytesBefore(),
+        "the dropped partition is disk the blob tables gave back: " + disk);
+    assertTrue(disk.databaseBytesBefore() > 0 && disk.databaseBytesAfter() > 0, disk.toString());
+
+    assertEquals(0, partitionCount(closed), "the closed segment's partition is gone");
+    try (var in = blobStore.open(survivor)) {
+      assertTrue(
+          java.util.Arrays.equals(survivorBytes, in.readAllBytes()),
+          "the survivor reads back byte for byte from the open segment");
+    }
+    assertTrue(blobStore.exists(newest));
+  }
+
+  @Test
+  void theDryRunAndAnAbortedSweepCompactNothingAndReportNoDisk() throws Exception {
+    // Compaction is a write — it moves chunks and drops partitions — so it belongs to an executed
+    // sweep and to nothing else. The dry run must stay reviewable without side effects, and an
+    // aborted run deleted nothing and is over before the blob loop: neither touches a segment, and
+    // the aborted receipt carries no disk figures rather than zeros that would read as measured.
+    repositoryService.ensure(DAEMON_REPO, DaemonBinariesProfile.KEY);
+    String doomed = agedBlob(4096 + 1);
+    int closed = openSegment();
+    rollSegment();
+    daemonRow(DAEMON, "2026.601.10", doomed, daysAgo(400), null);
+    daemonRow(DAEMON, "2026.701.20", agedBlob(39), daysAgo(300), null);
+    daemonRow(DAEMON, "2026.801.30", agedBlob(40), daysAgo(200), null);
+    int open = openSegment();
+
+    GcPlanReport plan = planner.plan(census.take(), List.of(daemonStrategy), GcPins.none());
+    assertEquals(List.of(doomed), plan.sweep().blobIds(), "the plan would free it");
+    assertEquals(1, partitionCount(closed), "and the dry run left the closed segment alone");
+    assertEquals(open, openSegment());
+
+    // This suite's pin urls are closed ports, so the registry-driven sweep aborts before the census.
+    GcSweepReport aborted = executor.sweep();
+    assertNotNull(aborted.aborted());
+    assertNull(aborted.disk(), "an aborted run compacted nothing and claims no disk");
+    assertEquals(1, partitionCount(closed), "the closed segment is still there");
+    assertEquals(open, openSegment());
+    assertTrue(blobStore.exists(doomed));
+
+    GcRepositorySweepReport scopedAbort = executor.sweep(DAEMON_REPO);
+    assertNotNull(scopedAbort.aborted());
+    assertNull(scopedAbort.disk(), "nor does an aborted scoped run");
+    assertEquals(1, partitionCount(closed));
+  }
+
   // --- wiring ----------------------------------------------------------------------------------
 
   private CiScreenshotsGcStrategy screenshotsStub() {
@@ -567,6 +652,32 @@ class GcSweepExecutorTest extends GcFixture {
    */
   private void detachEntities() {
     npmVersions.getEntityManager().clear();
+  }
+
+  /** The blob store's open segment: the partition every new chunk is written into. */
+  private int openSegment() {
+    return (int) count("select segment from blob_segment");
+  }
+
+  /**
+   * Closes the open segment the way the store's roll does, minus the locks a single-threaded case
+   * does not need: a partition for the next segment, and the open number moved onto it. The roll
+   * itself fires only once a segment passes {@code qits.artifacts.blobs.segment-size} (1 GiB), which
+   * no fixture here comes near, and it is the library's to test.
+   */
+  private void rollSegment() {
+    int next = openSegment() + 1;
+    execute(
+        "create table blob_chunk_" + next + " partition of blob_chunk for values in (" + next + ")");
+    execute("update blob_segment set segment = " + next);
+  }
+
+  /** 1 if segment {@code segment}'s partition exists, 0 once compaction dropped it. */
+  private long partitionCount(int segment) {
+    return count(
+        "select count(*) from pg_inherits i join pg_class c on c.oid = i.inhrelid"
+            + " join pg_class p on p.oid = i.inhparent where p.relname = 'blob_chunk'"
+            + " and c.relname = 'blob_chunk_" + segment + "'");
   }
 
   /** A stored blob aged past the grace window — the executed cases' default. */

@@ -1187,7 +1187,15 @@
               "$.sweep.withheldByGraceWindow",
               "$.sweep.withheldBytes",
               "$.sweep.stillReferenced",
-              "$.sweep.alreadyGone"
+              "$.sweep.alreadyGone",
+              "$.disk.blobTablesBytesBefore",
+              "$.disk.blobTablesBytesAfter",
+              "$.disk.databaseBytesBefore",
+              "$.disk.databaseBytesAfter",
+              "$.disk.segmentsDrained",
+              "$.disk.segmentsDropped",
+              "$.disk.segmentsHeld",
+              "$.disk.bytesMoved"
             ],
             "listFilteredTo": null
           }
@@ -1527,7 +1535,15 @@
               "$.sweep.withheldByGraceWindow",
               "$.sweep.withheldBytes",
               "$.sweep.stillReferenced",
-              "$.sweep.alreadyGone"
+              "$.sweep.alreadyGone",
+              "$.disk.blobTablesBytesBefore",
+              "$.disk.blobTablesBytesAfter",
+              "$.disk.databaseBytesBefore",
+              "$.disk.databaseBytesAfter",
+              "$.disk.segmentsDrained",
+              "$.disk.segmentsDropped",
+              "$.disk.segmentsHeld",
+              "$.disk.bytesMoved"
             ],
             "listFilteredTo": "$.withheldByGraceWindow"
           }

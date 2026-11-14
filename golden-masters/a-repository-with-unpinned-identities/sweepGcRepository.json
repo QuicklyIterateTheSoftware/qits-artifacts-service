@@ -82,5 +82,16 @@
     "alreadyGone": 0,
     "unlinkedBlobIds": []
   },
+  "disk": {
+    "state": "COMPACTED",
+    "blobTablesBytesBefore": 0,
+    "blobTablesBytesAfter": 0,
+    "databaseBytesBefore": 0,
+    "databaseBytesAfter": 0,
+    "segmentsDrained": 0,
+    "segmentsDropped": 0,
+    "segmentsHeld": 0,
+    "bytesMoved": 0
+  },
   "runId": "00000000-0000-4000-8000-000000000001"
 }

@@ -300,6 +300,15 @@ that library tells its consumers to do, and which its own suite applies unedited
 exercised on every build of the jar. Keep the text identical, so a later diff between the two is
 readable. `qits.artifacts.blobs-datasource=artifacts` is what points the store at them.
 
+**V7 segments `blob_chunk` (qits-2248)**, again verbatim — from the library's
+`db/blobstore-segments-upgrade.sql`, its instruction to a consumer whose blob tables came from the
+earlier `blobstore-tables.sql`. The chunk table becomes a LIST-partitioned parent with one partition
+per segment, `blob_segment` names the open one and `blob_open_segment()` is the column default an
+older library's inserts fall back on. A fresh chain ends with `blob_chunk_0` (the upgrade's
+partition for pre-segment chunks, empty there) and `blob_chunk_1` open; the first compaction drops
+the empty `_0`. Partitions after that are created by the store's roll and dropped by its compaction
+— never by a migration, and never by hand.
+
 The persistence unit is the artifacts jar's own: `quarkus.hibernate-orm.artifacts.packages` names
 `eu.wohlben.qits.blobstore.entity` AND `eu.wohlben.qits.artifacts.entity` in that jar's
 `microprofile-config.properties` — the store's entities and the formats' plus this repo's — and
@@ -490,6 +499,18 @@ collection" section is the contract; these are the rules that get "helpfully" re
   If the Phase-A env overrides `QITS_ARTIFACTS_GC_TYPE_OCI_IMAGES_WINDOW` and
   `QITS_ARTIFACTS_GC_BLOB_GRACE_PERIOD` are still set on qits-configuration, REMOVE them — they
   shadow these defaults.
+- **Deleting a blob frees no disk; the compaction after the blob loop does (qits-2248).** A
+  deleted chunk row's space stays inside `blob_chunk`'s files — PostgreSQL reuses it and never
+  returns it to the filesystem — so `GcSweepOutcome.bytesReclaimed` is the data size of what was
+  unlinked, and a run that "reclaimed" 15 GiB used to leave the volume exactly as full.
+  `GcSweepExecutor` calls the library's `BlobCompaction.compact()` after `BlobSweep.execute` on both
+  executed paths (whole store and one repository — compaction is store-wide either way), and the
+  receipt's `disk` (`GcDiskReport`) carries what it measured: blob tables and database bytes before
+  and after, segments drained, dropped and held. The dry run, an aborted run and a scoped run whose
+  type nothing collects never reach it, and report `disk: null`. It must run outside any
+  transaction — the library refuses one — which is why neither the executor nor the controller is
+  `@Transactional`; and a compaction failure is a logged warning and `disk: null`, never a failed
+  sweep, because the deletes have already happened and the receipt is their only record.
 - **The dry-run report is the review surface, and four of its parts are load-bearing.** `summary`
   is first in `GcPlanReport` because it is what a human reads first — executable yes/no, the
   reclaim in bytes and in units, one line per type — and it is **derived** by `GcSummary` from the
