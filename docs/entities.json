@@ -63,17 +63,17 @@
           "cardinality" : "collection"
         },
         {
-          "operationId" : "GcPlanController.repositorySweep",
-          "method" : "POST",
-          "path" : "/gc/repositories/{repository}/sweep",
-          "dto" : "eu.wohlben.qits.artifacts.gc.dto.GcIdentity",
-          "kind" : "returns",
-          "cardinality" : "single"
-        },
-        {
           "operationId" : "getGcPlan",
           "method" : "GET",
           "path" : "/gc/plan",
+          "dto" : "eu.wohlben.qits.artifacts.gc.dto.GcIdentity",
+          "kind" : "returns",
+          "cardinality" : "collection"
+        },
+        {
+          "operationId" : "planGcRepositoryWithSuppliedPins",
+          "method" : "POST",
+          "path" : "/gc/repositories/{repository}/plan",
           "dto" : "eu.wohlben.qits.artifacts.gc.dto.GcIdentity",
           "kind" : "returns",
           "cardinality" : "collection"
@@ -98,6 +98,14 @@
           "operationId" : "sweepGc",
           "method" : "POST",
           "path" : "/gc/sweep",
+          "dto" : "eu.wohlben.qits.artifacts.gc.dto.GcIdentity",
+          "kind" : "returns",
+          "cardinality" : "single"
+        },
+        {
+          "operationId" : "sweepGcRepository",
+          "method" : "POST",
+          "path" : "/gc/repositories/{repository}/sweep",
           "dto" : "eu.wohlben.qits.artifacts.gc.dto.GcIdentity",
           "kind" : "returns",
           "cardinality" : "single"
@@ -170,7 +178,7 @@
           "type" : "eu.wohlben.qits.artifacts.gc.dto.GcRepositoryPlanReport",
           "kind" : "via",
           "via" : "eu.wohlben.qits.artifacts.control.LiveBlobCensus$Census",
-          "site" : "GcPlanner.planForRepository(String)"
+          "site" : "GcPlanner.planForRepository(String, GcSuppliedPins)"
         },
         {
           "type" : "eu.wohlben.qits.artifacts.gc.dto.GcRepositoryPlanSummary",
@@ -239,14 +247,6 @@
           "cardinality" : "single"
         },
         {
-          "operationId" : "GcPlanController.repositorySweep",
-          "method" : "POST",
-          "path" : "/gc/repositories/{repository}/sweep",
-          "dto" : "eu.wohlben.qits.artifacts.gc.dto.GcIdentity",
-          "kind" : "returns",
-          "cardinality" : "single"
-        },
-        {
           "operationId" : "getGcPlan",
           "method" : "GET",
           "path" : "/gc/plan",
@@ -279,6 +279,22 @@
           "cardinality" : "collection"
         },
         {
+          "operationId" : "planGcRepositoriesWithSuppliedPins",
+          "method" : "POST",
+          "path" : "/gc/repositories",
+          "dto" : "eu.wohlben.qits.artifacts.gc.dto.GcRepositoryPlanSummary",
+          "kind" : "returns",
+          "cardinality" : "collection"
+        },
+        {
+          "operationId" : "planGcRepositoryWithSuppliedPins",
+          "method" : "POST",
+          "path" : "/gc/repositories/{repository}/plan",
+          "dto" : "eu.wohlben.qits.artifacts.gc.dto.GcIdentity",
+          "kind" : "returns",
+          "cardinality" : "single"
+        },
+        {
           "operationId" : "planGcWithSuppliedPins",
           "method" : "POST",
           "path" : "/gc/plan",
@@ -290,6 +306,14 @@
           "operationId" : "sweepGc",
           "method" : "POST",
           "path" : "/gc/sweep",
+          "dto" : "eu.wohlben.qits.artifacts.gc.dto.GcIdentity",
+          "kind" : "returns",
+          "cardinality" : "single"
+        },
+        {
+          "operationId" : "sweepGcRepository",
+          "method" : "POST",
+          "path" : "/gc/repositories/{repository}/sweep",
           "dto" : "eu.wohlben.qits.artifacts.gc.dto.GcIdentity",
           "kind" : "returns",
           "cardinality" : "single"
@@ -350,7 +374,7 @@
           "type" : "eu.wohlben.qits.artifacts.gc.dto.GcRepositoryPlanReport",
           "kind" : "via",
           "via" : "eu.wohlben.qits.artifacts.control.LiveBlobCensus$Census",
-          "site" : "GcPlanner.planForRepository(String)"
+          "site" : "GcPlanner.planForRepository(String, GcSuppliedPins)"
         },
         {
           "type" : "eu.wohlben.qits.artifacts.gc.dto.GcRepositoryPlanSummary",
@@ -427,14 +451,6 @@
           "cardinality" : "single"
         },
         {
-          "operationId" : "GcPlanController.repositorySweep",
-          "method" : "POST",
-          "path" : "/gc/repositories/{repository}/sweep",
-          "dto" : "eu.wohlben.qits.artifacts.gc.dto.GcIdentity",
-          "kind" : "returns",
-          "cardinality" : "single"
-        },
-        {
           "operationId" : "getGcPlan",
           "method" : "GET",
           "path" : "/gc/plan",
@@ -451,6 +467,22 @@
           "cardinality" : "single"
         },
         {
+          "operationId" : "planGcRepositoriesWithSuppliedPins",
+          "method" : "POST",
+          "path" : "/gc/repositories",
+          "dto" : "eu.wohlben.qits.artifacts.gc.dto.GcRepositoryPlanSummary",
+          "kind" : "returns",
+          "cardinality" : "collection"
+        },
+        {
+          "operationId" : "planGcRepositoryWithSuppliedPins",
+          "method" : "POST",
+          "path" : "/gc/repositories/{repository}/plan",
+          "dto" : "eu.wohlben.qits.artifacts.gc.dto.GcIdentity",
+          "kind" : "returns",
+          "cardinality" : "single"
+        },
+        {
           "operationId" : "planGcWithSuppliedPins",
           "method" : "POST",
           "path" : "/gc/plan",
@@ -462,6 +494,14 @@
           "operationId" : "sweepGc",
           "method" : "POST",
           "path" : "/gc/sweep",
+          "dto" : "eu.wohlben.qits.artifacts.gc.dto.GcIdentity",
+          "kind" : "returns",
+          "cardinality" : "single"
+        },
+        {
+          "operationId" : "sweepGcRepository",
+          "method" : "POST",
+          "path" : "/gc/repositories/{repository}/sweep",
           "dto" : "eu.wohlben.qits.artifacts.gc.dto.GcIdentity",
           "kind" : "returns",
           "cardinality" : "single"
@@ -569,17 +609,17 @@
           "cardinality" : "collection"
         },
         {
-          "operationId" : "GcPlanController.repositorySweep",
-          "method" : "POST",
-          "path" : "/gc/repositories/{repository}/sweep",
-          "dto" : "eu.wohlben.qits.artifacts.gc.dto.GcIdentity",
-          "kind" : "returns",
-          "cardinality" : "single"
-        },
-        {
           "operationId" : "getGcPlan",
           "method" : "GET",
           "path" : "/gc/plan",
+          "dto" : "eu.wohlben.qits.artifacts.gc.dto.GcIdentity",
+          "kind" : "returns",
+          "cardinality" : "collection"
+        },
+        {
+          "operationId" : "planGcRepositoryWithSuppliedPins",
+          "method" : "POST",
+          "path" : "/gc/repositories/{repository}/plan",
           "dto" : "eu.wohlben.qits.artifacts.gc.dto.GcIdentity",
           "kind" : "returns",
           "cardinality" : "collection"
@@ -604,6 +644,14 @@
           "operationId" : "sweepGc",
           "method" : "POST",
           "path" : "/gc/sweep",
+          "dto" : "eu.wohlben.qits.artifacts.gc.dto.GcIdentity",
+          "kind" : "returns",
+          "cardinality" : "single"
+        },
+        {
+          "operationId" : "sweepGcRepository",
+          "method" : "POST",
+          "path" : "/gc/repositories/{repository}/sweep",
           "dto" : "eu.wohlben.qits.artifacts.gc.dto.GcIdentity",
           "kind" : "returns",
           "cardinality" : "single"
@@ -658,7 +706,7 @@
           "type" : "eu.wohlben.qits.artifacts.gc.dto.GcRepositoryPlanReport",
           "kind" : "via",
           "via" : "eu.wohlben.qits.artifacts.control.LiveBlobCensus$Census",
-          "site" : "GcPlanner.planForRepository(String)"
+          "site" : "GcPlanner.planForRepository(String, GcSuppliedPins)"
         },
         {
           "type" : "eu.wohlben.qits.artifacts.gc.dto.GcRepositoryPlanSummary",
@@ -733,14 +781,6 @@
           "cardinality" : "single"
         },
         {
-          "operationId" : "GcPlanController.repositorySweep",
-          "method" : "POST",
-          "path" : "/gc/repositories/{repository}/sweep",
-          "dto" : "eu.wohlben.qits.artifacts.gc.dto.GcIdentity",
-          "kind" : "returns",
-          "cardinality" : "single"
-        },
-        {
           "operationId" : "getGcPlan",
           "method" : "GET",
           "path" : "/gc/plan",
@@ -753,6 +793,22 @@
           "method" : "GET",
           "path" : "/store/summary",
           "dto" : "eu.wohlben.qits.artifacts.dto.StoreSummary",
+          "kind" : "returns",
+          "cardinality" : "single"
+        },
+        {
+          "operationId" : "planGcRepositoriesWithSuppliedPins",
+          "method" : "POST",
+          "path" : "/gc/repositories",
+          "dto" : "eu.wohlben.qits.artifacts.gc.dto.GcRepositoryPlanSummary",
+          "kind" : "returns",
+          "cardinality" : "collection"
+        },
+        {
+          "operationId" : "planGcRepositoryWithSuppliedPins",
+          "method" : "POST",
+          "path" : "/gc/repositories/{repository}/plan",
+          "dto" : "eu.wohlben.qits.artifacts.gc.dto.GcIdentity",
           "kind" : "returns",
           "cardinality" : "single"
         },
@@ -776,6 +832,14 @@
           "operationId" : "sweepGc",
           "method" : "POST",
           "path" : "/gc/sweep",
+          "dto" : "eu.wohlben.qits.artifacts.gc.dto.GcIdentity",
+          "kind" : "returns",
+          "cardinality" : "single"
+        },
+        {
+          "operationId" : "sweepGcRepository",
+          "method" : "POST",
+          "path" : "/gc/repositories/{repository}/sweep",
           "dto" : "eu.wohlben.qits.artifacts.gc.dto.GcIdentity",
           "kind" : "returns",
           "cardinality" : "single"
