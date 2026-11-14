@@ -24,7 +24,11 @@ import java.util.List;
  *     receipt it is the record of what the keep-set was built from at the moment rows were deleted.
  *     An aborted run still carries it, because the failed source is the whole story of that receipt.
  * @param types one entry per repository type, always all of them, same honesty rule as the plan
- * @param sweep the blob unlinks: what was freed, and what was withheld
+ * @param sweep the blob unlinks: what was freed, and what was withheld. Its byte figures are data
+ *     sizes, not disk — see {@code disk}
+ * @param disk what the blob store's compaction gave back to the volume after the unlinks
+ *     (qits-2248), or null when there is no figure: an aborted run, or a compaction that failed and
+ *     was logged rather than allowed to fail a sweep whose deletes had already happened
  * @param untouchable the row-less pool as it stood before this run — restated on every receipt
  *     because it is the list a reviewer checks the ci-daemon binary against
  * @param runId this run's id, unique per receipt, so a log line, a receipt and whoever quotes it can
@@ -38,5 +42,6 @@ public record GcSweepReport(
     List<GcPinSource> pins,
     List<GcTypeSweepResult> types,
     GcSweepOutcome sweep,
+    GcDiskReport disk,
     GcUntouchablePool untouchable,
     String runId) {}

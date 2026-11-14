@@ -21,7 +21,12 @@ import java.util.Set;
 import java.util.TreeSet;
 
 /**
- * The one mechanism that frees disk, and it carries no policy at all.
+ * The one mechanism that frees blobs, and it carries no policy at all.
+ *
+ * <p>"Frees" means deletes, not gives the disk back: a deleted blob's chunk rows leave their space
+ * inside the chunk table's files, which PostgreSQL reuses but never returns to the filesystem. The
+ * volume gets it back only when the store's compaction drops a segment, which {@code
+ * GcSweepExecutor} runs after this (qits-2248).
  *
  * <p>Strategies kill identities and free nothing. This reconciles what they did: a blob dies only
  * when <b>no type</b> reaches it any more, because the store dedupes globally across types and

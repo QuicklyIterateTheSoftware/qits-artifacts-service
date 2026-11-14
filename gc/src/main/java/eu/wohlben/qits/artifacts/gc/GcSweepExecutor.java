@@ -1,11 +1,13 @@
 package eu.wohlben.qits.artifacts.gc;
 
 import eu.wohlben.qits.blobstore.control.ArtifactRepositoryService;
+import eu.wohlben.qits.blobstore.control.BlobCompaction;
 import eu.wohlben.qits.blobstore.control.BlobReclaim;
 import eu.wohlben.qits.artifacts.control.LiveBlobCensus;
 import eu.wohlben.qits.blobstore.entity.ArtifactRepository;
 import eu.wohlben.qits.blobstore.control.RepositoryTypeProfiles;
 import eu.wohlben.qits.blobstore.entity.RepositoryTypeProfile;
+import eu.wohlben.qits.artifacts.gc.dto.GcDiskReport;
 import eu.wohlben.qits.artifacts.gc.dto.GcRepositorySweepReport;
 import eu.wohlben.qits.artifacts.gc.dto.GcSweepOutcome;
 import eu.wohlben.qits.artifacts.gc.dto.GcSweepReport;
@@ -66,8 +68,17 @@ import java.util.UUID;
  *       qits.artifacts.gc.blob-grace-period}; see {@link GcStrategy.GraceWindow}.
  * </ul>
  *
- * <p>Every run logs one line per type and one for the blob loop, so "what did GC ever do" stays a
- * question with an answer.
+ * <p><b>Then the disk comes back, which the deletes alone never did (qits-2248).</b> Unlinking a blob
+ * deletes its chunk rows, and PostgreSQL keeps the space they held inside the table's files: it
+ * reuses it for later uploads but never returns it to the filesystem, so a run that reclaimed half
+ * the store left the volume exactly as full. After the blob loop each run therefore calls the
+ * library's {@link BlobCompaction}, which drains mostly-dead chunk segments and drops their
+ * partitions — the one operation that unlinks files — and the receipt reports what it measured in
+ * {@code disk}. A run that deleted nothing still compacts: segments emptied by an earlier run whose
+ * compaction was held, failed or ran on another replica are dropped by whichever run comes next.
+ *
+ * <p>Every run logs one line per type and one for the blob loop and the disk, so "what did GC ever
+ * do" stays a question with an answer.
  */
 @ApplicationScoped
 public class GcSweepExecutor {
@@ -75,6 +86,7 @@ public class GcSweepExecutor {
   @Inject LiveBlobCensus census;
   @Inject BlobSweep sweep;
   @Inject BlobReclaim blobs;
+  @Inject BlobCompaction compaction;
   @Inject Instance<GcStrategy> strategies;
   @Inject GcPinSources pinSources;
   @Inject GcTypeConfig config;
@@ -182,6 +194,7 @@ public class GcSweepExecutor {
         pins.sources(),
         types,
         new GcSweepOutcome(0, 0L, 0, 0L, 0, 0, List.of()),
+        null,
         new GcUntouchablePool(
             "not computed: this run aborted before taking a census, and deleted nothing",
             0,
@@ -214,6 +227,7 @@ public class GcSweepExecutor {
         List.of(),
         List.of(),
         new GcSweepOutcome(0, 0L, 0, 0L, 0, 0, List.of()),
+        null,
         new GcUntouchablePool(
             "not computed: this run aborted before taking a census, and deleted nothing",
             0,
@@ -288,16 +302,20 @@ public class GcSweepExecutor {
     // scoped plan's retained set — so a shared blob is protected by the reconciliation before the
     // re-census and the store's own guard ever have to catch it.
     GcSweepOutcome outcome = sweep.execute(taken, Map.of(type, scoped));
+    // Store-wide, like the blob loop above it: segments hold chunks of every repository, so there is
+    // no such thing as compacting one repository's share of the disk.
+    GcDiskReport disk = compact();
     Log.infof(
         "gc sweep %s blobs: unlinked %d (%d bytes), withheld %d by grace (%d bytes), %d still"
-            + " referenced, %d already gone",
+            + " referenced, %d already gone, %s",
         row.name,
         outcome.blobsUnlinked(),
         outcome.bytesReclaimed(),
         outcome.withheldByGraceWindow(),
         outcome.withheldBytes(),
         outcome.stillReferenced(),
-        outcome.alreadyGone());
+        outcome.alreadyGone(),
+        diskLine(disk));
 
     return new GcRepositorySweepReport(
         row.name,
@@ -313,6 +331,7 @@ public class GcSweepExecutor {
         applied.deleted(),
         applied.withheldByGraceWindow(),
         outcome,
+        disk,
         sweep.untouchable(taken),
         runId);
   }
@@ -342,6 +361,7 @@ public class GcSweepExecutor {
         List.of(),
         List.of(),
         new GcSweepOutcome(0, 0L, 0, 0L, 0, 0, List.of()),
+        null,
         // A census WAS taken here, so the pool is a real reading rather than "not computed".
         sweep.untouchable(taken),
         runId);
@@ -420,15 +440,17 @@ public class GcSweepExecutor {
     }
 
     GcSweepOutcome outcome = sweep.execute(taken, plans);
+    GcDiskReport disk = compact();
     Log.infof(
         "gc sweep blobs: unlinked %d (%d bytes), withheld %d by grace (%d bytes), %d still"
-            + " referenced, %d already gone",
+            + " referenced, %d already gone, %s",
         outcome.blobsUnlinked(),
         outcome.bytesReclaimed(),
         outcome.withheldByGraceWindow(),
         outcome.withheldBytes(),
         outcome.stillReferenced(),
-        outcome.alreadyGone());
+        outcome.alreadyGone(),
+        diskLine(disk));
     return new GcSweepReport(
         executedAt,
         false,
@@ -437,11 +459,73 @@ public class GcSweepExecutor {
         pins.sources(),
         types,
         outcome,
+        disk,
         // The pool as it stood before this run: a version row deleted moments ago leaves its
         // within-grace tarball row-less in a fresh census, and listing that as "untouchable" would
         // misname a blob the next run is going to sweep.
         sweep.untouchable(taken),
         runId);
+  }
+
+  /**
+   * Gives back the disk the run's deletes left behind, and says what that was worth — or null.
+   *
+   * <p><b>Only an executed sweep gets here.</b> The dry run is {@code GcPlanner}'s and never reaches
+   * this class, and neither does an aborted run nor a scoped one whose type nothing collects: each
+   * returns its receipt before the blob loop. Compaction moves and drops chunk partitions, which is
+   * a write, and a plan must stay reviewable without side effects.
+   *
+   * <p><b>Outside any transaction, by construction.</b> {@link BlobCompaction#compact()} commits
+   * each step on its own and refuses a caller's transaction with an {@link IllegalStateException};
+   * this class holds none — every delete above committed in a transaction of its own, opened and
+   * closed inside the adapter or the store — and the controller methods that call it are not
+   * {@code @Transactional}. Should a caller ever wrap a sweep in one, the refusal lands in the catch
+   * below as a logged warning and a receipt without disk figures, never as a failed sweep.
+   *
+   * <p><b>A failure never fails the sweep.</b> By the time this runs the identity rows and blobs are
+   * gone, and the receipt is the only record of which; turning a compaction error into a 500 would
+   * throw that record away to report something the next run will retry anyway. It is logged as a
+   * warning, with the cause, and the receipt carries no disk figures rather than invented ones.
+   */
+  private GcDiskReport compact() {
+    try {
+      BlobCompaction.CompactionResult result = compaction.compact();
+      return new GcDiskReport(
+          result.state().name(),
+          result.blobTablesBytesBefore(),
+          result.blobTablesBytesAfter(),
+          result.databaseBytesBefore(),
+          result.databaseBytesAfter(),
+          result.segmentsDrained(),
+          result.segmentsDropped(),
+          result.segmentsHeld(),
+          result.bytesMoved());
+    } catch (RuntimeException failed) {
+      Log.warnf(
+          failed,
+          "gc sweep: blob compaction failed, so this run returns no disk; the deletes stand and the"
+              + " next run compacts again — %s",
+          message(failed));
+      return null;
+    }
+  }
+
+  /** The disk half of a run's blob log line, beside the data figures it is not. */
+  private static String diskLine(GcDiskReport disk) {
+    if (disk == null) {
+      return "disk not compacted (see the warning above)";
+    }
+    return String.format(
+        "disk %d -> %d bytes (blob tables), %d -> %d bytes (database), %d segments dropped, %d"
+            + " drained, %d held (%s)",
+        disk.blobTablesBytesBefore(),
+        disk.blobTablesBytesAfter(),
+        disk.databaseBytesBefore(),
+        disk.databaseBytesAfter(),
+        disk.segmentsDropped(),
+        disk.segmentsDrained(),
+        disk.segmentsHeld(),
+        disk.state());
   }
 
   /**

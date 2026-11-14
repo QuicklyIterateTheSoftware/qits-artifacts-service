@@ -499,6 +499,18 @@ collection" section is the contract; these are the rules that get "helpfully" re
   If the Phase-A env overrides `QITS_ARTIFACTS_GC_TYPE_OCI_IMAGES_WINDOW` and
   `QITS_ARTIFACTS_GC_BLOB_GRACE_PERIOD` are still set on qits-configuration, REMOVE them — they
   shadow these defaults.
+- **Deleting a blob frees no disk; the compaction after the blob loop does (qits-2248).** A
+  deleted chunk row's space stays inside `blob_chunk`'s files — PostgreSQL reuses it and never
+  returns it to the filesystem — so `GcSweepOutcome.bytesReclaimed` is the data size of what was
+  unlinked, and a run that "reclaimed" 15 GiB used to leave the volume exactly as full.
+  `GcSweepExecutor` calls the library's `BlobCompaction.compact()` after `BlobSweep.execute` on both
+  executed paths (whole store and one repository — compaction is store-wide either way), and the
+  receipt's `disk` (`GcDiskReport`) carries what it measured: blob tables and database bytes before
+  and after, segments drained, dropped and held. The dry run, an aborted run and a scoped run whose
+  type nothing collects never reach it, and report `disk: null`. It must run outside any
+  transaction — the library refuses one — which is why neither the executor nor the controller is
+  `@Transactional`; and a compaction failure is a logged warning and `disk: null`, never a failed
+  sweep, because the deletes have already happened and the receipt is their only record.
 - **The dry-run report is the review surface, and four of its parts are load-bearing.** `summary`
   is first in `GcPlanReport` because it is what a human reads first — executable yes/no, the
   reclaim in bytes and in units, one line per type — and it is **derived** by `GcSummary` from the

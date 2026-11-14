@@ -41,7 +41,12 @@ import java.util.List;
  *     that condemned it
  * @param withheldByGraceWindow identities left whole because their own row, or a blob they release,
  *     is still inside the window. Not lost: the next run past it takes rows and files together.
- * @param sweep the blob unlinks — what was freed, and every candidate that was not
+ * @param sweep the blob unlinks — what was freed, and every candidate that was not. Its byte figures
+ *     are data sizes, not disk — see {@code disk}
+ * @param disk what the blob store's compaction gave back to the volume after the unlinks
+ *     (qits-2248), or null when there is no figure: an aborted run, a type nobody collects or that
+ *     refused to plan, or a compaction that failed and was logged. Compaction is store-wide — blob
+ *     segments do not know repositories — so this is the whole store's disk, not this repository's
  * @param untouchable the row-less pool as it stood before this run, restated
  * @param runId this run's id, unique per receipt
  */
@@ -59,5 +64,6 @@ public record GcRepositorySweepReport(
     List<GcIdentity> deleted,
     List<GcIdentity> withheldByGraceWindow,
     GcSweepOutcome sweep,
+    GcDiskReport disk,
     GcUntouchablePool untouchable,
     String runId) {}
