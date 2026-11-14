@@ -101,6 +101,13 @@ public class ProviderStates {
    * source unreachable and every pin-dependent type refuses.
    */
   public static final String PIN_SOURCES_SILENT = "a registry whose pin sources do not answer";
+  /**
+   * qits-2138: {@link #UNPINNED_IDENTITIES}, named for the one repository they sit in — the daemon
+   * repository — so qits-orchestrator's per-repository plan and sweep have a {@code {repository}}
+   * to address, and the listing a row to be filtered to.
+   */
+  public static final String A_REPOSITORY_WITH_UNPINNED_IDENTITIES =
+      "a repository with unpinned identities";
   public static final String A_MAVEN_ARTIFACT = "a maven artifact published at a version";
   public static final String NO_MAVEN_ARTIFACT = "no maven artifact published at the version";
   public static final String AN_NPM_PACKAGE = "an npm package published at a version";
@@ -915,6 +922,7 @@ public class ProviderStates {
     states.put(A_STORE_WITH_CONTENT, this::aStoreWithContent);
     states.put(UNPINNED_IDENTITIES, this::unpinnedIdentities);
     states.put(PIN_SOURCES_SILENT, this::pinSourcesSilent);
+    states.put(A_REPOSITORY_WITH_UNPINNED_IDENTITIES, this::aRepositoryWithUnpinnedIdentities);
     states.put(A_MAVEN_ARTIFACT, this::aMavenArtifact);
     states.put(NO_MAVEN_ARTIFACT, this::noMavenArtifact);
     states.put(AN_NPM_PACKAGE, this::anNpmPackage);
@@ -1402,6 +1410,19 @@ public class ProviderStates {
   private Setup unpinnedIdentities() {
     seedTwoDaemonVersions();
     return new Setup(new TreeMap<>(), List.of());
+  }
+
+  /**
+   * Seeded as {@link #unpinnedIdentities()}, with the repository and the daemon named: the
+   * per-repository routes take the one as their path segment, and the recordings keep only the
+   * entries naming the other, since other suites' rows share the store.
+   */
+  private Setup aRepositoryWithUnpinnedIdentities() {
+    seedTwoDaemonVersions();
+    Map<String, String> params = new TreeMap<>();
+    params.put("daemon", DAEMON);
+    params.put("repository", DAEMONS);
+    return new Setup(params, List.of());
   }
 
   /**

@@ -1,0 +1,87 @@
+{
+  "repository": "daemons",
+  "type": "daemon-binaries",
+  "generatedAt": "2026-01-01T00:00:00Z",
+  "dryRun": true,
+  "graceWindow": "PT6H",
+  "executable": true,
+  "pinFailures": [],
+  "pins": [
+    {
+      "source": "supplied: qits-platform-deployments",
+      "url": "",
+      "answered": true,
+      "outcome": "1 application pins over 2 image shas — what is serving, and what a rollback would restore",
+      "readAt": "2026-01-01T00:00:00Z",
+      "tookMillis": 0,
+      "pinCount": 0,
+      "keeps": [
+        "qits-artifacts:aaaa",
+        "qits-artifacts:bbbb"
+      ]
+    },
+    {
+      "source": "supplied: qits-ci",
+      "url": "",
+      "answered": true,
+      "outcome": "daemon qits-ci-daemon, 1 ladder rungs pinned (source: adopted)",
+      "readAt": "2026-01-01T00:00:00Z",
+      "tookMillis": 0,
+      "pinCount": 0,
+      "keeps": [
+        "qits-ci-daemon@2026.805.1"
+      ]
+    },
+    {
+      "source": "supplied: qits-platform-maintenance",
+      "url": "",
+      "answered": true,
+      "outcome": "1 manifest references over 1 coordinates (1 maven, 0 npm, 0 docker, 0 daemon) — what repositories on main still build against",
+      "readAt": "2026-01-01T00:00:00Z",
+      "tookMillis": 0,
+      "pinCount": 0,
+      "keeps": [
+        "eu.wohlben.qits:qits-blobstore:2026.903.85122"
+      ]
+    },
+    {
+      "source": "supplied: qits-workspaces",
+      "url": "",
+      "answered": true,
+      "outcome": "1 launch images over 1 coordinates — what a workspace or editor start would pull TODAY",
+      "readAt": "2026-01-01T00:00:00Z",
+      "tookMillis": 0,
+      "pinCount": 0,
+      "keeps": [
+        "qits/workspace:2026.903.120000"
+      ]
+    },
+    {
+      "source": "supplied: qits-projects",
+      "url": "",
+      "answered": true,
+      "outcome": "1 launch images over 1 coordinates — what an agent or refinement start would pull TODAY",
+      "readAt": "2026-01-01T00:00:00Z",
+      "tookMillis": 0,
+      "pinCount": 0,
+      "keeps": [
+        "qits/project-agent:2026.903.090000"
+      ]
+    }
+  ],
+  "strategy": "DaemonBinariesGcStrategy",
+  "note": null,
+  "error": null,
+  "kept": [
+    {
+      "repository": "daemons",
+      "identity": "contract-daemon@2026.1.0",
+      "rule": "among the last 2 released versions of this identity group — releases are kept by policy, not by access"
+    },
+    {
+      "repository": "daemons",
+      "identity": "contract-daemon@2026.2.0",
+      "rule": "among the last 2 released versions of this identity group — releases are kept by policy, not by access"
+    }
+  ]
+}

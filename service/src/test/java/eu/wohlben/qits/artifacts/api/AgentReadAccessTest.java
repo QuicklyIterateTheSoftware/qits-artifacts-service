@@ -144,5 +144,7 @@ class AgentReadAccessTest {
     asAgent().when().post(BASE + "/gc/repositories/agent-images/sweep").then().statusCode(403);
     // A read behind a write verb. It keeps its roles: agents send the GET.
     asAgent().when().post(BASE + "/gc/plan").then().statusCode(403);
+    asAgent().when().post(BASE + "/gc/repositories").then().statusCode(403);
+    asAgent().when().post(BASE + "/gc/repositories/agent-images/plan").then().statusCode(403);
   }
 }

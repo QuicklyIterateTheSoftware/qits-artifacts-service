@@ -107,7 +107,15 @@ public class GcPlanner {
    * censuses and 2N cross-service calls to draw one column.
    */
   public GcRepositoriesPlanResponse planForRepositories() {
-    GcPlanReport report = plan();
+    return planForRepositories(null);
+  }
+
+  /**
+   * The same figures, over pins the caller supplied — null fetches them, exactly as {@link
+   * #planForRepositories()} does (qits-2138).
+   */
+  public GcRepositoriesPlanResponse planForRepositories(GcSuppliedPins supplied) {
+    GcPlanReport report = plan(supplied);
     return new GcRepositoriesPlanResponse(
         report.generatedAt(),
         report.executable(),
@@ -127,8 +135,19 @@ public class GcPlanner {
    * @throws eu.wohlben.qits.blobstore.error.NotFoundException no repository of that name
    */
   public GcRepositoryPlanReport planForRepository(String name) {
+    return planForRepository(name, null);
+  }
+
+  /**
+   * The same plan, over pins the caller supplied — null fetches them, exactly as {@link
+   * #planForRepository(String)} does (qits-2138). The repository is resolved first, so an unknown
+   * name is a 404 whatever the body carried.
+   *
+   * @throws eu.wohlben.qits.blobstore.error.NotFoundException no repository of that name
+   */
+  public GcRepositoryPlanReport planForRepository(String name, GcSuppliedPins supplied) {
     ArtifactRepository row = repositories.require(name);
-    GcPins pins = pinSources.fetch();
+    GcPins pins = pinSources.fetch(supplied);
     LiveBlobCensus.Census taken = census.take();
     String type = row.type;
     Outcome outcome = outcomeOf(type, claiming(registered(), type), taken, pins);

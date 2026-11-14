@@ -222,6 +222,35 @@ class AdminWriteGuardTest {
   }
 
   @Test
+  void theMachineIdentityMayPostTheRepositoryReadsItIsAllowedToSweep() {
+    // qits-2138: the per-repository twins of POST /gc/plan sit under the same `gc` write prefix —
+    // no token is a 401 — and open to the same qits:system caller. No body here: what is on trial
+    // is the guard and the role, not the keep-set.
+    String system = bearer(MachineTokens.forSystem());
+    given().contentType(ContentType.JSON).when().post("/artifacts/api/gc/repositories").then().statusCode(401);
+    given()
+        .contentType(ContentType.JSON)
+        .when()
+        .post("/artifacts/api/gc/repositories/guard-probe/plan")
+        .then()
+        .statusCode(401);
+    given()
+        .header("Authorization", system)
+        .when()
+        .post("/artifacts/api/gc/repositories")
+        .then()
+        .statusCode(200)
+        .body("repositories", org.hamcrest.Matchers.notNullValue());
+    // An unknown repository: past the guard and the role, the 404 is the controller's.
+    given()
+        .header("Authorization", system)
+        .when()
+        .post("/artifacts/api/gc/repositories/guard-probe-absent/plan")
+        .then()
+        .statusCode(404);
+  }
+
+  @Test
   void anUploadWithoutATokenIs401() {
     given()
         .contentType("image/png")

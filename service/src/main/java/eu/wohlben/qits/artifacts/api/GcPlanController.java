@@ -53,7 +53,9 @@ import org.eclipse.microprofile.openapi.annotations.parameters.RequestBody;
  * store younger than the grace window it deletes nothing, provably.
  *
  * <p><b>Pins may arrive in the request.</b> {@code POST /gc/plan} is the {@code GET}'s twin for
- * that and nothing else, and both sweeps take the same optional body: {@code {"pins":
+ * that and nothing else — as {@code POST /gc/repositories} and {@code POST
+ * /gc/repositories/{repository}/plan} are for their {@code GET}s (qits-2138) — and both sweeps take
+ * the same optional body: {@code {"pins":
  * {"deployments": …, "ciDaemon": …, "dependencies": …, "workspaceLaunches": …, "projectLaunches":
  * …}}}, each member the
  * peer's response verbatim. It is how
@@ -153,6 +155,28 @@ public class GcPlanController {
   }
 
   /**
+   * The same listing, over pins the caller supplied — the {@code GET}'s twin exactly as {@code POST
+   * /gc/plan} is {@code GET /gc/plan}'s, and for the same caller: qits-orchestrator, which reads the
+   * pins itself once the pin sources are private to it (qits-2138). It reads and deletes nothing;
+   * with no body, or no {@code pins}, it answers what the {@code GET} answers.
+   */
+  @POST
+  @Path("/repositories")
+  // Named, unlike its GET: qits-orchestrator's pact cites it (qits-2138).
+  @Operation(operationId = "planGcRepositoriesWithSuppliedPins")
+  @jakarta.annotation.security.RolesAllowed({"qits:admin", "qits:system"})
+  public GcRepositoriesPlanResponse repositoriesWithSuppliedPins(
+      @RequestBody(
+              required = false,
+              content =
+                  @Content(
+                      mediaType = MediaType.APPLICATION_JSON,
+                      schema = @Schema(type = SchemaType.OBJECT)))
+          String body) {
+    return planner.planForRepositories(suppliedPins(body));
+  }
+
+  /**
    * One repository's plan in full: the identities that would die and the ones that would not, each
    * with its rule, the two blob figures, the configuration echo, the pins provenance and the
    * row-less pool.
@@ -169,6 +193,29 @@ public class GcPlanController {
   @jakarta.annotation.security.RolesAllowed({"qits:admin", "qits:agent", "qits:system", "qits:ci-run"})
   public GcRepositoryPlanReport repositoryPlan(@PathParam("repository") String repository) {
     return planner.planForRepository(repository);
+  }
+
+  /**
+   * The same plan, over pins the caller supplied: the review artifact for a scoped sweep that
+   * qits-orchestrator runs with the pins it read (qits-2138), so the plan and the sweep see one pin
+   * set. It reads and deletes nothing; 404 for a repository that does not exist, as the {@code
+   * GET}; with no body, or no {@code pins}, it answers what the {@code GET} answers.
+   */
+  @POST
+  @Path("/repositories/{repository}/plan")
+  // Named, unlike its GET: qits-orchestrator's pact cites it (qits-2138).
+  @Operation(operationId = "planGcRepositoryWithSuppliedPins")
+  @jakarta.annotation.security.RolesAllowed({"qits:admin", "qits:system"})
+  public GcRepositoryPlanReport repositoryPlanWithSuppliedPins(
+      @PathParam("repository") String repository,
+      @RequestBody(
+              required = false,
+              content =
+                  @Content(
+                      mediaType = MediaType.APPLICATION_JSON,
+                      schema = @Schema(type = SchemaType.OBJECT)))
+          String body) {
+    return planner.planForRepository(repository, suppliedPins(body));
   }
 
   /**
@@ -215,10 +262,18 @@ public class GcPlanController {
    */
   @POST
   @Path("/repositories/{repository}/sweep")
-  @Operation(hidden = true)
+  // Named since qits-2138: qits-orchestrator's pact cites it, with the pins it read.
+  @Operation(operationId = "sweepGcRepository")
   @jakarta.annotation.security.RolesAllowed("qits:system")
   public GcRepositorySweepReport repositorySweep(
-      @PathParam("repository") String repository, String body) {
+      @PathParam("repository") String repository,
+      @RequestBody(
+              required = false,
+              content =
+                  @Content(
+                      mediaType = MediaType.APPLICATION_JSON,
+                      schema = @Schema(type = SchemaType.OBJECT)))
+          String body) {
     return executor.sweep(repository, suppliedPins(body));
   }
 

@@ -391,12 +391,14 @@ class GcPlanControllerTest {
         .get("/artifacts/api/gc/sweep")
         .then()
         .statusCode(405);
+    // …and so is POST /gc/repositories/{repository}/plan, its scoped twin (qits-2138).
     given()
         .header("Authorization", SuiteBearers.operator())
         .when()
         .post("/artifacts/api/gc/repositories/" + REPO + "/plan")
         .then()
-        .statusCode(405);
+        .statusCode(200)
+        .body("dryRun", is(true));
     given()
         .header("Authorization", SuiteBearers.operator())
         .when()
@@ -649,6 +651,88 @@ class GcPlanControllerTest {
   }
 
   @Test
+  void theRepositoryReadsTakeSuppliedPinsAsThePlanDoes() {
+    // qits-2138: qits-orchestrator is the one component that can read the pin sources once they
+    // go private, so the per-repository reads take its set exactly as POST /gc/plan does — and
+    // name it as supplied.
+    given()
+        .header("Authorization", SuiteBearers.platform())
+        .contentType(io.restassured.http.ContentType.JSON)
+        .body(body())
+        .when()
+        .post("/artifacts/api/gc/repositories")
+        .then()
+        .statusCode(200)
+        .body("executable", is(true))
+        .body("pinFailures", hasSize(0))
+        .body("repositories.find { it.repository == '" + REPO + "' }.error", nullValue());
+
+    given()
+        .header("Authorization", SuiteBearers.operator())
+        .contentType(io.restassured.http.ContentType.JSON)
+        .body(body())
+        .when()
+        .post("/artifacts/api/gc/repositories/" + REPO + "/plan")
+        .then()
+        .statusCode(200)
+        .body("repository", is(REPO))
+        .body("dryRun", is(true))
+        .body("executable", is(true))
+        .body("pinFailures", hasSize(0))
+        .body("error", nullValue())
+        .body(
+            "pins.source",
+            org.hamcrest.Matchers.containsInAnyOrder(
+                "supplied: qits-platform-deployments",
+                "supplied: qits-ci",
+                "supplied: qits-platform-maintenance",
+                "supplied: qits-workspaces",
+                "supplied: qits-projects"))
+        .body("pins.url", everyItem(is("")));
+
+    // An unknown repository is still a 404, whatever the body carries.
+    given()
+        .header("Authorization", SuiteBearers.platform())
+        .contentType(io.restassured.http.ContentType.JSON)
+        .body(body())
+        .when()
+        .post("/artifacts/api/gc/repositories/no-such-repository/plan")
+        .then()
+        .statusCode(404);
+  }
+
+  @Test
+  void theRepositoryReadsRefuseASuppliedSetMissingASource() {
+    // The fail-closed rule holds on both twins: a member left out is that source unanswered.
+    String partial = body(DEPLOYMENTS, CI_DAEMON, DEPENDENCIES, WORKSPACE_LAUNCHES, null);
+    given()
+        .header("Authorization", SuiteBearers.platform())
+        .contentType(io.restassured.http.ContentType.JSON)
+        .body(partial)
+        .when()
+        .post("/artifacts/api/gc/repositories")
+        .then()
+        .statusCode(200)
+        .body("executable", is(false))
+        .body("pinFailures", hasSize(1))
+        .body("pinFailures[0]", org.hamcrest.Matchers.containsString("projectLaunches"));
+
+    given()
+        .header("Authorization", SuiteBearers.platform())
+        .contentType(io.restassured.http.ContentType.JSON)
+        .body(partial)
+        .when()
+        .post("/artifacts/api/gc/repositories/" + REPO + "/plan")
+        .then()
+        .statusCode(200)
+        .body("executable", is(false))
+        .body("pinFailures", hasSize(1))
+        .body("pinFailures[0]", org.hamcrest.Matchers.containsString("projectLaunches"))
+        .body("pins.find { it.source == 'supplied: qits-projects' }.answered", is(false))
+        .body("pins.find { it.source == 'supplied: qits-ci' }.answered", is(true));
+  }
+
+  @Test
   void aCallWithNoBodyIsTheOldCallInEveryRespect() {
     // The SPA and every operator recipe send no body — some with no Content-Type at all — and that
     // must keep meaning "read the pins over HTTP". Here those readers are closed ports, so the
@@ -667,6 +751,27 @@ class GcPlanControllerTest {
         .body(
             "pins.find { it.source == 'qits-workspaces' }.url",
             is("http://localhost:1/workspaces/api/pins"));
+
+    // The repository twins read over HTTP too, with no body or with {} (qits-2138).
+    given()
+        .header("Authorization", SuiteBearers.operator())
+        .when()
+        .post("/artifacts/api/gc/repositories")
+        .then()
+        .statusCode(200)
+        .body("executable", is(false))
+        .body("pinFailures", hasSize(5));
+    given()
+        .header("Authorization", SuiteBearers.operator())
+        .contentType(io.restassured.http.ContentType.JSON)
+        .body("{}")
+        .when()
+        .post("/artifacts/api/gc/repositories/" + REPO + "/plan")
+        .then()
+        .statusCode(200)
+        .body("executable", is(false))
+        .body("pinFailures", hasSize(5))
+        .body("pins.find { it.source == 'qits-ci' }.url", is("http://localhost:1/ci/api/daemon"));
 
     // An empty JSON object is the SPA's scoped sweep, which posts {} rather than nothing.
     given()
@@ -700,6 +805,22 @@ class GcPlanControllerTest {
         .body("{\"pins\": 5}")
         .when()
         .post("/artifacts/api/gc/sweep")
+        .then()
+        .statusCode(400);
+    given()
+        .header("Authorization", SuiteBearers.operator())
+        .contentType(io.restassured.http.ContentType.JSON)
+        .body("{\"pins\": not json}")
+        .when()
+        .post("/artifacts/api/gc/repositories")
+        .then()
+        .statusCode(400);
+    given()
+        .header("Authorization", SuiteBearers.operator())
+        .contentType(io.restassured.http.ContentType.JSON)
+        .body("{\"pins\": 5}")
+        .when()
+        .post("/artifacts/api/gc/repositories/" + REPO + "/plan")
         .then()
         .statusCode(400);
   }
