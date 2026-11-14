@@ -1057,6 +1057,35 @@ components:
           $ref: "#/components/schemas/Instant"
         accessedAt:
           $ref: "#/components/schemas/Instant"
+    GcDiskReport:
+      type: object
+      properties:
+        state:
+          type: string
+        blobTablesBytesBefore:
+          type: integer
+          format: int64
+        blobTablesBytesAfter:
+          type: integer
+          format: int64
+        databaseBytesBefore:
+          type: integer
+          format: int64
+        databaseBytesAfter:
+          type: integer
+          format: int64
+        segmentsDrained:
+          type: integer
+          format: int32
+        segmentsDropped:
+          type: integer
+          format: int32
+        segmentsHeld:
+          type: integer
+          format: int32
+        bytesMoved:
+          type: integer
+          format: int64
     GcIdentity:
       type: object
       properties:
@@ -1279,6 +1308,8 @@ components:
             $ref: "#/components/schemas/GcIdentity"
         sweep:
           $ref: "#/components/schemas/GcSweepOutcome"
+        disk:
+          $ref: "#/components/schemas/GcDiskReport"
         untouchable:
           $ref: "#/components/schemas/GcUntouchablePool"
         runId:
@@ -1348,6 +1379,8 @@ components:
             $ref: "#/components/schemas/GcTypeSweepResult"
         sweep:
           $ref: "#/components/schemas/GcSweepOutcome"
+        disk:
+          $ref: "#/components/schemas/GcDiskReport"
         untouchable:
           $ref: "#/components/schemas/GcUntouchablePool"
         runId:
