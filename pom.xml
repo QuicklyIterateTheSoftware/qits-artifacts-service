@@ -139,7 +139,7 @@
              qits-1149): what each pin source and the idp record for their provider states. Test
              scope, read off the classpath by ProviderGoldenMasters. Moved by qits-maintenance like
              every other pin; do not hand-edit them to chase a release. -->
-        <qits.deployments-golden-masters.version>2026.1113.124805</qits.deployments-golden-masters.version>
+        <qits.deployments-golden-masters.version>2026.1114.112916</qits.deployments-golden-masters.version>
         <qits.ci-golden-masters.version>2026.1113.31502</qits.ci-golden-masters.version>
         <qits.maintenance-golden-masters.version>2026.1112.35408</qits.maintenance-golden-masters.version>
         <qits.workspaces-golden-masters.version>2026.1111.70514</qits.workspaces-golden-masters.version>
