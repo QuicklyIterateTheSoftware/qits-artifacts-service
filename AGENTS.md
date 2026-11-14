@@ -300,6 +300,15 @@ that library tells its consumers to do, and which its own suite applies unedited
 exercised on every build of the jar. Keep the text identical, so a later diff between the two is
 readable. `qits.artifacts.blobs-datasource=artifacts` is what points the store at them.
 
+**V7 segments `blob_chunk` (qits-2248)**, again verbatim — from the library's
+`db/blobstore-segments-upgrade.sql`, its instruction to a consumer whose blob tables came from the
+earlier `blobstore-tables.sql`. The chunk table becomes a LIST-partitioned parent with one partition
+per segment, `blob_segment` names the open one and `blob_open_segment()` is the column default an
+older library's inserts fall back on. A fresh chain ends with `blob_chunk_0` (the upgrade's
+partition for pre-segment chunks, empty there) and `blob_chunk_1` open; the first compaction drops
+the empty `_0`. Partitions after that are created by the store's roll and dropped by its compaction
+— never by a migration, and never by hand.
+
 The persistence unit is the artifacts jar's own: `quarkus.hibernate-orm.artifacts.packages` names
 `eu.wohlben.qits.blobstore.entity` AND `eu.wohlben.qits.artifacts.entity` in that jar's
 `microprofile-config.properties` — the store's entities and the formats' plus this repo's — and

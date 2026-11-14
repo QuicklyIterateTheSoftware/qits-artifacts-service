@@ -9,6 +9,7 @@ import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -191,9 +192,9 @@ class MigrationLineageTest {
   @Test
   void theBlobTablesAreHereBecauseTheStoreIsInThisDatabaseNow() throws SQLException {
     // The blob store's three tables, copied verbatim from qits-blobstore's own
-    // db/blobstore-tables.sql into V1. They are the half of this schema that used to be a directory,
-    // so a lineage that built every metadata table and none of these would leave a service that
-    // boots and then cannot store a byte.
+    // db/blobstore-tables.sql into V1, and segmented by its upgrade script, verbatim in V7. They are
+    // the half of this schema that used to be a directory, so a lineage that built every metadata
+    // table and none of these would leave a service that boots and then cannot store a byte.
     for (String table : List.of("blob", "blob_content", "blob_chunk")) {
       assertEquals(1, tableCount(table), table);
       assertEquals(0, count("select count(*) from " + table), table + " starts empty");
@@ -215,6 +216,68 @@ class MigrationLineageTest {
                     "insert into blob (id, content_id, size_bytes, chunk_size, stored_at) values"
                         + " ('../etc/passwd', '00000000-0000-0000-0000-000000000001', 1, 1, now())"));
     assertTrue(refused.getMessage().toUpperCase(Locale.ROOT).contains("BLOB"), refused.getMessage());
+
+    // V7 (qits-2248): the chunk table is segmented, which is what lets a gc sweep give disk back —
+    // a delete frees nothing on disk, a dropped partition does. A chain from empty ends with the
+    // library's current shape: blob_chunk a LIST-partitioned parent, the one-row blob_segment naming
+    // the open segment, and that segment's partition there to take the first upload. The extra
+    // blob_chunk_0 is the upgrade's partition for pre-segment chunks, empty on a fresh install.
+    assertEquals(1, tableCount("blob_segment"), "blob_segment");
+    assertEquals(
+        1,
+        count(
+            "select count(*) from pg_partitioned_table p join pg_class c on c.oid = p.partrelid"
+                + " where c.relname = 'blob_chunk' and p.partstrat = 'l'"),
+        "blob_chunk is list-partitioned");
+    assertEquals(1, count("select count(*) from blob_segment"), "exactly one open segment");
+    assertEquals(1, count("select segment from blob_segment"), "segment 1 is the open one");
+    assertEquals(
+        List.of("blob_chunk_0", "blob_chunk_1"),
+        strings(
+            "select c.relname from pg_inherits i join pg_class c on c.oid = i.inhrelid"
+                + " join pg_class p on p.oid = i.inhparent where p.relname = 'blob_chunk'"
+                + " order by c.relname"));
+  }
+
+  @Test
+  void theSegmentUpgradeKeepsEveryChunkAStoreAlreadyHeldInSegmentZero() throws SQLException {
+    // The path a deployed store takes: V1..V6 applied, chunks stored, then V7. Nothing is rewritten
+    // — the old table is renamed into partition 0 and attached — so a chunk written before the
+    // upgrade reads back from the parent exactly as before, and a writer that names no segment (a
+    // library older than qits-2248, still serving during a start-first deploy) lands in the open
+    // segment through the column's default rather than in the closed one.
+    migrateTo("6");
+    execute(
+        "insert into blob_content (content_id, state, started_at) values"
+            + " ('00000000-0000-0000-0000-000000000001', 'PROMOTED', now()),"
+            + " ('00000000-0000-0000-0000-000000000002', 'PROMOTED', now())");
+    execute(
+        "insert into blob_chunk (content_id, seq, bytes) values"
+            + " ('00000000-0000-0000-0000-000000000001', 0, '\\x0102')");
+
+    Flyway.configure()
+        .dataSource(dataSource)
+        .locations("classpath:db/artifacts/postgresql")
+        .load()
+        .migrate();
+
+    assertEquals(
+        1,
+        count(
+            "select count(*) from blob_chunk where content_id ="
+                + " '00000000-0000-0000-0000-000000000001' and seq = 0 and segment = 0"
+                + " and bytes = '\\x0102'"),
+        "the old chunk is segment 0's, read through the parent");
+    assertEquals(1, count("select count(*) from blob_chunk_0"));
+
+    execute(
+        "insert into blob_chunk (content_id, seq, bytes) values"
+            + " ('00000000-0000-0000-0000-000000000002', 0, '\\x03')");
+    assertEquals(1, count("select count(*) from blob_chunk_1"), "an unnamed segment is the open one");
+
+    // The cascade survives the rename: deleting a content still takes its chunks, in any segment.
+    execute("delete from blob_content");
+    assertEquals(0, count("select count(*) from blob_chunk"));
   }
 
   @Test
@@ -568,6 +631,18 @@ class MigrationLineageTest {
       rows.next();
       return rows.getLong(1);
     }
+  }
+
+  private List<String> strings(String query) throws SQLException {
+    List<String> out = new ArrayList<>();
+    try (Connection connection = dataSource.getConnection();
+        Statement statement = connection.createStatement();
+        ResultSet rows = statement.executeQuery(query)) {
+      while (rows.next()) {
+        out.add(rows.getString(1));
+      }
+    }
+    return out;
   }
 
   /** 1 if the table is in this database's public schema, 0 if it is not. */
