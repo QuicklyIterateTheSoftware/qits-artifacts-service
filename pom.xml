@@ -132,7 +132,7 @@
         <qits.bootstrap-cli-pacts-qits-artifacts-service.version>2026.1023.225504</qits.bootstrap-cli-pacts-qits-artifacts-service.version>
         <qits.maintenance-service-pacts-qits-artifacts-service.version>2026.1019.73752</qits.maintenance-service-pacts-qits-artifacts-service.version>
         <qits.orchestrator-service-pacts-qits-artifacts-service.version>2026.1019.92500</qits.orchestrator-service-pacts-qits-artifacts-service.version>
-        <qits.platform-access-monorepo-pacts-qits-artifacts-service.version>2026.1109.54009</qits.platform-access-monorepo-pacts-qits-artifacts-service.version>
+        <qits.platform-access-monorepo-pacts-qits-artifacts-service.version>2026.1113.220814</qits.platform-access-monorepo-pacts-qits-artifacts-service.version>
         <qits.deployments-service-pacts-qits-artifacts-service.version>2026.1107.180656</qits.deployments-service-pacts-qits-artifacts-service.version>
         <qits.landing-app-pacts-qits-artifacts-service.version>2026.1111.115708</qits.landing-app-pacts-qits-artifacts-service.version>
         <!-- THE PROVIDERS' GOLDEN MASTERS this service's OWN consumer pacts read (contracts/consumer,
@@ -143,7 +143,7 @@
         <qits.ci-golden-masters.version>2026.1113.31502</qits.ci-golden-masters.version>
         <qits.maintenance-golden-masters.version>2026.1112.35408</qits.maintenance-golden-masters.version>
         <qits.workspaces-golden-masters.version>2026.1111.70514</qits.workspaces-golden-masters.version>
-        <qits.projects-golden-masters.version>2026.1113.120648</qits.projects-golden-masters.version>
+        <qits.projects-golden-masters.version>2026.1113.222933</qits.projects-golden-masters.version>
         <qits.idp-golden-masters.version>2026.1109.13349</qits.idp-golden-masters.version>
         <qits.maven.repository.url>https://registry.qits.wohlben.eu/artifacts/maven/maven</qits.maven.repository.url>
         <maven.compiler.release>25</maven.compiler.release>
