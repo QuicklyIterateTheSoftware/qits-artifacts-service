@@ -221,6 +221,38 @@
       ]
     },
     {
+      "name": "a docs catalog of every kind",
+      "slug": "a-docs-catalog-of-every-kind",
+      "params": {
+        "site0": "@apidocs/qits-ci",
+        "site1": "@userflows/qits-events",
+        "site2": "@guides/qits-platform",
+        "site3": "@contracts/qits-projects",
+        "site4": "@routes/qits-landing",
+        "site5": "@changelog/qits-landing-app",
+        "site6": "@qits/ui-components",
+        "site7": "qits-storybook"
+      },
+      "dependsOn": [],
+      "operations": [
+        {
+          "operationId": "listDocsSites",
+          "method": "GET",
+          "path": "/artifacts/docs/docs",
+          "status": 200,
+          "file": "a-docs-catalog-of-every-kind/listDocsSites.json",
+          "frozen": {
+            "ids": [],
+            "instants": [
+              "$.sites[*].latestPublishedAt"
+            ],
+            "strings": [],
+            "listFilteredTo": "$.sites"
+          }
+        }
+      ]
+    },
+    {
       "name": "a docs site published from two branches",
       "slug": "a-docs-site-published-from-two-branches",
       "params": {
@@ -1576,6 +1608,27 @@
             "instants": [],
             "strings": [],
             "listFilteredTo": null
+          }
+        }
+      ]
+    },
+    {
+      "name": "an empty docs catalog",
+      "slug": "an-empty-docs-catalog",
+      "params": {},
+      "dependsOn": [],
+      "operations": [
+        {
+          "operationId": "listDocsSites",
+          "method": "GET",
+          "path": "/artifacts/docs/docs",
+          "status": 200,
+          "file": "an-empty-docs-catalog/listDocsSites.json",
+          "frozen": {
+            "ids": [],
+            "instants": [],
+            "strings": [],
+            "listFilteredTo": "$.sites"
           }
         }
       ]

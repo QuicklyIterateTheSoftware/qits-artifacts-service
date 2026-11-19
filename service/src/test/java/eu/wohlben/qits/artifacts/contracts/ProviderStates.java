@@ -65,6 +65,11 @@ public class ProviderStates {
   // qits-1948: `qits artifacts publish docs submit --if-changed`
   public static final String A_DOCS_SITE_WITH_A_CONTENT_HASH =
       "a docs site published with a content hash";
+  // qits-2318: qits-landing-app's docs page — the whole catalog of the docs repository, once with a
+  // site in every section the page groups by (and some with several versions, published at
+  // different times, so a newest-first sort shows), and once with no site at all.
+  public static final String A_DOCS_CATALOG_OF_EVERY_KIND = "a docs catalog of every kind";
+  public static final String AN_EMPTY_DOCS_CATALOG = "an empty docs catalog";
   // qits-1951: the landing app's routes bundle. Three states over the same bundle, one per file the
   // consumer reads, because a state records one answer per operation and getDocsFile is one
   // operation: the state's {path} param is what picks the file.
@@ -900,6 +905,8 @@ public class ProviderStates {
     states.put(A_DOCS_SITE, this::aDocsSite);
     states.put(A_DOCS_SITE_FROM_TWO_BRANCHES, this::aDocsSiteFromTwoBranches);
     states.put(A_DOCS_SITE_WITH_A_CONTENT_HASH, this::aDocsSiteWithAContentHash);
+    states.put(A_DOCS_CATALOG_OF_EVERY_KIND, this::aDocsCatalogOfEveryKind);
+    states.put(AN_EMPTY_DOCS_CATALOG, this::anEmptyDocsCatalog);
     states.put(A_ROUTES_BUNDLE, () -> aRoutesBundle(ROUTES_MANIFEST));
     states.put(A_ROUTES_BUNDLE_FREEZE, () -> aRoutesBundle(ROUTES_FREEZE));
     states.put(A_ROUTES_BUNDLE_FONT, () -> aRoutesBundle(ROUTES_FONT));
@@ -993,6 +1000,9 @@ public class ProviderStates {
                           ROUTES_SITE,
                           CONTRACTS_SITE,
                           GITHOST_CONTRACTS_SITE))
+                  .forEach(docsSites::delete);
+              docsSites
+                  .list("repository = ?1 and name in ?2", DOCS, DOCS_CATALOG.keySet())
                   .forEach(docsSites::delete);
               // The registries' tables live in the same persistence unit as the daemon rows.
               var entityManager = daemonBinaries.getEntityManager();
@@ -1205,6 +1215,97 @@ public class ProviderStates {
     params.put("site", DOCS_SITE);
     params.put("version", DOCS_VERSION);
     return new Setup(params, List.of());
+  }
+
+  // --- the docs catalog (qits-2318) ------------------------------------------------------------
+
+  /**
+   * The docs catalog state's sites, by name, each to its versions (oldest first) and the instant
+   * each was published at: one site per section qits-landing-app's docs page groups by — API docs,
+   * user flows, guides, contracts, routes, changelogs, and two unscoped storybooks, one under a
+   * package scope of its own and one bare. Three sites carry more than one version, and every
+   * site's newest instant differs from every other's, so a newest-first sort is visible.
+   */
+  static final Map<String, Map<String, Instant>> DOCS_CATALOG = docsCatalog();
+
+  private static Map<String, Map<String, Instant>> docsCatalog() {
+    Instant base = Instant.parse("2026-01-01T00:00:00Z");
+    Map<String, Map<String, Instant>> catalog = new LinkedHashMap<>();
+    catalog.put(
+        "@apidocs/qits-ci",
+        versions(
+            "2026.101.10000", base.plusSeconds(3600),
+            "2026.105.10000", base.plusSeconds(5 * 86400 + 3600),
+            "2026.112.10000", base.plusSeconds(12 * 86400 + 3600)));
+    catalog.put(
+        "@userflows/qits-events", versions("2026.110.20000", base.plusSeconds(10 * 86400 + 7200)));
+    catalog.put(
+        "@guides/qits-platform", versions("2026.103.30000", base.plusSeconds(3 * 86400 + 10800)));
+    catalog.put(CONTRACTS_SITE, versions("2026.114.40000", base.plusSeconds(14 * 86400 + 14400)));
+    catalog.put(
+        ROUTES_SITE,
+        versions(
+            "2026.108.50000", base.plusSeconds(8 * 86400 + 18000),
+            "2026.116.50000", base.plusSeconds(16 * 86400 + 18000)));
+    catalog.put(
+        "@changelog/qits-landing-app",
+        versions("2026.115.60000", base.plusSeconds(15 * 86400 + 21600)));
+    catalog.put(
+        "@qits/ui-components",
+        versions(
+            "2026.102.70000", base.plusSeconds(2 * 86400 + 25200),
+            "2026.113.70000", base.plusSeconds(13 * 86400 + 25200)));
+    catalog.put("qits-storybook", versions("1.0.0", base.plusSeconds(86400 + 28800)));
+    return Collections.unmodifiableMap(catalog);
+  }
+
+  private static Map<String, Instant> versions(Object... versionsAndInstants) {
+    Map<String, Instant> versions = new LinkedHashMap<>();
+    for (int i = 0; i < versionsAndInstants.length; i += 2) {
+      versions.put((String) versionsAndInstants[i], (Instant) versionsAndInstants[i + 1]);
+    }
+    return Collections.unmodifiableMap(versions);
+  }
+
+  /**
+   * Every site of {@link #DOCS_CATALOG}, each version published as {@link #aDocsSite} publishes its
+   * one, then stamped with its fixed instant: the server stamps a publish with the time it lands,
+   * which would leak into the recording. One param per site, its name, so the catalog listing is
+   * filtered to these sites in a store other suites share.
+   */
+  private Setup aDocsCatalogOfEveryKind() {
+    Map<String, String> params = new TreeMap<>();
+    DOCS_CATALOG.forEach(
+        (site, versions) -> {
+          versions
+              .keySet()
+              .forEach(version -> publishDocs(site, version, DOCS_BUNDLE, DOCS_BRANCH));
+          params.put("site" + params.size(), site);
+        });
+    QuarkusTransaction.requiringNew()
+        .run(
+            () ->
+                DOCS_CATALOG.forEach(
+                    (site, versions) ->
+                        versions.forEach(
+                            (version, publishedAt) ->
+                                docsSites.update(
+                                    "publishedAt = ?1 where repository = ?2 and name = ?3 and"
+                                        + " version = ?4",
+                                    publishedAt,
+                                    DOCS,
+                                    site,
+                                    version))));
+    return new Setup(params, List.of());
+  }
+
+  /**
+   * The docs repository exists and holds no site of the contract catalog: {@code listDocsSites}
+   * answers an empty list. The store is shared, so the recording keeps none of what other suites
+   * published; nothing here deletes their sites.
+   */
+  private Setup anEmptyDocsCatalog() {
+    return new Setup(Map.of(), List.of());
   }
 
   /**

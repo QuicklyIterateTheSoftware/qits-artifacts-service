@@ -640,6 +640,31 @@ class GoldenMasterRecordingTest {
    */
   private Map<String, Map<String, String>> committedParams = Map.of();
 
+  /**
+   * The docs catalog: qits-landing-app's docs page (qits-2318) — the whole catalog of the docs
+   * repository, filtered to the state's own sites (the store is shared), once holding a site of
+   * every kind the page groups by and once holding none.
+   */
+  static final List<Interaction> DOCS_CATALOG_INTERACTIONS =
+      List.of(
+          op(ProviderStates.A_DOCS_CATALOG_OF_EVERY_KIND, "listDocsSites", "GET", DOCS_SITES, 200)
+              .filtered("$.sites")
+              .build(),
+          op(ProviderStates.AN_EMPTY_DOCS_CATALOG, "listDocsSites", "GET", DOCS_SITES, 200)
+              .filtered("$.sites")
+              .build());
+
+  /**
+   * The states whose instants are recorded as answered rather than frozen: each pins them to fixed
+   * values itself, so the recording stays byte-stable while the newest-first order stays visible.
+   */
+  static final Set<String> KEPT_INSTANTS = Set.of(ProviderStates.A_DOCS_CATALOG_OF_EVERY_KIND);
+
+  /** Every interaction this test records. */
+  static List<Interaction> allInteractions() {
+    return Stream.concat(INTERACTIONS.stream(), DOCS_CATALOG_INTERACTIONS.stream()).toList();
+  }
+
   @Test
   void goldenMastersMatchTheProvider() throws IOException {
     Path dir = GoldenFiles.repositoryRoot().resolve("golden-masters");
@@ -654,7 +679,7 @@ class GoldenMasterRecordingTest {
 
     committedParams = committedParams(dir.resolve("index.json"));
 
-    for (Interaction interaction : INTERACTIONS) {
+    for (Interaction interaction : allInteractions()) {
       checkDeclared(interaction, declared, failures);
 
       Recorded recorded = record(interaction);
@@ -907,6 +932,9 @@ class GoldenMasterRecordingTest {
                 params,
                 committedParams.getOrDefault(ProviderStates.slug(interaction.state()), Map.of()))
             .uniqueTokens(setup.uniqueTokens());
+    if (KEPT_INSTANTS.contains(interaction.state())) {
+      freezer.keepInstants();
+    }
     ObjectNode frozenParams = JsonNodeFactory.instance.objectNode();
     params.forEach((k, v) -> frozenParams.put(k, freezer.freezeParam(v)));
 

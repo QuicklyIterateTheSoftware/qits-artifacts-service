@@ -222,6 +222,16 @@ class ConsumerPactVerificationTest {
     return states.params(ProviderStates.A_DOCS_SITE_WITH_A_CONTENT_HASH);
   }
 
+  @State(ProviderStates.A_DOCS_CATALOG_OF_EVERY_KIND)
+  Map<String, String> aDocsCatalogOfEveryKind() {
+    return states.params(ProviderStates.A_DOCS_CATALOG_OF_EVERY_KIND);
+  }
+
+  @State(ProviderStates.AN_EMPTY_DOCS_CATALOG)
+  Map<String, String> anEmptyDocsCatalog() {
+    return states.params(ProviderStates.AN_EMPTY_DOCS_CATALOG);
+  }
+
   @State(ProviderStates.A_ROUTES_BUNDLE)
   Map<String, String> aRoutesBundle() {
     return states.params(ProviderStates.A_ROUTES_BUNDLE);
