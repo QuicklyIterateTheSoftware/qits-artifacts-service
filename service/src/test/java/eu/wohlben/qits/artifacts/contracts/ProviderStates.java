@@ -135,6 +135,10 @@ public class ProviderStates {
   public static final String A_STORE_HOLDING_EVERY_KIND =
       "a store holding one artifact of every kind";
   public static final String A_STORE_WITH_NOTHING_PUBLISHED = "a store with nothing published";
+  // qits-2324: qits-landing-app's artifacts image page — an image whose tag was pushed over, so one
+  // of its two manifests is reachable by digest only and no tag names it.
+  public static final String AN_IMAGE_WITH_AN_UNTAGGED_MANIFEST =
+      "an image with a manifest no tag names";
 
   /** The daemon repository every deployment carries, and the one consumers name. */
   static final String DAEMONS = ArtifactsRepositorySeeder.DAEMONS;
@@ -951,6 +955,7 @@ public class ProviderStates {
     states.put(AN_APPLICATION_WITH_PUBLISHED_ARTIFACTS, this::anApplicationWithPublishedArtifacts);
     states.put(A_STORE_HOLDING_EVERY_KIND, this::aStoreHoldingEveryKind);
     states.put(A_STORE_WITH_NOTHING_PUBLISHED, this::aStoreWithNothingPublished);
+    states.put(AN_IMAGE_WITH_AN_UNTAGGED_MANIFEST, this::anImageWithAnUntaggedManifest);
   }
 
   /** Every state name this provider answers for. */
@@ -1642,6 +1647,22 @@ public class ProviderStates {
   }
 
   /**
+   * {@link #IMAGE} pushed twice under {@link #IMAGE_TAG} with different content (qits-2324): first a
+   * superseded build, then the one {@link #anImage} pushes. The tag moves to the second manifest,
+   * and the first stays stored — reachable by its digest, named by no tag — which is the row the
+   * image page's manifest listing exists to show. The setup's {@link #cleanUp} clears the image's
+   * tags and manifests first, so both manifests are this state's own.
+   */
+  private Setup anImageWithAnUntaggedManifest() {
+    pushImage(SUPERSEDED_IMAGE_CONTENT);
+    pushImage(IMAGE_CONTENT);
+    Map<String, String> params = new TreeMap<>();
+    params.put("image", IMAGE);
+    params.put("imagesRepository", ArtifactsRepositorySeeder.IMAGES);
+    return new Setup(params, List.of());
+  }
+
+  /**
    * The explorer states' params: each listing's repository under a name of its own, since one
    * state addresses six, and the contract name each listing is filtered to.
    */
@@ -1806,8 +1827,24 @@ public class ProviderStates {
    * manifest's digest — what {@code Docker-Content-Digest} answers — is the same on every machine.
    */
   private Setup anImage() {
+    pushImage(IMAGE_CONTENT);
+    return new Setup(imageParams(IMAGE), List.of());
+  }
+
+  /** What {@link #anImage}'s one layer holds: its {@code contract.txt}. */
+  private static final String IMAGE_CONTENT = "a contract image\n";
+
+  /** The build {@link #anImageWithAnUntaggedManifest} pushes first, and pushes over. */
+  private static final String SUPERSEDED_IMAGE_CONTENT = "a superseded contract image\n";
+
+  /**
+   * Pushes {@link #IMAGE} under {@link #IMAGE_TAG} with one layer whose {@code contract.txt} holds
+   * {@code content}, as a client pushes it: the config and layer blobs, then the manifest naming
+   * both. A push of other content moves the tag and leaves the earlier manifest stored.
+   */
+  private void pushImage(String content) {
     String name = ArtifactsRepositorySeeder.IMAGES + "/" + IMAGE;
-    byte[] layerTar = tar(Map.of("contract.txt", "a contract image\n"));
+    byte[] layerTar = tar(Map.of("contract.txt", content));
     byte[] layer = storedGzip(layerTar);
     byte[] config =
         ("{\"architecture\":\"amd64\",\"os\":\"linux\",\"config\":{},"
@@ -1838,7 +1875,6 @@ public class ProviderStates {
             .body(manifest.getBytes(StandardCharsets.UTF_8))
             .put("/v2/" + name + "/manifests/" + IMAGE_TAG),
         "the manifest push");
-    return new Setup(imageParams(IMAGE), List.of());
   }
 
   /** The images repository exists; no image of the name was ever pushed. */

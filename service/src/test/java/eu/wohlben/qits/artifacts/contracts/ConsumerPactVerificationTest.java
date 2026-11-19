@@ -376,4 +376,9 @@ class ConsumerPactVerificationTest {
   Map<String, String> aStoreWithNothingPublished() {
     return states.params(ProviderStates.A_STORE_WITH_NOTHING_PUBLISHED);
   }
+
+  @State(ProviderStates.AN_IMAGE_WITH_AN_UNTAGGED_MANIFEST)
+  Map<String, String> anImageWithAnUntaggedManifest() {
+    return states.params(ProviderStates.AN_IMAGE_WITH_AN_UNTAGGED_MANIFEST);
+  }
 }

@@ -662,7 +662,21 @@ class GoldenMasterRecordingTest {
               // --- the store explorer: qits-landing-app's artifacts store page (qits-2316) — the
               // repository listing, then each kind's listing in the repository that holds it
               explorer(ProviderStates.A_STORE_HOLDING_EVERY_KIND),
-              explorer(ProviderStates.A_STORE_WITH_NOTHING_PUBLISHED))
+              explorer(ProviderStates.A_STORE_WITH_NOTHING_PUBLISHED),
+              imagePage(ProviderStates.A_STORE_HOLDING_EVERY_KIND),
+              imagePage(ProviderStates.A_STORE_WITH_NOTHING_PUBLISHED),
+              // --- an image whose tag was pushed over (qits-2324): its row in the repository's
+              // listing, then the image page's two reads, one manifest of the two untagged
+              List.of(
+                  op(
+                          ProviderStates.AN_IMAGE_WITH_AN_UNTAGGED_MANIFEST,
+                          "listImages",
+                          "GET",
+                          "/artifacts/api/repositories/{imagesRepository}/images",
+                          200)
+                      .filtered("$.images", "image")
+                      .build()),
+              imagePage(ProviderStates.AN_IMAGE_WITH_AN_UNTAGGED_MANIFEST))
           .flatMap(List::stream)
           .toList();
 
@@ -716,6 +730,29 @@ class GoldenMasterRecordingTest {
                 "/artifacts/api/repositories/{screenshotsRepository}/blobs",
                 200)
             .kept("$.records", "id", List.of())
+            .build());
+  }
+
+  /**
+   * The image page's reads in one state (qits-2324): one image's tags and its manifests, tagged or
+   * not. Recorded unfiltered — both are scoped to the state's own image, whose rows every setup
+   * clears first, so nothing another suite stores can appear in them.
+   */
+  private static List<Interaction> imagePage(String state) {
+    return List.of(
+        op(
+                state,
+                "listImageTagSummaries",
+                "GET",
+                "/artifacts/api/repositories/{imagesRepository}/images/{image}/tags",
+                200)
+            .build(),
+        op(
+                state,
+                "listImageManifestSummaries",
+                "GET",
+                "/artifacts/api/repositories/{imagesRepository}/images/{image}/manifests",
+                200)
             .build());
   }
 

@@ -1644,6 +1644,36 @@
           }
         },
         {
+          "operationId": "listImageManifestSummaries",
+          "method": "GET",
+          "path": "/artifacts/api/repositories/{imagesRepository}/images/{image}/manifests",
+          "status": 200,
+          "file": "a-store-holding-one-artifact-of-every-kind/listImageManifestSummaries.json",
+          "frozen": {
+            "ids": [],
+            "instants": [
+              "$.manifests[*].createdAt"
+            ],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        },
+        {
+          "operationId": "listImageTagSummaries",
+          "method": "GET",
+          "path": "/artifacts/api/repositories/{imagesRepository}/images/{image}/tags",
+          "status": 200,
+          "file": "a-store-holding-one-artifact-of-every-kind/listImageTagSummaries.json",
+          "frozen": {
+            "ids": [],
+            "instants": [
+              "$.tags[*].createdAt"
+            ],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        },
+        {
           "operationId": "listImages",
           "method": "GET",
           "path": "/artifacts/api/repositories/{imagesRepository}/images",
@@ -1758,6 +1788,32 @@
             "instants": [],
             "strings": [],
             "listFilteredTo": "$.sites"
+          }
+        },
+        {
+          "operationId": "listImageManifestSummaries",
+          "method": "GET",
+          "path": "/artifacts/api/repositories/{imagesRepository}/images/{image}/manifests",
+          "status": 200,
+          "file": "a-store-with-nothing-published/listImageManifestSummaries.json",
+          "frozen": {
+            "ids": [],
+            "instants": [],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        },
+        {
+          "operationId": "listImageTagSummaries",
+          "method": "GET",
+          "path": "/artifacts/api/repositories/{imagesRepository}/images/{image}/tags",
+          "status": 200,
+          "file": "a-store-with-nothing-published/listImageTagSummaries.json",
+          "frozen": {
+            "ids": [],
+            "instants": [],
+            "strings": [],
+            "listFilteredTo": null
           }
         },
         {
@@ -1925,6 +1981,60 @@
             "instants": [],
             "strings": [],
             "listFilteredTo": null
+          }
+        }
+      ]
+    },
+    {
+      "name": "an image with a manifest no tag names",
+      "slug": "an-image-with-a-manifest-no-tag-names",
+      "params": {
+        "image": "contract-image",
+        "imagesRepository": "qits"
+      },
+      "dependsOn": [],
+      "operations": [
+        {
+          "operationId": "listImageManifestSummaries",
+          "method": "GET",
+          "path": "/artifacts/api/repositories/{imagesRepository}/images/{image}/manifests",
+          "status": 200,
+          "file": "an-image-with-a-manifest-no-tag-names/listImageManifestSummaries.json",
+          "frozen": {
+            "ids": [],
+            "instants": [
+              "$.manifests[*].createdAt"
+            ],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        },
+        {
+          "operationId": "listImageTagSummaries",
+          "method": "GET",
+          "path": "/artifacts/api/repositories/{imagesRepository}/images/{image}/tags",
+          "status": 200,
+          "file": "an-image-with-a-manifest-no-tag-names/listImageTagSummaries.json",
+          "frozen": {
+            "ids": [],
+            "instants": [
+              "$.tags[*].createdAt"
+            ],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        },
+        {
+          "operationId": "listImages",
+          "method": "GET",
+          "path": "/artifacts/api/repositories/{imagesRepository}/images",
+          "status": 200,
+          "file": "an-image-with-a-manifest-no-tag-names/listImages.json",
+          "frozen": {
+            "ids": [],
+            "instants": [],
+            "strings": [],
+            "listFilteredTo": "$.images"
           }
         }
       ]

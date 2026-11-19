@@ -1038,6 +1038,132 @@ paths:
         - qits:agent
         - qits:system
         - qits:ci-run
+  /artifacts/api/repositories/{repo}/images/{image}/manifests:
+    get:
+      operationId: listImageManifestSummaries
+      parameters:
+      - name: image
+        in: path
+        required: true
+        schema:
+          type: string
+          pattern: .+
+      - name: repo
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: accessed-after
+        in: query
+        schema:
+          type: string
+      - name: accessed-before
+        in: query
+        schema:
+          type: string
+      - name: created-after
+        in: query
+        schema:
+          type: string
+      - name: created-before
+        in: query
+        schema:
+          type: string
+      - name: max-size
+        in: query
+        schema:
+          type: string
+      - name: min-size
+        in: query
+        schema:
+          type: string
+      - name: never-accessed
+        in: query
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListManifestsResponse"
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+      summary: Manifests
+      tags:
+      - Image Browse Controller
+      security:
+      - SecurityScheme:
+        - qits:admin
+        - qits:agent
+        - qits:system
+        - qits:ci-run
+  /artifacts/api/repositories/{repo}/images/{image}/tags:
+    get:
+      operationId: listImageTagSummaries
+      parameters:
+      - name: image
+        in: path
+        required: true
+        schema:
+          type: string
+          pattern: .+
+      - name: repo
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: accessed-after
+        in: query
+        schema:
+          type: string
+      - name: accessed-before
+        in: query
+        schema:
+          type: string
+      - name: created-after
+        in: query
+        schema:
+          type: string
+      - name: created-before
+        in: query
+        schema:
+          type: string
+      - name: max-size
+        in: query
+        schema:
+          type: string
+      - name: min-size
+        in: query
+        schema:
+          type: string
+      - name: never-accessed
+        in: query
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListTagsResponse"
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+      summary: Tags
+      tags:
+      - Image Browse Controller
+      security:
+      - SecurityScheme:
+        - qits:admin
+        - qits:agent
+        - qits:system
+        - qits:ci-run
   /artifacts/api/repositories/{repo}/maven-packages:
     get:
       operationId: listMavenPackages
@@ -1693,6 +1819,24 @@ components:
           type: array
           items:
             type: string
+    ImageManifestSummary:
+      type: object
+      properties:
+        digest:
+          type: string
+        mediaType:
+          type: string
+        sizeBytes:
+          type: integer
+          format: int64
+        createdAt:
+          $ref: "#/components/schemas/Instant"
+        accessedAt:
+          $ref: "#/components/schemas/Instant"
+        tags:
+          type: array
+          items:
+            type: string
     ImageSummary:
       type: object
       properties:
@@ -1707,6 +1851,20 @@ components:
         sizeBytes:
           type: integer
           format: int64
+    ImageTagSummary:
+      type: object
+      properties:
+        tag:
+          type: string
+        digest:
+          type: string
+        sizeBytes:
+          type: integer
+          format: int64
+        createdAt:
+          $ref: "#/components/schemas/Instant"
+        accessedAt:
+          $ref: "#/components/schemas/Instant"
     Instant:
       type: string
       format: date-time
@@ -1747,6 +1905,13 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/ImageSummary"
+    ListManifestsResponse:
+      type: object
+      properties:
+        manifests:
+          type: array
+          items:
+            $ref: "#/components/schemas/ImageManifestSummary"
     ListMavenPackagesResponse:
       type: object
       properties:
@@ -1768,6 +1933,13 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/RepositorySummary"
+    ListTagsResponse:
+      type: object
+      properties:
+        tags:
+          type: array
+          items:
+            $ref: "#/components/schemas/ImageTagSummary"
     MavenPackageSummary:
       type: object
       properties:
@@ -1866,4 +2038,4 @@ components:
       description: Authentication
 info:
   title: qits-artifacts API
-  version: 2026.1109.44929
+  version: 2026.1119.190120

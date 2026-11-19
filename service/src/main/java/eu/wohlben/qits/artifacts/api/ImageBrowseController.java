@@ -22,9 +22,9 @@ import org.eclipse.microprofile.openapi.annotations.Operation;
  * that does not exist, so discovery by probing is impossible. This is a JSON API for a human, on the
  * JAX-RS surface, not an extension of the registry's wire protocol.
  *
- * <p>Reads, so unguarded: {@code ArtifactsTokenFilter} covers write methods only. Hidden from the
- * OpenAPI document like every operation this service ships; the contract is written out in the
- * README.
+ * <p>Reads, so unguarded: {@code ArtifactsTokenFilter} covers write methods only. All three are in
+ * the OpenAPI document under the operationIds the golden masters record ({@code listImages},
+ * qits-2316; {@code listImageTagSummaries} and {@code listImageManifestSummaries}, qits-2324).
  *
  * <p>The class path is spelled down to {@code /images} rather than stopping at {@code
  * /repositories/{repo}} on purpose — a class path that is a strict prefix of {@code
@@ -61,7 +61,9 @@ public class ImageBrowseController {
    */
   @GET
   @Path("/{image:.+}/tags")
-  @Operation(hidden = true)
+  // Named: golden-masters/ records it under this operationId (qits-2324); qits-landing-app's
+  // artifacts image page reads it. Not listImageTags: that is the registry's /v2 tags/list.
+  @Operation(operationId = "listImageTagSummaries")
   public ListTagsResponse tags(
       @PathParam("repo") String repo,
       @PathParam("image") String image,
@@ -85,7 +87,9 @@ public class ImageBrowseController {
 
   @GET
   @Path("/{image:.+}/manifests")
-  @Operation(hidden = true)
+  // Named: golden-masters/ records it under this operationId (qits-2324); qits-landing-app's
+  // artifacts image page reads it.
+  @Operation(operationId = "listImageManifestSummaries")
   public ListManifestsResponse manifests(
       @PathParam("repo") String repo,
       @PathParam("image") String image,

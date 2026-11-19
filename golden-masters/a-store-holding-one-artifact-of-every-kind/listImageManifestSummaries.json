@@ -1,0 +1,14 @@
+{
+  "manifests": [
+    {
+      "digest": "sha256:1b91a3dfff59dad5c1d9c7e557ca94e67e96aabad34050385263cffe926ed7a2",
+      "mediaType": "application/vnd.oci.image.manifest.v1+json",
+      "sizeBytes": 2636,
+      "createdAt": "2026-01-01T00:00:00Z",
+      "accessedAt": null,
+      "tags": [
+        "2100.1.0"
+      ]
+    }
+  ]
+}
