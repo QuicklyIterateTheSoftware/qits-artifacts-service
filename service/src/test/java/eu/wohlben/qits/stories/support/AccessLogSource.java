@@ -50,7 +50,7 @@ import java.util.Map;
  * <h2>The floor</h2>
  *
  * <p>The log file is append-only across the whole IT phase — one launched process serves {@code
- * PackagedProcessIT} and all twenty-one stories — and it survives between builds. So the source
+ * PackagedProcessIT} and all nineteen stories — and it survives between builds. So the source
  * registers a <b>floor</b> the first time a story attributes anything: every line already in the
  * file at that moment belongs to an earlier build or to {@code PackagedProcessIT}, and none of it
  * is any story's traffic. That works because the class order puts {@code PackagedProcessIT} ahead

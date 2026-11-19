@@ -26,18 +26,15 @@ import org.junit.jupiter.api.condition.EnabledIf;
  * The maven category's <b>browser</b> story: headless Chromium over the explorer SPA, against the
  * same packaged process the two command-line stories drove.
  *
- * <p>It is also the only story in this repository that uses the explorer's <b>search box</b>, and
- * the maven listing is where a search stops being decoration: a repository holds one row per
- * {@code groupId:artifactId} and a platform's coordinates run to hundreds, so finding one by
- * scrolling is not the workflow anybody has. The filter is client-side over the rows already
- * fetched, which is why the story fills it and screenshots the result rather than waiting for a
- * request.
+ * <p>It used to be the only story in this repository that used the explorer's <b>search box</b>,
+ * over the maven repository's coordinate listing. That listing is the repository page, which moved
+ * to the landing app in qits-2316 — this app's {@code repositories/:repo} now hands the browser off
+ * to it — so the story addresses the coordinate page directly, spelling the coordinate the way that
+ * listing's routerLink did: one segment, the {@code :} literal.
  *
- * <p>Two selector facts, both learned the expensive way. The coordinate cell is a {@code th.mono}
- * with an anchor inside it — not the {@code th[scope="row"]} the daemons and docs listings use — so
- * a selector copied from those tables matches nothing here. And on the coordinate page the version
- * is the header's <b>own text</b> rather than a link, so {@code th:text-is(…)} is right there and
- * would be wrong on the daemon page, where the same-looking cell wraps a download anchor.
+ * <p>A selector fact learned the expensive way: on the coordinate page the version is the header's
+ * <b>own text</b> rather than a link, so {@code th:text-is(…)} is right there and would be wrong on
+ * the daemon page, where the same-looking cell wraps a download anchor.
  */
 @QuarkusIntegrationTest
 @TestProfile(PackagedProcessIT.TargetDirState.class)
@@ -59,11 +56,11 @@ public class MavenExploreIT {
   @UserStoryDescription(
       """
       The repository's own web UI, served by the same process that stores the bytes. An operator
-      opens the store's repositories at the host root, steps into the maven repository, narrows a
-      list of coordinates down to the one they want, and opens it — arriving at the screen that
-      answers the question a maven client cannot be asked: not "is this version there?", which a
-      resolve answers, but "what files IS this version?", which is the jar, the pom and every
-      checksum sidecar a deploy uploaded, with the size each one occupies.
+      opens the store's repositories at the host root, then the coordinate they want — the screen
+      that answers the question a maven client cannot be asked: not "is this version there?",
+      which a resolve answers, but "what files IS this version?", which is the jar, the pom and
+      every checksum sidecar a deploy uploaded, with the size each one occupies. (The maven
+      repository's own coordinate listing moved to the landing app in qits-2316.)
       """)
   void anOperatorFindsADeployedCoordinate(
       Flow flow, Interactions story, UserflowContext context) {
@@ -87,18 +84,9 @@ public class MavenExploreIT {
     flow.waitFor("table tbody th a");
     flow.screenshot("the store's repositories").as("repositories-listed");
 
-    // :text-is is exact, so the `maven-packages` type badge in the row's second cell cannot shadow
-    // the repository link in its header.
-    flow.click("tbody th a:text-is('maven')");
-    flow.waitFor("tbody th.mono a:text-is('" + coordinate + "')");
-
-    // The search box: the maven section renders exactly one, and only when the coordinate listing
-    // has loaded — which the wait above has already established.
-    flow.fill("label.search input[type=\"search\"]", MavenDeployIT.ARTIFACT_ID);
-    flow.waitFor("tbody th.mono a:text-is('" + coordinate + "')");
-    flow.screenshot("the maven repository's coordinates, filtered").as("coordinate-listed");
-
-    flow.click("tbody th.mono a:text-is('" + coordinate + "')");
+    // The repository page between the two — the coordinate listing and its search box — is the
+    // landing app's since qits-2316, so the coordinate page is addressed directly.
+    flow.navigate("{}repositories/{}/maven-packages/{}", root, "maven", coordinate);
     // The version is the header cell's own text here, so :text-is matches the th itself.
     flow.waitFor("tbody th.mono:text-is('" + version + "')");
     // The files column, which is the whole reason this page exists rather than a version list.
@@ -114,7 +102,6 @@ public class MavenExploreIT {
     }
     ReportAssertions.assertComplete(CATEGORY, SLUG, UserflowReport.PASSED);
     ReportAssertions.assertStepId(CATEGORY, SLUG, "repositories-listed");
-    ReportAssertions.assertStepId(CATEGORY, SLUG, "coordinate-listed");
     ReportAssertions.assertStepId(CATEGORY, SLUG, "files-shown");
     // No edge is pinned by name — a browser story fetches the SPA's own build-hashed bundle beside
     // the reads it is about, and NpmExploreIT carries the long form of that decision. What every

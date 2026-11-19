@@ -59,11 +59,12 @@ public class OciExploreIT {
   @UserflowRunsAfter(OciPullIT.class)
   @UserStoryDescription(
       """
-      An operator asking what the platform would run. The store's repositories, the platform image
-      repository one click in, and one image's tags — each with the manifest digest it points at
-      and the bytes that manifest references. The sizes on that screen deliberately do not add up:
+      An operator asking what the platform would run. The store's repositories, then one image's
+      tags in the platform image repository — each with the manifest digest it points at and the
+      bytes that manifest references. The sizes on that screen deliberately do not add up:
       consecutive builds share their base layers, so the same bytes appear on most rows and the
-      only honest total is the union printed above them.
+      only honest total is the union printed above them. (The repository's own image listing moved
+      to the landing app in qits-2316, so the story addresses the image page directly.)
       """)
   void anOperatorFindsAPushedImage(Flow flow, Interactions story, UserflowContext context) {
     String image = context.require("story.qits.image", String.class);
@@ -85,13 +86,11 @@ public class OciExploreIT {
     flow.waitFor("table tbody th a");
     flow.screenshot("the store's repositories").as("repositories-listed");
 
-    // :text-is is exact, so the `oci-images` type badge in the row's second cell cannot shadow the
-    // repository link in its header.
-    flow.click("tbody th a:text-is('" + OciPushIT.REPOSITORY + "')");
-    flow.waitFor("tbody th[scope=\"row\"] a:text-is('" + image + "')");
-    flow.screenshot("the platform repository's images").as("image-listed");
-
-    flow.click("tbody th[scope=\"row\"] a:text-is('" + image + "')");
+    // The repository page between the two — the image listing a click on the row used to open — is
+    // the landing app's since qits-2316 (this app's `repositories/:repo` now hands the browser off
+    // to it), so the image page is addressed directly, spelled the way that listing's routerLink
+    // spelled it. The fingerprint keeps `{}` for every part, as the root navigate does.
+    flow.navigate("{}repositories/{}/images/{}", root, OciPushIT.REPOSITORY, image);
     // A tag that does not look like a git commit sha is the header cell's own text rather than a
     // link out to the CI explorer, so :text-is matches the th itself here.
     flow.waitFor("tbody th[scope=\"row\"].mono:text-is('" + tag + "')");
@@ -109,7 +108,6 @@ public class OciExploreIT {
     }
     ReportAssertions.assertComplete(CATEGORY, SLUG, UserflowReport.PASSED);
     ReportAssertions.assertStepId(CATEGORY, SLUG, "repositories-listed");
-    ReportAssertions.assertStepId(CATEGORY, SLUG, "image-listed");
     ReportAssertions.assertStepId(CATEGORY, SLUG, "tags-shown");
     // No edge is pinned by name — a browser story fetches the SPA's own build-hashed bundle beside
     // the reads it is about, and NpmExploreIT carries the long form of that decision. What every

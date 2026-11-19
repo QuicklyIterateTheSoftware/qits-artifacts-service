@@ -59,10 +59,11 @@ public class NpmExploreIT {
   @UserStoryDescription(
       """
       The registry's own web UI, served by the same process that stores the bytes. An operator
-      opens the store's repositories at the host root, steps into the npm repository, and finds the
-      package a pipeline published earlier in this chain — then its version list, which is the one
-      screen that says out loud what immutability means here: a version appears once and never
-      changes.
+      opens the store's repositories at the host root, then the package a pipeline published earlier
+      in this chain — its version list, which is the one screen that says out loud what
+      immutability means here: a version appears once and never changes. (The npm repository's own
+      package listing moved to the landing app in qits-2316, so the story addresses the package
+      page directly.)
       """)
   void anOperatorFindsAPublishedPackage(Flow flow, Interactions story, UserflowContext context) {
     String name = context.require("story.npm.name", String.class);
@@ -85,13 +86,12 @@ public class NpmExploreIT {
     flow.waitFor("table tbody th a");
     flow.screenshot("the store's repositories").as("repositories-listed");
 
-    // The repository rows are seeded at startup, so `npm` is a link whether or not any other test
-    // has run. :text-is is exact, so the `npm-packages` type badge cannot shadow it.
-    flow.click("tbody th a:text-is('npm')");
-    flow.waitFor("tbody th a:text-is('" + name + "')");
-    flow.screenshot("the npm repository's packages").as("package-listed");
-
-    flow.click("tbody th a:text-is('" + name + "')");
+    // The repository page between the two — the package listing a click on the `npm` row used to
+    // open — is the landing app's since qits-2316 (this app's `repositories/:repo` now hands the
+    // browser off to it), so the package page is addressed directly. A scoped name is ONE route
+    // segment, spelled the way that listing's routerLink spelled it: the slash escaped to %2F, the
+    // `@` literal.
+    flow.navigate("{}repositories/{}/packages/{}", root, "npm", name.replace("/", "%2F"));
     flow.waitFor("th:text-is('" + version + "')");
     flow.screenshot("the package's immutable versions").as("versions-shown");
   }
@@ -103,7 +103,6 @@ public class NpmExploreIT {
     }
     ReportAssertions.assertComplete(CATEGORY, SLUG, UserflowReport.PASSED);
     ReportAssertions.assertStepId(CATEGORY, SLUG, "repositories-listed");
-    ReportAssertions.assertStepId(CATEGORY, SLUG, "package-listed");
     ReportAssertions.assertStepId(CATEGORY, SLUG, "versions-shown");
     // No edge is pinned by NAME here, and that is a decision rather than a gap. A browser story
     // fetches the SPA's own bundle beside the reads it is about, and those filenames carry a build
