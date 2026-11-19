@@ -100,6 +100,11 @@ class GoldenMasterRecordingTest {
    *     or null — the index's {@code frozen.listFilteredTo}
    * @param filteredOn the one param whose value marks an entry the state created, or null for any
    *     of them — needed where another param's value (a version) is common in the shared store
+   * @param keptField with {@code keptValues}: the {@code listFilteredTo} array keeps exactly the
+   *     entries whose top-level {@code keptField} equals one of {@code keptValues}, instead of those
+   *     mentioning a param — for a list whose entries the state did not create (the seeded
+   *     repositories), where a substring would also keep another suite's {@code unauthenticated-npm}
+   * @param keptValues see {@code keptField}; empty keeps no entry at all
    * @param sortedBy for an array the provider answers in no guaranteed order: {@code
    *     <$.path-to-array>:<field.path in each entry>}, sorted by that field's value before freezing.
    *     Null when the order is the provider's own.
@@ -124,6 +129,8 @@ class GoldenMasterRecordingTest {
       List<String> headers,
       String listFilteredTo,
       String filteredOn,
+      String keptField,
+      List<String> keptValues,
       String sortedBy,
       List<String> dropped,
       boolean zeroNumbers,
@@ -156,6 +163,9 @@ class GoldenMasterRecordingTest {
     private final List<String> headers = new ArrayList<>();
     private String listFilteredTo;
     private String filteredOn;
+    private String keptField;
+    private List<String> keptValues = List.of();
+    private String sortedBy;
     private final List<String> dropped = new ArrayList<>();
     private boolean zeroNumbers;
     private final List<String> blanked = new ArrayList<>();
@@ -235,6 +245,23 @@ class GoldenMasterRecordingTest {
       return this;
     }
 
+    /**
+     * The {@code array} keeps exactly the entries whose top-level {@code field} equals one of the
+     * {@code values} — none, when there are none (qits-2316).
+     */
+    Op kept(String array, String field, List<String> values) {
+      listFilteredTo = array;
+      keptField = field;
+      keptValues = List.copyOf(values);
+      return this;
+    }
+
+    /** The {@code array} is answered in no guaranteed order: sort it by the entries' {@code field}. */
+    Op sorted(String array, String field) {
+      sortedBy = array + ":" + field;
+      return this;
+    }
+
     Op drop(String... members) {
       dropped.addAll(List.of(members));
       return this;
@@ -267,7 +294,9 @@ class GoldenMasterRecordingTest {
           List.copyOf(headers),
           listFilteredTo,
           filteredOn,
-          null,
+          keptField,
+          keptValues,
+          sortedBy,
           List.copyOf(dropped),
           zeroNumbers,
           List.copyOf(blanked));
@@ -320,315 +349,375 @@ class GoldenMasterRecordingTest {
    * /tmp/claude-1000/pact-inventory/round2/qits-artifacts-service-states.md} (qits-1149).
    */
   static final List<Interaction> INTERACTIONS =
-      List.of(
-          // --- daemons: qits-maintenance (ArtifactPresence), qits-bootstrap, the qits CLI
-          op(ProviderStates.A_DAEMON_WITH_TWO_VERSIONS, "listDaemonVersions", "GET", DAEMON_VERSIONS, 200)
-              .build(),
-          op(ProviderStates.A_DAEMON_WITH_TWO_VERSIONS, "headDaemon", "HEAD", DAEMON, 200)
-              .headers(DIGEST_HEADERS)
-              .build(),
-          // the qits CLI's update: the repository listing, the download, and a re-publish's 409
-          op(ProviderStates.A_DAEMON_WITH_TWO_VERSIONS, "listDaemons", "GET", DAEMONS, 200)
-              .filtered("$.daemons", "daemon")
-              .build(),
-          op(ProviderStates.A_DAEMON_WITH_TWO_VERSIONS, "getDaemon", "GET", DAEMON, 200)
-              .raw()
-              .headers("Content-Length")
-              .build(),
-          op(ProviderStates.A_DAEMON_WITH_TWO_VERSIONS, "putDaemon", "PUT", DAEMON, 409)
-              .text("application/octet-stream", ProviderStates.DAEMON_BYTES)
-              .build(),
-          // the qits CLI's update (ArtifactsReleases): its own name's newest release, then the
-          // HEAD that says the length and digest, then the download
-          op(ProviderStates.THE_CLI_AS_A_DAEMON, "listDaemons", "GET", DAEMONS, 200)
-              .filtered("$.daemons", "daemon")
-              .build(),
-          op(ProviderStates.THE_CLI_AS_A_DAEMON, "headDaemon", "HEAD", DAEMON, 200)
-              .headers(DIGEST_HEADERS)
-              .build(),
-          op(ProviderStates.THE_CLI_AS_A_DAEMON, "getDaemon", "GET", DAEMON, 200)
-              .raw()
-              .headers("Content-Length")
-              .build(),
-          op(ProviderStates.A_DAEMON_NOTHING_PUBLISHED, "listDaemonVersions", "GET", DAEMON_VERSIONS, 200)
-              .build(),
-          op(ProviderStates.A_DAEMON_NOTHING_PUBLISHED, "headDaemon", "HEAD", DAEMON, 404).build(),
-          op(ProviderStates.A_DAEMON_NOTHING_PUBLISHED, "putDaemon", "PUT", DAEMON, 201)
-              .text("application/octet-stream", ProviderStates.DAEMON_BYTES)
-              .build(),
-          // --- sboms: the qits CLI, qits-maintenance (SbomClient)
-          op(ProviderStates.NO_SBOM, "putSbom", "PUT", SBOM, 201)
-              .json(ProviderStates.CYCLONEDX_JSON, ProviderStates.SBOM_DOCUMENT)
-              .build(),
-          op(ProviderStates.NO_SBOM, "getSbom", "GET", SBOM, 404).build(),
-          op(ProviderStates.NO_SBOM, "headSbom", "HEAD", SBOM, 404).build(),
-          op(ProviderStates.AN_SBOM, "putSbom", "PUT", SBOM, 200)
-              .json(ProviderStates.CYCLONEDX_JSON, ProviderStates.SBOM_DOCUMENT)
-              .build(),
-          op(ProviderStates.AN_SBOM, "getSbom", "GET", SBOM, 200)
-              .headers("Content-Type", "Docker-Content-Digest", "ETag")
-              .build(),
-          op(ProviderStates.AN_SBOM, "headSbom", "HEAD", SBOM, 200).headers(DIGEST_HEADERS).build(),
-          // --- docs: qits-docs (DocsUpstream), the qits CLI
-          op(ProviderStates.NO_DOCS, "putDocs", "PUT", DOCS_VERSION, 201)
-              .binary("application/gzip", ProviderStates.DOCS_BUNDLE)
-              .build(),
-          op(ProviderStates.NO_DOCS, "listDocsVersions", "GET", DOCS_SITE, 404).build(),
-          op(ProviderStates.NO_DOCS, "getDocsVersion", "GET", DOCS_VERSION, 404).build(),
-          op(ProviderStates.NO_DOCS, "getDocsFile", "GET", DOCS_FILE, 404).build(),
-          // the qits CLI's docs publish of a version that exists
-          op(ProviderStates.A_DOCS_SITE, "putDocs", "PUT", DOCS_VERSION, 409)
-              .binary("application/gzip", ProviderStates.DOCS_BUNDLE)
-              .build(),
-          op(ProviderStates.A_DOCS_SITE, "listDocsSites", "GET", DOCS_SITES, 200)
-              .filtered("$.sites")
-              .build(),
-          op(ProviderStates.A_DOCS_SITE, "listDocsVersions", "GET", DOCS_SITE, 200).build(),
-          op(ProviderStates.A_DOCS_SITE, "getDocsVersion", "GET", DOCS_VERSION, 200).build(),
-          op(ProviderStates.A_DOCS_SITE, "getDocsFile", "GET", DOCS_FILE, 200)
-              .raw()
-              .headers("Content-Length", "Content-Type", "ETag")
-              .build(),
-          op(ProviderStates.A_DOCS_SITE_FROM_TWO_BRANCHES, "listDocsVersions", "GET", DOCS_SITE, 200)
-              .query("meta.git.branch.name", "main")
-              .build(),
-          // the qits CLI's `publish docs submit --if-changed`: the newest version's content.hash
-          op(ProviderStates.A_DOCS_SITE_WITH_A_CONTENT_HASH, "listDocsVersions", "GET", DOCS_SITE, 200)
-              .build(),
-          // --- the routes bundle: qits-landing-app (qits-1951) — the catalog, the site's versions,
-          // the newest version's file list, then its files: the manifest (JSON, so recorded), a
-          // freeze page and the font it loads (raw bytes: status and headers only)
-          op(ProviderStates.A_ROUTES_BUNDLE, "listDocsSites", "GET", DOCS_SITES, 200)
-              .filtered("$.sites", "site")
-              .build(),
-          op(ProviderStates.A_ROUTES_BUNDLE, "listDocsVersions", "GET", DOCS_SITE, 200).build(),
-          op(ProviderStates.A_ROUTES_BUNDLE, "getDocsVersion", "GET", DOCS_VERSION, 200).build(),
-          op(ProviderStates.A_ROUTES_BUNDLE, "getDocsFile", "GET", DOCS_FILE, 200)
-              .headers("Content-Length", "Content-Type", "ETag")
-              .build(),
-          // the freeze page itself, recorded verbatim (qits-2041): the UI builder reads its links
-          op(ProviderStates.A_ROUTES_BUNDLE_FREEZE, "getDocsFile", "GET", DOCS_FILE, 200)
-              .textAnswer("html")
-              .headers("Content-Length", "Content-Type", "ETag")
-              .build(),
-          op(ProviderStates.A_ROUTES_BUNDLE_FONT, "getDocsFile", "GET", DOCS_FILE, 200)
-              .raw()
-              .headers("Content-Length", "Content-Type", "ETag")
-              .build(),
-          // --- the routes bundle with kinds and viewports: qits-landing-app's UI builder
-          // (qits-2059) — the same reads, over a manifest whose route freezes carry kind and
-          // viewport
-          op(ProviderStates.A_ROUTES_BUNDLE_WITH_VIEWPORTS, "listDocsSites", "GET", DOCS_SITES, 200)
-              .filtered("$.sites", "site")
-              .build(),
-          op(ProviderStates.A_ROUTES_BUNDLE_WITH_VIEWPORTS, "listDocsVersions", "GET", DOCS_SITE, 200)
-              .build(),
-          op(ProviderStates.A_ROUTES_BUNDLE_WITH_VIEWPORTS, "getDocsVersion", "GET", DOCS_VERSION, 200)
-              .build(),
-          op(ProviderStates.A_ROUTES_BUNDLE_WITH_VIEWPORTS, "getDocsFile", "GET", DOCS_FILE, 200)
-              .headers("Content-Length", "Content-Type", "ETag")
-              .build(),
-          // --- the contracts bundle: qits-landing-app's entity map read (qits-1950) — the state
-          // also publishes the routes bundle, so the catalog has two sites to answer with, and
-          // listDocsSites is recorded unfiltered (no params.values() of this state's own site name
-          // mention the routes site) to keep both. entities.json is JSON, so unlike the routes
-          // bundle's font and freeze files, its body is recorded too.
-          op(ProviderStates.A_CONTRACTS_BUNDLE, "listDocsSites", "GET", DOCS_SITES, 200).build(),
-          op(ProviderStates.A_CONTRACTS_BUNDLE, "listDocsVersions", "GET", DOCS_SITE, 200).build(),
-          op(ProviderStates.A_CONTRACTS_BUNDLE, "getDocsFile", "GET", DOCS_FILE, 200)
-              .headers("Content-Length", "Content-Type", "ETag")
-              .build(),
-          // --- two contracts bundles: qits-landing-app's contracts, entity and UI-builder links
-          // (qits-2041). One set-up publishes qits-githost's and qits-projects' bundles beside the
-          // routes bundle; each state reads one file. listDocsSites is unfiltered: three sites.
-          op(ProviderStates.A_CONTRACTS_BUNDLE_WITH_AN_INDEX, "listDocsSites", "GET", DOCS_SITES, 200)
-              .build(),
-          op(ProviderStates.A_CONTRACTS_BUNDLE_WITH_AN_INDEX, "listDocsVersions", "GET", DOCS_SITE, 200)
-              .build(),
-          op(ProviderStates.A_CONTRACTS_BUNDLE_WITH_AN_INDEX, "getDocsFile", "GET", DOCS_FILE, 200)
-              .headers("Content-Length", "Content-Type", "ETag")
-              .build(),
-          op(
-                  ProviderStates.A_CONTRACTS_BUNDLE_A_DEPENDENCY_POINTS_INTO,
-                  "listDocsVersions",
-                  "GET",
-                  DOCS_SITE,
-                  200)
-              .build(),
-          op(ProviderStates.A_CONTRACTS_BUNDLE_A_DEPENDENCY_POINTS_INTO, "getDocsFile", "GET", DOCS_FILE, 200)
-              .headers("Content-Length", "Content-Type", "ETag")
-              .build(),
-          op(ProviderStates.A_CONTRACTS_BUNDLE_WITH_A_PROJECTION, "getDocsFile", "GET", DOCS_FILE, 200)
-              .headers("Content-Length", "Content-Type", "ETag")
-              .build(),
-          // --- changelogs: qits-maintenance (ChangelogClient), the qits CLI (bump-message)
-          op(ProviderStates.CHANGELOGS, "listDocsVersions", "GET", CHANGELOG_SITE, 200).build(),
-          op(ProviderStates.CHANGELOGS, "getDocsFile", "GET", CHANGELOG_FILE, 200)
-              .raw()
-              .headers("Content-Length", "Content-Type", "ETag")
-              .build(),
-          op(ProviderStates.NO_CHANGELOG, "listDocsVersions", "GET", CHANGELOG_SITE, 404).build(),
-          op(ProviderStates.NO_CHANGELOG, "getDocsFile", "GET", CHANGELOG_FILE, 404).build(),
-          // --- content hashes: the qits CLI
-          op(ProviderStates.A_CONTENT_HASH, "getContentHash", "GET", CONTENT_HASH, 200).build(),
-          op(ProviderStates.A_CONTENT_HASH, "getNewestContentHash", "GET", NEWEST_CONTENT_HASH, 200)
-              .build(),
-          // the npm publish's if-changed decision
-          op(ProviderStates.AN_NPM_CONTENT_HASH, "getContentHash", "GET", CONTENT_HASH, 200).build(),
-          op(ProviderStates.AN_NPM_CONTENT_HASH, "getNewestContentHash", "GET", NEWEST_CONTENT_HASH, 200)
-              .build(),
-          // --- maven: qits-ci (HttpArtifactPresence), qits-maintenance (LatestResolver,
-          // ArtifactPresence), the bootstrap's probes, the qits CLI's deploy and pom reads
-          op(ProviderStates.A_MAVEN_ARTIFACT, "getMavenFile", "GET", MAVEN_POM, 200)
-              .raw()
-              .headers("Content-Length")
-              .build(),
-          op(ProviderStates.A_MAVEN_ARTIFACT, "getMavenMetadata", "GET", MAVEN_METADATA, 200)
-              .raw()
-              .headers("Content-Type")
-              .build(),
-          op(ProviderStates.NO_MAVEN_ARTIFACT, "getMavenFile", "GET", MAVEN_POM, 404).build(),
-          op(ProviderStates.NO_MAVEN_ARTIFACT, "getMavenMetadata", "GET", MAVEN_METADATA, 404)
-              .build(),
-          op(ProviderStates.NO_MAVEN_ARTIFACT, "getContentHash", "GET", CONTENT_HASH, 404).build(),
-          op(ProviderStates.NO_MAVEN_ARTIFACT, "getNewestContentHash", "GET", NEWEST_CONTENT_HASH, 404)
-              .build(),
-          op(ProviderStates.NO_MAVEN_ARTIFACT, "putMavenFile", "PUT", MAVEN_POM, 201)
-              .text("application/xml", ProviderStates.mavenPom(ProviderStates.MAVEN_ABSENT_ARTIFACT))
-              .raw()
-              .build(),
-          // the jar: the bootstrap's presence probe, and the CLI's deploy, which PUTs it before the pom
-          op(ProviderStates.A_MAVEN_JAR, "getMavenFile", "GET", MAVEN_JAR, 200)
-              .raw()
-              .headers("Content-Length")
-              .build(),
-          op(ProviderStates.NO_MAVEN_JAR, "getMavenFile", "GET", MAVEN_JAR, 404).build(),
-          op(ProviderStates.NO_MAVEN_JAR, "putMavenFile", "PUT", MAVEN_JAR, 201)
-              .text("application/java-archive", ProviderStates.MAVEN_JAR_BYTES)
-              .raw()
-              .build(),
-          // --- npm: qits-ci (HttpArtifactPresence), qits-maintenance (LatestResolver,
-          // ArtifactPresence), the bootstrap's tarball probe, the qits CLI's publish and plan
-          // dist.tarball is an absolute URL on whatever origin answered: the test server's port.
-          op(ProviderStates.AN_NPM_PACKAGE, "getNpmPackument", "GET", NPM_PACKUMENT, 200)
-              .blank("$.versions[*].dist.tarball")
-              .build(),
-          op(ProviderStates.AN_NPM_PACKAGE, "headNpmTarball", "HEAD", NPM_TARBALL, 200)
-              .headers("Content-Length")
-              .build(),
-          // The body is the JSON string npm and the qits CLI send, quotes included, recorded as its
-          // text: a consumer replays the text verbatim, and an unquoted version (which the door also
-          // takes, for a hand-written curl) is not what either client sends.
-          op(ProviderStates.AN_NPM_PACKAGE, "putNpmDistTag", "PUT", NPM_DIST_TAG, 200)
-              .text("application/json", "\"" + ProviderStates.NPM_VERSION + "\"")
-              .build(),
-          op(ProviderStates.NO_NPM_PACKAGE, "getNpmPackument", "GET", NPM_PACKUMENT, 404).build(),
-          op(ProviderStates.NO_NPM_PACKAGE, "headNpmTarball", "HEAD", NPM_TARBALL, 404).build(),
-          op(ProviderStates.NO_NPM_PACKAGE, "putNpmPackage", "PUT", NPM_PACKUMENT, 201)
-              .json(
-                  "application/json",
-                  ProviderStates.npmPublishDocument(ProviderStates.NPM_ABSENT_PACKAGE))
-              .build(),
-          // --- OCI: qits-ci (HttpImagePins), qits-maintenance (LatestResolver, ArtifactPresence),
-          // the bootstrap's image probes
-          op(ProviderStates.AN_IMAGE, "headImageManifest", "HEAD", IMAGE_MANIFEST, 200)
-              .headers("Docker-Content-Digest")
-              .build(),
-          op(ProviderStates.AN_IMAGE, "getImageManifest", "GET", IMAGE_MANIFEST, 200)
-              .raw()
-              .headers("Content-Type", "Docker-Content-Digest")
-              .build(),
-          op(ProviderStates.AN_IMAGE, "listImageTags", "GET", IMAGE_TAGS, 200)
-              .query("n", "1000")
-              .build(),
-          op(ProviderStates.NO_IMAGE, "headImageManifest", "HEAD", IMAGE_MANIFEST, 404).build(),
-          op(ProviderStates.NO_IMAGE, "getImageManifest", "GET", IMAGE_MANIFEST, 404).build(),
-          // An image name nothing was pushed under lists no tags rather than answering 404.
-          op(ProviderStates.NO_IMAGE, "listImageTags", "GET", IMAGE_TAGS, 200)
-              .query("n", "1000")
-              .build(),
-          // --- the store and its GC: qits-orchestrator
-          op(ProviderStates.A_STORE_WITH_CONTENT, "getStoreSummary", "GET", "/artifacts/api/store/summary", 200)
-              .zeroNumbers()
-              .build(),
-          // the GET is the plan's own read of live pins, never the orchestrator's supplied set —
-          // recorded with every source silent, which is the fail-safe answer a reviewer actually
-          // needs to see rather than one this suite has to stub.
-          op(ProviderStates.PIN_SOURCES_SILENT, "getGcPlan", "GET", "/artifacts/api/gc/plan", 200)
-              .drop(STORE_WIDE_LISTS)
-              .drop("sweep")
-              .zeroNumbers()
-              .blank(
-                  "$.summary.headline",
-                  "$.summary.reclaimable",
-                  "$.summary.types[*]",
-                  "$.pins[*].url",
-                  "$.pins[*].outcome",
-                  "$.pinFailures[*]")
-              .build(),
-          op(ProviderStates.UNPINNED_IDENTITIES, "planGcWithSuppliedPins", "POST", "/artifacts/api/gc/plan", 200)
-              .json("application/json", ProviderStates.GC_PINS)
-              .drop(STORE_WIDE_LISTS)
-              .drop("sweep")
-              .zeroNumbers()
-              .blank("$.summary.headline", "$.summary.reclaimable", "$.summary.types[*]")
-              .build(),
-          op(ProviderStates.UNPINNED_IDENTITIES, "sweepGc", "POST", "/artifacts/api/gc/sweep", 200)
-              .json("application/json", ProviderStates.GC_PINS)
-              .drop(STORE_WIDE_LISTS)
-              .zeroNumbers()
-              .build(),
-          // qits-2138: the per-repository surface over the same supplied set — the listing, one
-          // repository's plan and its scoped sweep — once the pin sources are the orchestrator's
-          // alone to read. Every row but the state's is another suite's, so the lists are
-          // filtered to the state's repository and daemon and every figure is store-wide.
-          op(
-                  ProviderStates.A_REPOSITORY_WITH_UNPINNED_IDENTITIES,
-                  "planGcRepositoriesWithSuppliedPins",
-                  "POST",
-                  "/artifacts/api/gc/repositories",
-                  200)
-              .json("application/json", ProviderStates.GC_PINS)
-              .filtered("$.repositories", "repository")
-              .zeroNumbers()
-              .build(),
-          op(
-                  ProviderStates.A_REPOSITORY_WITH_UNPINNED_IDENTITIES,
-                  "planGcRepositoryWithSuppliedPins",
-                  "POST",
-                  "/artifacts/api/gc/repositories/{repository}/plan",
-                  200)
-              .json("application/json", ProviderStates.GC_PINS)
-              .filtered("$.kept", "daemon")
-              .drop("configuration", "dead", "sweep", "structural", "untouchable")
-              .zeroNumbers()
-              .build(),
-          op(
-                  ProviderStates.A_REPOSITORY_WITH_UNPINNED_IDENTITIES,
-                  "sweepGcRepository",
-                  "POST",
-                  "/artifacts/api/gc/repositories/{repository}/sweep",
-                  200)
-              .json("application/json", ProviderStates.GC_PINS)
-              .filtered("$.withheldByGraceWindow", "daemon")
-              .drop("untouchable")
-              .zeroNumbers()
-              .build(),
-          // a pin the store cannot file refuses the whole run: aborted, nothing deleted
-          op(ProviderStates.AN_UNFILEABLE_PIN, "sweepGc", "POST", "/artifacts/api/gc/sweep", 200)
-              .json("application/json", ProviderStates.GC_PINS_UNFILEABLE)
-              .drop(STORE_WIDE_LISTS)
-              .zeroNumbers()
-              .build(),
-          // --- the decommission of a retired application (qits-1941)
-          op(
-                  ProviderStates.AN_APPLICATION_WITH_PUBLISHED_ARTIFACTS,
-                  "purgeApplication",
-                  "POST",
-                  "/artifacts/api/applications/{application}/purge",
-                  200)
-              .json("application/json", ProviderStates.PURGE_BODY)
-              .build());
+      Stream.of(
+              List.of(
+              // --- daemons: qits-maintenance (ArtifactPresence), qits-bootstrap, the qits CLI
+              op(ProviderStates.A_DAEMON_WITH_TWO_VERSIONS, "listDaemonVersions", "GET", DAEMON_VERSIONS, 200)
+                  .build(),
+              op(ProviderStates.A_DAEMON_WITH_TWO_VERSIONS, "headDaemon", "HEAD", DAEMON, 200)
+                  .headers(DIGEST_HEADERS)
+                  .build(),
+              // the qits CLI's update: the repository listing, the download, and a re-publish's 409
+              op(ProviderStates.A_DAEMON_WITH_TWO_VERSIONS, "listDaemons", "GET", DAEMONS, 200)
+                  .filtered("$.daemons", "daemon")
+                  .build(),
+              op(ProviderStates.A_DAEMON_WITH_TWO_VERSIONS, "getDaemon", "GET", DAEMON, 200)
+                  .raw()
+                  .headers("Content-Length")
+                  .build(),
+              op(ProviderStates.A_DAEMON_WITH_TWO_VERSIONS, "putDaemon", "PUT", DAEMON, 409)
+                  .text("application/octet-stream", ProviderStates.DAEMON_BYTES)
+                  .build(),
+              // the qits CLI's update (ArtifactsReleases): its own name's newest release, then the
+              // HEAD that says the length and digest, then the download
+              op(ProviderStates.THE_CLI_AS_A_DAEMON, "listDaemons", "GET", DAEMONS, 200)
+                  .filtered("$.daemons", "daemon")
+                  .build(),
+              op(ProviderStates.THE_CLI_AS_A_DAEMON, "headDaemon", "HEAD", DAEMON, 200)
+                  .headers(DIGEST_HEADERS)
+                  .build(),
+              op(ProviderStates.THE_CLI_AS_A_DAEMON, "getDaemon", "GET", DAEMON, 200)
+                  .raw()
+                  .headers("Content-Length")
+                  .build(),
+              op(ProviderStates.A_DAEMON_NOTHING_PUBLISHED, "listDaemonVersions", "GET", DAEMON_VERSIONS, 200)
+                  .build(),
+              op(ProviderStates.A_DAEMON_NOTHING_PUBLISHED, "headDaemon", "HEAD", DAEMON, 404).build(),
+              op(ProviderStates.A_DAEMON_NOTHING_PUBLISHED, "putDaemon", "PUT", DAEMON, 201)
+                  .text("application/octet-stream", ProviderStates.DAEMON_BYTES)
+                  .build(),
+              // --- sboms: the qits CLI, qits-maintenance (SbomClient)
+              op(ProviderStates.NO_SBOM, "putSbom", "PUT", SBOM, 201)
+                  .json(ProviderStates.CYCLONEDX_JSON, ProviderStates.SBOM_DOCUMENT)
+                  .build(),
+              op(ProviderStates.NO_SBOM, "getSbom", "GET", SBOM, 404).build(),
+              op(ProviderStates.NO_SBOM, "headSbom", "HEAD", SBOM, 404).build(),
+              op(ProviderStates.AN_SBOM, "putSbom", "PUT", SBOM, 200)
+                  .json(ProviderStates.CYCLONEDX_JSON, ProviderStates.SBOM_DOCUMENT)
+                  .build(),
+              op(ProviderStates.AN_SBOM, "getSbom", "GET", SBOM, 200)
+                  .headers("Content-Type", "Docker-Content-Digest", "ETag")
+                  .build(),
+              op(ProviderStates.AN_SBOM, "headSbom", "HEAD", SBOM, 200).headers(DIGEST_HEADERS).build(),
+              // --- docs: qits-docs (DocsUpstream), the qits CLI
+              op(ProviderStates.NO_DOCS, "putDocs", "PUT", DOCS_VERSION, 201)
+                  .binary("application/gzip", ProviderStates.DOCS_BUNDLE)
+                  .build(),
+              op(ProviderStates.NO_DOCS, "listDocsVersions", "GET", DOCS_SITE, 404).build(),
+              op(ProviderStates.NO_DOCS, "getDocsVersion", "GET", DOCS_VERSION, 404).build(),
+              op(ProviderStates.NO_DOCS, "getDocsFile", "GET", DOCS_FILE, 404).build(),
+              // the qits CLI's docs publish of a version that exists
+              op(ProviderStates.A_DOCS_SITE, "putDocs", "PUT", DOCS_VERSION, 409)
+                  .binary("application/gzip", ProviderStates.DOCS_BUNDLE)
+                  .build(),
+              op(ProviderStates.A_DOCS_SITE, "listDocsSites", "GET", DOCS_SITES, 200)
+                  .filtered("$.sites")
+                  .build(),
+              op(ProviderStates.A_DOCS_SITE, "listDocsVersions", "GET", DOCS_SITE, 200).build(),
+              op(ProviderStates.A_DOCS_SITE, "getDocsVersion", "GET", DOCS_VERSION, 200).build(),
+              op(ProviderStates.A_DOCS_SITE, "getDocsFile", "GET", DOCS_FILE, 200)
+                  .raw()
+                  .headers("Content-Length", "Content-Type", "ETag")
+                  .build(),
+              op(ProviderStates.A_DOCS_SITE_FROM_TWO_BRANCHES, "listDocsVersions", "GET", DOCS_SITE, 200)
+                  .query("meta.git.branch.name", "main")
+                  .build(),
+              // the qits CLI's `publish docs submit --if-changed`: the newest version's content.hash
+              op(ProviderStates.A_DOCS_SITE_WITH_A_CONTENT_HASH, "listDocsVersions", "GET", DOCS_SITE, 200)
+                  .build(),
+              // --- the routes bundle: qits-landing-app (qits-1951) — the catalog, the site's versions,
+              // the newest version's file list, then its files: the manifest (JSON, so recorded), a
+              // freeze page and the font it loads (raw bytes: status and headers only)
+              op(ProviderStates.A_ROUTES_BUNDLE, "listDocsSites", "GET", DOCS_SITES, 200)
+                  .filtered("$.sites", "site")
+                  .build(),
+              op(ProviderStates.A_ROUTES_BUNDLE, "listDocsVersions", "GET", DOCS_SITE, 200).build(),
+              op(ProviderStates.A_ROUTES_BUNDLE, "getDocsVersion", "GET", DOCS_VERSION, 200).build(),
+              op(ProviderStates.A_ROUTES_BUNDLE, "getDocsFile", "GET", DOCS_FILE, 200)
+                  .headers("Content-Length", "Content-Type", "ETag")
+                  .build(),
+              // the freeze page itself, recorded verbatim (qits-2041): the UI builder reads its links
+              op(ProviderStates.A_ROUTES_BUNDLE_FREEZE, "getDocsFile", "GET", DOCS_FILE, 200)
+                  .textAnswer("html")
+                  .headers("Content-Length", "Content-Type", "ETag")
+                  .build(),
+              op(ProviderStates.A_ROUTES_BUNDLE_FONT, "getDocsFile", "GET", DOCS_FILE, 200)
+                  .raw()
+                  .headers("Content-Length", "Content-Type", "ETag")
+                  .build(),
+              // --- the routes bundle with kinds and viewports: qits-landing-app's UI builder
+              // (qits-2059) — the same reads, over a manifest whose route freezes carry kind and
+              // viewport
+              op(ProviderStates.A_ROUTES_BUNDLE_WITH_VIEWPORTS, "listDocsSites", "GET", DOCS_SITES, 200)
+                  .filtered("$.sites", "site")
+                  .build(),
+              op(ProviderStates.A_ROUTES_BUNDLE_WITH_VIEWPORTS, "listDocsVersions", "GET", DOCS_SITE, 200)
+                  .build(),
+              op(ProviderStates.A_ROUTES_BUNDLE_WITH_VIEWPORTS, "getDocsVersion", "GET", DOCS_VERSION, 200)
+                  .build(),
+              op(ProviderStates.A_ROUTES_BUNDLE_WITH_VIEWPORTS, "getDocsFile", "GET", DOCS_FILE, 200)
+                  .headers("Content-Length", "Content-Type", "ETag")
+                  .build(),
+              // --- the contracts bundle: qits-landing-app's entity map read (qits-1950) — the state
+              // also publishes the routes bundle, so the catalog has two sites to answer with, and
+              // listDocsSites is recorded unfiltered (no params.values() of this state's own site name
+              // mention the routes site) to keep both. entities.json is JSON, so unlike the routes
+              // bundle's font and freeze files, its body is recorded too.
+              op(ProviderStates.A_CONTRACTS_BUNDLE, "listDocsSites", "GET", DOCS_SITES, 200).build(),
+              op(ProviderStates.A_CONTRACTS_BUNDLE, "listDocsVersions", "GET", DOCS_SITE, 200).build(),
+              op(ProviderStates.A_CONTRACTS_BUNDLE, "getDocsFile", "GET", DOCS_FILE, 200)
+                  .headers("Content-Length", "Content-Type", "ETag")
+                  .build(),
+              // --- two contracts bundles: qits-landing-app's contracts, entity and UI-builder links
+              // (qits-2041). One set-up publishes qits-githost's and qits-projects' bundles beside the
+              // routes bundle; each state reads one file. listDocsSites is unfiltered: three sites.
+              op(ProviderStates.A_CONTRACTS_BUNDLE_WITH_AN_INDEX, "listDocsSites", "GET", DOCS_SITES, 200)
+                  .build(),
+              op(ProviderStates.A_CONTRACTS_BUNDLE_WITH_AN_INDEX, "listDocsVersions", "GET", DOCS_SITE, 200)
+                  .build(),
+              op(ProviderStates.A_CONTRACTS_BUNDLE_WITH_AN_INDEX, "getDocsFile", "GET", DOCS_FILE, 200)
+                  .headers("Content-Length", "Content-Type", "ETag")
+                  .build(),
+              op(
+                      ProviderStates.A_CONTRACTS_BUNDLE_A_DEPENDENCY_POINTS_INTO,
+                      "listDocsVersions",
+                      "GET",
+                      DOCS_SITE,
+                      200)
+                  .build(),
+              op(ProviderStates.A_CONTRACTS_BUNDLE_A_DEPENDENCY_POINTS_INTO, "getDocsFile", "GET", DOCS_FILE, 200)
+                  .headers("Content-Length", "Content-Type", "ETag")
+                  .build(),
+              op(ProviderStates.A_CONTRACTS_BUNDLE_WITH_A_PROJECTION, "getDocsFile", "GET", DOCS_FILE, 200)
+                  .headers("Content-Length", "Content-Type", "ETag")
+                  .build(),
+              // --- changelogs: qits-maintenance (ChangelogClient), the qits CLI (bump-message)
+              op(ProviderStates.CHANGELOGS, "listDocsVersions", "GET", CHANGELOG_SITE, 200).build(),
+              op(ProviderStates.CHANGELOGS, "getDocsFile", "GET", CHANGELOG_FILE, 200)
+                  .raw()
+                  .headers("Content-Length", "Content-Type", "ETag")
+                  .build(),
+              op(ProviderStates.NO_CHANGELOG, "listDocsVersions", "GET", CHANGELOG_SITE, 404).build(),
+              op(ProviderStates.NO_CHANGELOG, "getDocsFile", "GET", CHANGELOG_FILE, 404).build(),
+              // --- content hashes: the qits CLI
+              op(ProviderStates.A_CONTENT_HASH, "getContentHash", "GET", CONTENT_HASH, 200).build(),
+              op(ProviderStates.A_CONTENT_HASH, "getNewestContentHash", "GET", NEWEST_CONTENT_HASH, 200)
+                  .build(),
+              // the npm publish's if-changed decision
+              op(ProviderStates.AN_NPM_CONTENT_HASH, "getContentHash", "GET", CONTENT_HASH, 200).build(),
+              op(ProviderStates.AN_NPM_CONTENT_HASH, "getNewestContentHash", "GET", NEWEST_CONTENT_HASH, 200)
+                  .build(),
+              // --- maven: qits-ci (HttpArtifactPresence), qits-maintenance (LatestResolver,
+              // ArtifactPresence), the bootstrap's probes, the qits CLI's deploy and pom reads
+              op(ProviderStates.A_MAVEN_ARTIFACT, "getMavenFile", "GET", MAVEN_POM, 200)
+                  .raw()
+                  .headers("Content-Length")
+                  .build(),
+              op(ProviderStates.A_MAVEN_ARTIFACT, "getMavenMetadata", "GET", MAVEN_METADATA, 200)
+                  .raw()
+                  .headers("Content-Type")
+                  .build(),
+              op(ProviderStates.NO_MAVEN_ARTIFACT, "getMavenFile", "GET", MAVEN_POM, 404).build(),
+              op(ProviderStates.NO_MAVEN_ARTIFACT, "getMavenMetadata", "GET", MAVEN_METADATA, 404)
+                  .build(),
+              op(ProviderStates.NO_MAVEN_ARTIFACT, "getContentHash", "GET", CONTENT_HASH, 404).build(),
+              op(ProviderStates.NO_MAVEN_ARTIFACT, "getNewestContentHash", "GET", NEWEST_CONTENT_HASH, 404)
+                  .build(),
+              op(ProviderStates.NO_MAVEN_ARTIFACT, "putMavenFile", "PUT", MAVEN_POM, 201)
+                  .text("application/xml", ProviderStates.mavenPom(ProviderStates.MAVEN_ABSENT_ARTIFACT))
+                  .raw()
+                  .build(),
+              // the jar: the bootstrap's presence probe, and the CLI's deploy, which PUTs it before the pom
+              op(ProviderStates.A_MAVEN_JAR, "getMavenFile", "GET", MAVEN_JAR, 200)
+                  .raw()
+                  .headers("Content-Length")
+                  .build(),
+              op(ProviderStates.NO_MAVEN_JAR, "getMavenFile", "GET", MAVEN_JAR, 404).build(),
+              op(ProviderStates.NO_MAVEN_JAR, "putMavenFile", "PUT", MAVEN_JAR, 201)
+                  .text("application/java-archive", ProviderStates.MAVEN_JAR_BYTES)
+                  .raw()
+                  .build(),
+              // --- npm: qits-ci (HttpArtifactPresence), qits-maintenance (LatestResolver,
+              // ArtifactPresence), the bootstrap's tarball probe, the qits CLI's publish and plan
+              // dist.tarball is an absolute URL on whatever origin answered: the test server's port.
+              op(ProviderStates.AN_NPM_PACKAGE, "getNpmPackument", "GET", NPM_PACKUMENT, 200)
+                  .blank("$.versions[*].dist.tarball")
+                  .build(),
+              op(ProviderStates.AN_NPM_PACKAGE, "headNpmTarball", "HEAD", NPM_TARBALL, 200)
+                  .headers("Content-Length")
+                  .build(),
+              // The body is the JSON string npm and the qits CLI send, quotes included, recorded as its
+              // text: a consumer replays the text verbatim, and an unquoted version (which the door also
+              // takes, for a hand-written curl) is not what either client sends.
+              op(ProviderStates.AN_NPM_PACKAGE, "putNpmDistTag", "PUT", NPM_DIST_TAG, 200)
+                  .text("application/json", "\"" + ProviderStates.NPM_VERSION + "\"")
+                  .build(),
+              op(ProviderStates.NO_NPM_PACKAGE, "getNpmPackument", "GET", NPM_PACKUMENT, 404).build(),
+              op(ProviderStates.NO_NPM_PACKAGE, "headNpmTarball", "HEAD", NPM_TARBALL, 404).build(),
+              op(ProviderStates.NO_NPM_PACKAGE, "putNpmPackage", "PUT", NPM_PACKUMENT, 201)
+                  .json(
+                      "application/json",
+                      ProviderStates.npmPublishDocument(ProviderStates.NPM_ABSENT_PACKAGE))
+                  .build(),
+              // --- OCI: qits-ci (HttpImagePins), qits-maintenance (LatestResolver, ArtifactPresence),
+              // the bootstrap's image probes
+              op(ProviderStates.AN_IMAGE, "headImageManifest", "HEAD", IMAGE_MANIFEST, 200)
+                  .headers("Docker-Content-Digest")
+                  .build(),
+              op(ProviderStates.AN_IMAGE, "getImageManifest", "GET", IMAGE_MANIFEST, 200)
+                  .raw()
+                  .headers("Content-Type", "Docker-Content-Digest")
+                  .build(),
+              op(ProviderStates.AN_IMAGE, "listImageTags", "GET", IMAGE_TAGS, 200)
+                  .query("n", "1000")
+                  .build(),
+              op(ProviderStates.NO_IMAGE, "headImageManifest", "HEAD", IMAGE_MANIFEST, 404).build(),
+              op(ProviderStates.NO_IMAGE, "getImageManifest", "GET", IMAGE_MANIFEST, 404).build(),
+              // An image name nothing was pushed under lists no tags rather than answering 404.
+              op(ProviderStates.NO_IMAGE, "listImageTags", "GET", IMAGE_TAGS, 200)
+                  .query("n", "1000")
+                  .build(),
+              // --- the store and its GC: qits-orchestrator
+              op(ProviderStates.A_STORE_WITH_CONTENT, "getStoreSummary", "GET", "/artifacts/api/store/summary", 200)
+                  .zeroNumbers()
+                  .build(),
+              // the GET is the plan's own read of live pins, never the orchestrator's supplied set —
+              // recorded with every source silent, which is the fail-safe answer a reviewer actually
+              // needs to see rather than one this suite has to stub.
+              op(ProviderStates.PIN_SOURCES_SILENT, "getGcPlan", "GET", "/artifacts/api/gc/plan", 200)
+                  .drop(STORE_WIDE_LISTS)
+                  .drop("sweep")
+                  .zeroNumbers()
+                  .blank(
+                      "$.summary.headline",
+                      "$.summary.reclaimable",
+                      "$.summary.types[*]",
+                      "$.pins[*].url",
+                      "$.pins[*].outcome",
+                      "$.pinFailures[*]")
+                  .build(),
+              op(ProviderStates.UNPINNED_IDENTITIES, "planGcWithSuppliedPins", "POST", "/artifacts/api/gc/plan", 200)
+                  .json("application/json", ProviderStates.GC_PINS)
+                  .drop(STORE_WIDE_LISTS)
+                  .drop("sweep")
+                  .zeroNumbers()
+                  .blank("$.summary.headline", "$.summary.reclaimable", "$.summary.types[*]")
+                  .build(),
+              op(ProviderStates.UNPINNED_IDENTITIES, "sweepGc", "POST", "/artifacts/api/gc/sweep", 200)
+                  .json("application/json", ProviderStates.GC_PINS)
+                  .drop(STORE_WIDE_LISTS)
+                  .zeroNumbers()
+                  .build(),
+              // qits-2138: the per-repository surface over the same supplied set — the listing, one
+              // repository's plan and its scoped sweep — once the pin sources are the orchestrator's
+              // alone to read. Every row but the state's is another suite's, so the lists are
+              // filtered to the state's repository and daemon and every figure is store-wide.
+              op(
+                      ProviderStates.A_REPOSITORY_WITH_UNPINNED_IDENTITIES,
+                      "planGcRepositoriesWithSuppliedPins",
+                      "POST",
+                      "/artifacts/api/gc/repositories",
+                      200)
+                  .json("application/json", ProviderStates.GC_PINS)
+                  .filtered("$.repositories", "repository")
+                  .zeroNumbers()
+                  .build(),
+              op(
+                      ProviderStates.A_REPOSITORY_WITH_UNPINNED_IDENTITIES,
+                      "planGcRepositoryWithSuppliedPins",
+                      "POST",
+                      "/artifacts/api/gc/repositories/{repository}/plan",
+                      200)
+                  .json("application/json", ProviderStates.GC_PINS)
+                  .filtered("$.kept", "daemon")
+                  .drop("configuration", "dead", "sweep", "structural", "untouchable")
+                  .zeroNumbers()
+                  .build(),
+              op(
+                      ProviderStates.A_REPOSITORY_WITH_UNPINNED_IDENTITIES,
+                      "sweepGcRepository",
+                      "POST",
+                      "/artifacts/api/gc/repositories/{repository}/sweep",
+                      200)
+                  .json("application/json", ProviderStates.GC_PINS)
+                  .filtered("$.withheldByGraceWindow", "daemon")
+                  .drop("untouchable")
+                  .zeroNumbers()
+                  .build(),
+              // a pin the store cannot file refuses the whole run: aborted, nothing deleted
+              op(ProviderStates.AN_UNFILEABLE_PIN, "sweepGc", "POST", "/artifacts/api/gc/sweep", 200)
+                  .json("application/json", ProviderStates.GC_PINS_UNFILEABLE)
+                  .drop(STORE_WIDE_LISTS)
+                  .zeroNumbers()
+                  .build(),
+              // --- the decommission of a retired application (qits-1941)
+              op(
+                      ProviderStates.AN_APPLICATION_WITH_PUBLISHED_ARTIFACTS,
+                      "purgeApplication",
+                      "POST",
+                      "/artifacts/api/applications/{application}/purge",
+                      200)
+                  .json("application/json", ProviderStates.PURGE_BODY)
+                  .build()),
+              // --- the store explorer: qits-landing-app's artifacts store page (qits-2316) — the
+              // repository listing, then each kind's listing in the repository that holds it
+              explorer(ProviderStates.A_STORE_HOLDING_EVERY_KIND),
+              explorer(ProviderStates.A_STORE_WITH_NOTHING_PUBLISHED))
+          .flatMap(List::stream)
+          .toList();
+
+  /**
+   * The store explorer's reads in one state (qits-2316). Every listing but the repositories' is
+   * filtered to the contract name the state publishes under, since other suites' rows share every
+   * seeded repository; the repository listing is kept to the seeded rows, sorted by name, and its
+   * figures are store-wide. The CI media listing is kept to nothing: no state uploads CI media.
+   */
+  private static List<Interaction> explorer(String state) {
+    return List.of(
+        op(state, "listRepositories", "GET", "/artifacts/api/repositories", 200)
+            .kept("$.repositories", "name", ProviderStates.SEEDED_REPOSITORIES)
+            .sorted("$.repositories", "name")
+            .zeroNumbers()
+            .build(),
+        op(state, "listImages", "GET", "/artifacts/api/repositories/{imagesRepository}/images", 200)
+            .filtered("$.images", "image")
+            .build(),
+        op(
+                state,
+                "listNpmPackages",
+                "GET",
+                "/artifacts/api/repositories/{npmRepository}/packages",
+                200)
+            .filtered("$.packages", "npmPackage")
+            .build(),
+        op(
+                state,
+                "listMavenPackages",
+                "GET",
+                "/artifacts/api/repositories/{mavenRepository}/maven-packages",
+                200)
+            .filtered("$.packages", "mavenPackage")
+            .build(),
+        op(state, "listDaemons", "GET", "/artifacts/api/repositories/{daemonsRepository}/daemons", 200)
+            .filtered("$.daemons", "daemon")
+            .build(),
+        op(
+                state,
+                "listDocsSiteSummaries",
+                "GET",
+                "/artifacts/api/repositories/{docsRepository}/docs",
+                200)
+            .filtered("$.sites", "docsSite")
+            .build(),
+        op(
+                state,
+                "listArtifactRecords",
+                "GET",
+                "/artifacts/api/repositories/{screenshotsRepository}/blobs",
+                200)
+            .kept("$.records", "id", List.of())
+            .build());
+  }
 
   private static final Pattern TEMPLATE_PARAM = Pattern.compile("\\{([^}]+)}");
 
@@ -961,7 +1050,9 @@ class GoldenMasterRecordingTest {
       ArrayNode kept = JsonNodeFactory.instance.arrayNode();
       for (JsonNode entry : list) {
         String text = entry.toString();
-        if (createdIds.stream().anyMatch(text::contains)) {
+        if (interaction.keptField() != null
+            ? interaction.keptValues().contains(entry.path(interaction.keptField()).asText())
+            : createdIds.stream().anyMatch(text::contains)) {
           kept.add(entry);
         }
       }

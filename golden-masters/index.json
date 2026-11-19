@@ -1551,6 +1551,244 @@
       ]
     },
     {
+      "name": "a store holding one artifact of every kind",
+      "slug": "a-store-holding-one-artifact-of-every-kind",
+      "params": {
+        "daemon": "contract-daemon",
+        "daemonsRepository": "daemons",
+        "docsRepository": "docs",
+        "docsSite": "contract-docs-site",
+        "image": "contract-image",
+        "imagesRepository": "qits",
+        "mavenPackage": "eu.wohlben.qits:contract-maven",
+        "mavenRepository": "maven",
+        "npmPackage": "contract-package",
+        "npmRepository": "npm",
+        "screenshotsRepository": "ci-screenshots"
+      },
+      "dependsOn": [],
+      "operations": [
+        {
+          "operationId": "listArtifactRecords",
+          "method": "GET",
+          "path": "/artifacts/api/repositories/{screenshotsRepository}/blobs",
+          "status": 200,
+          "file": "a-store-holding-one-artifact-of-every-kind/listArtifactRecords.json",
+          "frozen": {
+            "ids": [],
+            "instants": [],
+            "strings": [],
+            "listFilteredTo": "$.records"
+          }
+        },
+        {
+          "operationId": "listDaemons",
+          "method": "GET",
+          "path": "/artifacts/api/repositories/{daemonsRepository}/daemons",
+          "status": 200,
+          "file": "a-store-holding-one-artifact-of-every-kind/listDaemons.json",
+          "frozen": {
+            "ids": [],
+            "instants": [
+              "$.daemons[*].latestPublishedAt"
+            ],
+            "strings": [],
+            "listFilteredTo": "$.daemons"
+          }
+        },
+        {
+          "operationId": "listDocsSiteSummaries",
+          "method": "GET",
+          "path": "/artifacts/api/repositories/{docsRepository}/docs",
+          "status": 200,
+          "file": "a-store-holding-one-artifact-of-every-kind/listDocsSiteSummaries.json",
+          "frozen": {
+            "ids": [],
+            "instants": [
+              "$.sites[*].latestPublishedAt"
+            ],
+            "strings": [],
+            "listFilteredTo": "$.sites"
+          }
+        },
+        {
+          "operationId": "listImages",
+          "method": "GET",
+          "path": "/artifacts/api/repositories/{imagesRepository}/images",
+          "status": 200,
+          "file": "a-store-holding-one-artifact-of-every-kind/listImages.json",
+          "frozen": {
+            "ids": [],
+            "instants": [],
+            "strings": [],
+            "listFilteredTo": "$.images"
+          }
+        },
+        {
+          "operationId": "listMavenPackages",
+          "method": "GET",
+          "path": "/artifacts/api/repositories/{mavenRepository}/maven-packages",
+          "status": 200,
+          "file": "a-store-holding-one-artifact-of-every-kind/listMavenPackages.json",
+          "frozen": {
+            "ids": [],
+            "instants": [],
+            "strings": [],
+            "listFilteredTo": "$.packages"
+          }
+        },
+        {
+          "operationId": "listNpmPackages",
+          "method": "GET",
+          "path": "/artifacts/api/repositories/{npmRepository}/packages",
+          "status": 200,
+          "file": "a-store-holding-one-artifact-of-every-kind/listNpmPackages.json",
+          "frozen": {
+            "ids": [],
+            "instants": [],
+            "strings": [],
+            "listFilteredTo": "$.packages"
+          }
+        },
+        {
+          "operationId": "listRepositories",
+          "method": "GET",
+          "path": "/artifacts/api/repositories",
+          "status": 200,
+          "file": "a-store-holding-one-artifact-of-every-kind/listRepositories.json",
+          "frozen": {
+            "ids": [],
+            "instants": [
+              "$.repositories[*].createdAt"
+            ],
+            "strings": [],
+            "volatile": [
+              "$.repositories[*].itemCount",
+              "$.repositories[*].sizeBytes"
+            ],
+            "listFilteredTo": "$.repositories"
+          }
+        }
+      ]
+    },
+    {
+      "name": "a store with nothing published",
+      "slug": "a-store-with-nothing-published",
+      "params": {
+        "daemon": "contract-daemon",
+        "daemonsRepository": "daemons",
+        "docsRepository": "docs",
+        "docsSite": "contract-docs-site",
+        "image": "contract-image",
+        "imagesRepository": "qits",
+        "mavenPackage": "eu.wohlben.qits:contract-maven",
+        "mavenRepository": "maven",
+        "npmPackage": "contract-package",
+        "npmRepository": "npm",
+        "screenshotsRepository": "ci-screenshots"
+      },
+      "dependsOn": [],
+      "operations": [
+        {
+          "operationId": "listArtifactRecords",
+          "method": "GET",
+          "path": "/artifacts/api/repositories/{screenshotsRepository}/blobs",
+          "status": 200,
+          "file": "a-store-with-nothing-published/listArtifactRecords.json",
+          "frozen": {
+            "ids": [],
+            "instants": [],
+            "strings": [],
+            "listFilteredTo": "$.records"
+          }
+        },
+        {
+          "operationId": "listDaemons",
+          "method": "GET",
+          "path": "/artifacts/api/repositories/{daemonsRepository}/daemons",
+          "status": 200,
+          "file": "a-store-with-nothing-published/listDaemons.json",
+          "frozen": {
+            "ids": [],
+            "instants": [],
+            "strings": [],
+            "listFilteredTo": "$.daemons"
+          }
+        },
+        {
+          "operationId": "listDocsSiteSummaries",
+          "method": "GET",
+          "path": "/artifacts/api/repositories/{docsRepository}/docs",
+          "status": 200,
+          "file": "a-store-with-nothing-published/listDocsSiteSummaries.json",
+          "frozen": {
+            "ids": [],
+            "instants": [],
+            "strings": [],
+            "listFilteredTo": "$.sites"
+          }
+        },
+        {
+          "operationId": "listImages",
+          "method": "GET",
+          "path": "/artifacts/api/repositories/{imagesRepository}/images",
+          "status": 200,
+          "file": "a-store-with-nothing-published/listImages.json",
+          "frozen": {
+            "ids": [],
+            "instants": [],
+            "strings": [],
+            "listFilteredTo": "$.images"
+          }
+        },
+        {
+          "operationId": "listMavenPackages",
+          "method": "GET",
+          "path": "/artifacts/api/repositories/{mavenRepository}/maven-packages",
+          "status": 200,
+          "file": "a-store-with-nothing-published/listMavenPackages.json",
+          "frozen": {
+            "ids": [],
+            "instants": [],
+            "strings": [],
+            "listFilteredTo": "$.packages"
+          }
+        },
+        {
+          "operationId": "listNpmPackages",
+          "method": "GET",
+          "path": "/artifacts/api/repositories/{npmRepository}/packages",
+          "status": 200,
+          "file": "a-store-with-nothing-published/listNpmPackages.json",
+          "frozen": {
+            "ids": [],
+            "instants": [],
+            "strings": [],
+            "listFilteredTo": "$.packages"
+          }
+        },
+        {
+          "operationId": "listRepositories",
+          "method": "GET",
+          "path": "/artifacts/api/repositories",
+          "status": 200,
+          "file": "a-store-with-nothing-published/listRepositories.json",
+          "frozen": {
+            "ids": [],
+            "instants": [
+              "$.repositories[*].createdAt"
+            ],
+            "strings": [],
+            "volatile": [
+              "$.repositories[*].itemCount",
+              "$.repositories[*].sizeBytes"
+            ],
+            "listFilteredTo": "$.repositories"
+          }
+        }
+      ]
+    },
+    {
       "name": "an application with published artifacts",
       "slug": "an-application-with-published-artifacts",
       "params": {

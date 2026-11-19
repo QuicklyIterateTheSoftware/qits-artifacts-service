@@ -356,4 +356,14 @@ class ConsumerPactVerificationTest {
   Map<String, String> anApplicationWithPublishedArtifacts() {
     return states.params(ProviderStates.AN_APPLICATION_WITH_PUBLISHED_ARTIFACTS);
   }
+
+  @State(ProviderStates.A_STORE_HOLDING_EVERY_KIND)
+  Map<String, String> aStoreHoldingEveryKind() {
+    return states.params(ProviderStates.A_STORE_HOLDING_EVERY_KIND);
+  }
+
+  @State(ProviderStates.A_STORE_WITH_NOTHING_PUBLISHED)
+  Map<String, String> aStoreWithNothingPublished() {
+    return states.params(ProviderStates.A_STORE_WITH_NOTHING_PUBLISHED);
+  }
 }

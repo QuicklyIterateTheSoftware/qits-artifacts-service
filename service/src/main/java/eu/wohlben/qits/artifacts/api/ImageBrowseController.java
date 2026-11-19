@@ -46,7 +46,9 @@ public class ImageBrowseController {
 
   /** 404 for an unknown repository, 400 for one that is not an image repository. */
   @GET
-  @Operation(hidden = true)
+  // Named: golden-masters/ records it under this operationId (qits-2316); qits-landing-app's
+  // artifacts store page reads it.
+  @Operation(operationId = "listImages")
   public ListImagesResponse images(@PathParam("repo") String repo) {
     return new ListImagesResponse(explorer.listImages(repo));
   }

@@ -585,14 +585,6 @@
       ],
       "operations" : [
         {
-          "operationId" : "DocsBrowseController.sites",
-          "method" : "GET",
-          "path" : "/repositories/{repo}/docs",
-          "dto" : "eu.wohlben.qits.artifacts.api.DocsBrowseController$ListDocsSitesResponse",
-          "kind" : "returns",
-          "cardinality" : "collection"
-        },
-        {
           "operationId" : "DocsBrowseController.versions",
           "method" : "GET",
           "path" : "/repositories/{repo}/docs/{site:.+}/versions",
@@ -613,6 +605,14 @@
           "method" : "GET",
           "path" : "/gc/plan",
           "dto" : "eu.wohlben.qits.artifacts.gc.dto.GcIdentity",
+          "kind" : "returns",
+          "cardinality" : "collection"
+        },
+        {
+          "operationId" : "listDocsSiteSummaries",
+          "method" : "GET",
+          "path" : "/repositories/{repo}/docs",
+          "dto" : "eu.wohlben.qits.artifacts.api.DocsBrowseController$ListDocsSitesResponse",
           "kind" : "returns",
           "cardinality" : "collection"
         },

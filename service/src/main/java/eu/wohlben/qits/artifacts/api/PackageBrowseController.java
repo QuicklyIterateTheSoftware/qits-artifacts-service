@@ -11,6 +11,7 @@ import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.core.MediaType;
 import java.util.List;
 import org.eclipse.microprofile.openapi.annotations.Operation;
+import org.eclipse.microprofile.openapi.annotations.media.Schema;
 
 /**
  * Browsing an npm repository — hosted or proxy, the same two routes.
@@ -33,11 +34,16 @@ public class PackageBrowseController {
 
   @Inject ArtifactExplorerService explorer;
 
+  // Named apart: the npm and maven listings both declare a ListPackagesResponse, and two schemas
+  // with one simple name would be numbered rather than named in the OpenAPI document (qits-2316).
+  @Schema(name = "ListNpmPackagesResponse")
   public record ListPackagesResponse(List<PackageSummary> packages) {}
 
   /** 404 for an unknown repository, 400 for one that is neither npm type. */
   @GET
-  @Operation(hidden = true)
+  // Named: golden-masters/ records it under this operationId (qits-2316); qits-landing-app's
+  // artifacts store page reads it.
+  @Operation(operationId = "listNpmPackages")
   public ListPackagesResponse packages(@PathParam("repo") String repo) {
     return new ListPackagesResponse(explorer.listPackages(repo));
   }

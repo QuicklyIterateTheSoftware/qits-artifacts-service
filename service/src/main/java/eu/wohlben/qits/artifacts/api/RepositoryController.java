@@ -78,7 +78,9 @@ public class RepositoryController {
    * this is the only place that enumerates anything — see {@code ArtifactExplorerService}.
    */
   @GET
-  @Operation(hidden = true)
+  // Named: golden-masters/ records it under this operationId (qits-2316); qits-landing-app's
+  // artifacts store page reads it.
+  @Operation(operationId = "listRepositories")
   @jakarta.annotation.security.RolesAllowed({"qits:admin", "qits:agent", "qits:system", "qits:ci-run"})
   public ListRepositoriesResponse list() {
     return new ListRepositoriesResponse(explorer.listRepositories());

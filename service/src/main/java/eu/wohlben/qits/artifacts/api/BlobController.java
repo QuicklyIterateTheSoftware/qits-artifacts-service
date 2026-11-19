@@ -86,7 +86,9 @@ public class BlobController {
 
   @GET
   @Produces(MediaType.APPLICATION_JSON)
-  @Operation(hidden = true)
+  // Named: golden-masters/ records it under this operationId (qits-2316); qits-landing-app's
+  // artifacts store page reads it.
+  @Operation(operationId = "listArtifactRecords")
   @jakarta.annotation.security.RolesAllowed({"qits:admin", "qits:agent", "qits:system", "qits:ci-run"})
   public ListBlobsResponse query(
       @PathParam("repo") String repo,

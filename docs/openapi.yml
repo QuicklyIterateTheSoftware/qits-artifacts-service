@@ -835,6 +835,86 @@ paths:
       security:
       - SecurityScheme:
         - qits:system
+  /artifacts/api/repositories:
+    get:
+      operationId: listRepositories
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListRepositoriesResponse"
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+      summary: List
+      tags:
+      - Repository Controller
+      security:
+      - SecurityScheme:
+        - qits:admin
+        - qits:agent
+        - qits:system
+        - qits:ci-run
+  /artifacts/api/repositories/{repo}/blobs:
+    get:
+      operationId: listArtifactRecords
+      parameters:
+      - name: repo
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: accessed-after
+        in: query
+        schema:
+          type: string
+      - name: accessed-before
+        in: query
+        schema:
+          type: string
+      - name: created-after
+        in: query
+        schema:
+          type: string
+      - name: created-before
+        in: query
+        schema:
+          type: string
+      - name: max-size
+        in: query
+        schema:
+          type: string
+      - name: min-size
+        in: query
+        schema:
+          type: string
+      - name: never-accessed
+        in: query
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListBlobsResponse"
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+      summary: Query
+      tags:
+      - Blob Controller
+      security:
+      - SecurityScheme:
+        - qits:admin
+        - qits:agent
+        - qits:system
+        - qits:ci-run
   /artifacts/api/repositories/{repo}/daemons:
     get:
       operationId: listDaemons
@@ -892,6 +972,122 @@ paths:
       summary: Versions
       tags:
       - Daemon Browse Controller
+      security:
+      - SecurityScheme:
+        - qits:admin
+        - qits:agent
+        - qits:system
+        - qits:ci-run
+  /artifacts/api/repositories/{repo}/docs:
+    get:
+      operationId: listDocsSiteSummaries
+      parameters:
+      - name: repo
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListDocsSitesResponse"
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+      summary: Sites
+      tags:
+      - Docs Browse Controller
+      security:
+      - SecurityScheme:
+        - qits:admin
+        - qits:agent
+        - qits:system
+        - qits:ci-run
+  /artifacts/api/repositories/{repo}/images:
+    get:
+      operationId: listImages
+      parameters:
+      - name: repo
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListImagesResponse"
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+      summary: Images
+      tags:
+      - Image Browse Controller
+      security:
+      - SecurityScheme:
+        - qits:admin
+        - qits:agent
+        - qits:system
+        - qits:ci-run
+  /artifacts/api/repositories/{repo}/maven-packages:
+    get:
+      operationId: listMavenPackages
+      parameters:
+      - name: repo
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListMavenPackagesResponse"
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+      summary: Packages
+      tags:
+      - Maven Browse Controller
+      security:
+      - SecurityScheme:
+        - qits:admin
+        - qits:agent
+        - qits:system
+        - qits:ci-run
+  /artifacts/api/repositories/{repo}/packages:
+    get:
+      operationId: listNpmPackages
+      parameters:
+      - name: repo
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListNpmPackagesResponse"
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+      summary: Packages
+      tags:
+      - Package Browse Controller
       security:
       - SecurityScheme:
         - qits:admin
@@ -1028,6 +1224,26 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/PurgedPackage"
+    ArtifactRecordDto:
+      type: object
+      properties:
+        id:
+          type: string
+        repository:
+          type: string
+        mediatype:
+          type: string
+        size:
+          type: integer
+          format: int64
+        createdAt:
+          $ref: "#/components/schemas/Instant"
+        accessedAt:
+          $ref: "#/components/schemas/Instant"
+        metadata:
+          type: object
+          additionalProperties:
+            type: string
     DaemonSummary:
       type: object
       properties:
@@ -1057,6 +1273,21 @@ components:
           $ref: "#/components/schemas/Instant"
         accessedAt:
           $ref: "#/components/schemas/Instant"
+    DocsSiteSummary:
+      type: object
+      properties:
+        name:
+          type: string
+        versionCount:
+          type: integer
+          format: int64
+        latestVersion:
+          type: string
+        latestPublishedAt:
+          $ref: "#/components/schemas/Instant"
+        sizeBytes:
+          type: integer
+          format: int64
     GcDiskReport:
       type: object
       properties:
@@ -1458,11 +1689,32 @@ components:
           type: array
           items:
             type: string
+    ImageSummary:
+      type: object
+      properties:
+        name:
+          type: string
+        tagCount:
+          type: integer
+          format: int64
+        manifestCount:
+          type: integer
+          format: int64
+        sizeBytes:
+          type: integer
+          format: int64
     Instant:
       type: string
       format: date-time
       examples:
       - 2022-03-10T16:15:50Z
+    ListBlobsResponse:
+      type: object
+      properties:
+        records:
+          type: array
+          items:
+            $ref: "#/components/schemas/ArtifactRecordDto"
     ListDaemonVersionsResponse:
       type: object
       properties:
@@ -1477,6 +1729,62 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/DaemonSummary"
+    ListDocsSitesResponse:
+      type: object
+      properties:
+        sites:
+          type: array
+          items:
+            $ref: "#/components/schemas/DocsSiteSummary"
+    ListImagesResponse:
+      type: object
+      properties:
+        images:
+          type: array
+          items:
+            $ref: "#/components/schemas/ImageSummary"
+    ListMavenPackagesResponse:
+      type: object
+      properties:
+        packages:
+          type: array
+          items:
+            $ref: "#/components/schemas/MavenPackageSummary"
+    ListNpmPackagesResponse:
+      type: object
+      properties:
+        packages:
+          type: array
+          items:
+            $ref: "#/components/schemas/PackageSummary"
+    ListRepositoriesResponse:
+      type: object
+      properties:
+        repositories:
+          type: array
+          items:
+            $ref: "#/components/schemas/RepositorySummary"
+    MavenPackageSummary:
+      type: object
+      properties:
+        name:
+          type: string
+        versionCount:
+          type: integer
+          format: int64
+        sizeBytes:
+          type: integer
+          format: int64
+    PackageSummary:
+      type: object
+      properties:
+        name:
+          type: string
+        versionCount:
+          type: integer
+          format: int64
+        latest:
+          type: string
     PurgedPackage:
       type: object
       properties:
@@ -1490,6 +1798,21 @@ components:
           type: array
           items:
             type: string
+    RepositorySummary:
+      type: object
+      properties:
+        name:
+          type: string
+        type:
+          type: string
+        createdAt:
+          $ref: "#/components/schemas/Instant"
+        itemCount:
+          type: integer
+          format: int64
+        sizeBytes:
+          type: integer
+          format: int64
     StoreSummary:
       type: object
       properties:

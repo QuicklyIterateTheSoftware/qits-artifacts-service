@@ -1,0 +1,9 @@
+{
+  "packages": [
+    {
+      "name": "contract-package",
+      "versionCount": 1,
+      "latest": "2100.1.0"
+    }
+  ]
+}

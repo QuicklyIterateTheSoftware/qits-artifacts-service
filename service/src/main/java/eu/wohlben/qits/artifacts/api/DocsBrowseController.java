@@ -60,7 +60,9 @@ public class DocsBrowseController {
 
   /** 404 for an unknown repository, 400 for one that is not a docs repository. */
   @GET
-  @Operation(hidden = true)
+  // Named: golden-masters/ records it under this operationId (qits-2316); qits-landing-app's
+  // artifacts store page reads it.
+  @Operation(operationId = "listDocsSiteSummaries")
   public ListDocsSitesResponse sites(@PathParam("repo") String repo) {
     return new ListDocsSitesResponse(explorer.listDocsSites(repo));
   }

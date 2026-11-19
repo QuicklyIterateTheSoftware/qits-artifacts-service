@@ -1,0 +1,60 @@
+{
+  "repositories": [
+    {
+      "name": "ci-screenshots",
+      "type": "ci-screenshots",
+      "createdAt": "2026-01-01T00:00:00Z",
+      "itemCount": 0,
+      "sizeBytes": 0
+    },
+    {
+      "name": "ci-videos",
+      "type": "ci-videos",
+      "createdAt": "2026-01-01T00:00:00Z",
+      "itemCount": 0,
+      "sizeBytes": 0
+    },
+    {
+      "name": "daemons",
+      "type": "daemon-binaries",
+      "createdAt": "2026-01-01T00:00:00Z",
+      "itemCount": 0,
+      "sizeBytes": 0
+    },
+    {
+      "name": "docs",
+      "type": "docs",
+      "createdAt": "2026-01-01T00:00:00Z",
+      "itemCount": 0,
+      "sizeBytes": 0
+    },
+    {
+      "name": "maven",
+      "type": "maven-packages",
+      "createdAt": "2026-01-01T00:00:00Z",
+      "itemCount": 0,
+      "sizeBytes": 0
+    },
+    {
+      "name": "npm",
+      "type": "npm-packages",
+      "createdAt": "2026-01-01T00:00:00Z",
+      "itemCount": 0,
+      "sizeBytes": 0
+    },
+    {
+      "name": "qits",
+      "type": "oci-images",
+      "createdAt": "2026-01-01T00:00:00Z",
+      "itemCount": 0,
+      "sizeBytes": 0
+    },
+    {
+      "name": "sboms",
+      "type": "sboms",
+      "createdAt": "2026-01-01T00:00:00Z",
+      "itemCount": 0,
+      "sizeBytes": 0
+    }
+  ]
+}

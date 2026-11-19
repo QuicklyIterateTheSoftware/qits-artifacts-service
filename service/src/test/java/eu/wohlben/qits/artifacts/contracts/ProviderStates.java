@@ -123,6 +123,12 @@ public class ProviderStates {
   // qits-1941: the decommission of a retired application
   public static final String AN_APPLICATION_WITH_PUBLISHED_ARTIFACTS =
       "an application with published artifacts";
+  // qits-2316: qits-landing-app's artifacts store page — the repository listing and each kind's
+  // explorer listing, once over a store holding one artifact of every kind and once over one that
+  // holds none on the contract coordinates.
+  public static final String A_STORE_HOLDING_EVERY_KIND =
+      "a store holding one artifact of every kind";
+  public static final String A_STORE_WITH_NOTHING_PUBLISHED = "a store with nothing published";
 
   /** The daemon repository every deployment carries, and the one consumers name. */
   static final String DAEMONS = ArtifactsRepositorySeeder.DAEMONS;
@@ -935,6 +941,8 @@ public class ProviderStates {
     states.put(THE_CLI_AS_A_DAEMON, this::theCliAsADaemon);
     states.put(AN_UNFILEABLE_PIN, this::anUnfileablePin);
     states.put(AN_APPLICATION_WITH_PUBLISHED_ARTIFACTS, this::anApplicationWithPublishedArtifacts);
+    states.put(A_STORE_HOLDING_EVERY_KIND, this::aStoreHoldingEveryKind);
+    states.put(A_STORE_WITH_NOTHING_PUBLISHED, this::aStoreWithNothingPublished);
   }
 
   /** Every state name this provider answers for. */
@@ -1463,6 +1471,67 @@ public class ProviderStates {
     params.put("application", PURGE_APPLICATION);
     params.put("repository", PURGE_REPOSITORY);
     return new Setup(params, List.of());
+  }
+
+  // --- the store explorer (qits-2316) ----------------------------------------------------------
+
+  /**
+   * The repositories every deployment seeds, in the order the seeder ensures them: what the
+   * repository listing is recorded over, since other suites create repositories of their own.
+   */
+  public static final List<String> SEEDED_REPOSITORIES =
+      List.of(
+          ArtifactsRepositorySeeder.CI_SCREENSHOTS,
+          ArtifactsRepositorySeeder.CI_VIDEOS,
+          ArtifactsRepositorySeeder.IMAGES,
+          ArtifactsRepositorySeeder.NPM,
+          ArtifactsRepositorySeeder.MAVEN,
+          DAEMONS,
+          DOCS,
+          ArtifactsRepositorySeeder.SBOMS);
+
+  /**
+   * One artifact of every kind on the contract coordinates, each published the way its own state
+   * publishes it: an image pushed under a tag into {@code qits} ({@link #anImage}), one npm version
+   * ({@link #anNpmPackage}), one maven coordinate ({@link #aMavenArtifact}), one daemon version and
+   * one docs site version. No CI media: an upload needs a CI run, and the repository's rows are
+   * other suites', so its listing is recorded empty.
+   */
+  private Setup aStoreHoldingEveryKind() {
+    anImage();
+    anNpmPackage();
+    aMavenArtifact();
+    DaemonBinary daemon =
+        daemonRow(
+            DAEMON_VERSION, "contract-daemon " + DAEMON_VERSION, Instant.parse("2100-01-01T00:00:00Z"));
+    QuarkusTransaction.requiringNew().run(() -> daemonBinaries.persist(daemon));
+    publishDocs(DOCS_SITE, DOCS_VERSION, DOCS_BUNDLE, DOCS_BRANCH);
+    return new Setup(explorerParams(), List.of());
+  }
+
+  /** The seeded repositories, and nothing on any contract coordinate in them. */
+  private Setup aStoreWithNothingPublished() {
+    return new Setup(explorerParams(), List.of());
+  }
+
+  /**
+   * The explorer states' params: each listing's repository under a name of its own, since one
+   * state addresses six, and the contract name each listing is filtered to.
+   */
+  private static Map<String, String> explorerParams() {
+    Map<String, String> params = new TreeMap<>();
+    params.put("daemon", DAEMON);
+    params.put("daemonsRepository", DAEMONS);
+    params.put("docsRepository", DOCS);
+    params.put("docsSite", DOCS_SITE);
+    params.put("image", IMAGE);
+    params.put("imagesRepository", ArtifactsRepositorySeeder.IMAGES);
+    params.put("mavenPackage", MAVEN_GROUP + ":" + MAVEN_ARTIFACT);
+    params.put("mavenRepository", ArtifactsRepositorySeeder.MAVEN);
+    params.put("npmPackage", NPM_PACKAGE);
+    params.put("npmRepository", ArtifactsRepositorySeeder.NPM);
+    params.put("screenshotsRepository", ArtifactsRepositorySeeder.CI_SCREENSHOTS);
+    return params;
   }
 
   // --- the registry protocols: maven, npm, OCI --------------------------------------------------
