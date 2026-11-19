@@ -31,6 +31,10 @@ import org.junit.jupiter.api.condition.EnabledIf;
  * "Open" link on the page spells the slashes <b>literally</b>, because it leaves the application
  * for the docs wire, whose grammar accepts no percent-encoded separator. Asserting {@code %2F} on
  * that link would be asserting a 404.
+ *
+ * <p>The story writes the escaped spelling itself: the docs repository's site listing — the
+ * repository page whose routerLink used to produce it — moved to the landing app in qits-2316, so
+ * the site page is addressed directly.
  */
 @QuarkusIntegrationTest
 @TestProfile(PackagedProcessIT.TargetDirState.class)
@@ -51,11 +55,13 @@ public class DocsExploreIT {
   @UserflowRunsAfter(DocsReadIT.class)
   @UserStoryDescription(
       """
-      An operator who has a documentation site and no link to it. The store's repositories, the
-      docs repository one click in, and the site's versions — each with the branch and commit it
+      An operator who has a documentation site and no link to it. The store's repositories, then
+      the site's versions — each with the branch and commit it
       was published from printed beside it, and a way straight into the bundle. Those two columns
       are what the publisher declared on the upload rather than anything this store verified, which
-      is why they are printed to match against a build and are deliberately not links.
+      is why they are printed to match against a build and are deliberately not links. (The docs
+      repository's own site listing moved to the landing app in qits-2316, so the story addresses
+      the site page directly.)
       """)
   void anOperatorFindsAPublishedSite(Flow flow, Interactions story, UserflowContext context) {
     String site = context.require("story.docs.site", String.class);
@@ -74,13 +80,10 @@ public class DocsExploreIT {
     flow.waitFor("table tbody th a");
     flow.screenshot("the store's repositories").as("repositories-listed");
 
-    // :text-is is exact, so the `docs` type badge in the row's second cell cannot shadow the
-    // repository link in its header.
-    flow.click("tbody th a:text-is('docs')");
-    flow.waitFor("tbody th[scope=\"row\"] a:text-is('" + site + "')");
-    flow.screenshot("the docs repository's sites").as("site-listed");
-
-    flow.click("tbody th[scope=\"row\"] a:text-is('" + site + "')");
+    // The repository page between the two is the landing app's since qits-2316, so the site page
+    // is addressed directly — the name ONE route segment, the slash escaped to %2F and the `@`
+    // literal, exactly as the old listing's routerLink spelled it.
+    flow.navigate("{}repositories/{}/docs/{}", root, "docs", site.replace("/", "%2F"));
     flow.waitFor("th:text-is('" + version + "')");
     // The branch/commit cell, which is the whole reason those two columns exist.
     flow.expectText("tbody tr td.mono.subtle", DocsPublishIT.BRANCH);
@@ -96,7 +99,6 @@ public class DocsExploreIT {
     }
     ReportAssertions.assertComplete(CATEGORY, SLUG, UserflowReport.PASSED);
     ReportAssertions.assertStepId(CATEGORY, SLUG, "repositories-listed");
-    ReportAssertions.assertStepId(CATEGORY, SLUG, "site-listed");
     ReportAssertions.assertStepId(CATEGORY, SLUG, "versions-shown");
     // No edge is pinned by name — a browser story fetches the SPA's own build-hashed bundle beside
     // the reads it is about, and NpmExploreIT carries the long form of that decision. What every

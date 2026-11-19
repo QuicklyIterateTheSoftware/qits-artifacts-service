@@ -793,7 +793,7 @@ caller of `/artifacts/api` names itself with a bearer:
   the run's `MockIdp`, with the gate off, and `stories.support.StoryIdentities` mints each caller's
   token — `PackagedProcessIT.asOperator()` / `asPlatform()` / `asCiRun()` for RestAssured, the curl
   stories' `-H` (the token `redact`ed out of the report), and `StoryBrowser.asOperator(flow)` on the
-  Playwright context before the first navigate, one copy for all seven explore stories. The wire
+  Playwright context before the first navigate, one copy for all five explore stories. The wire
   cases stay header-free on purpose, because tokenless-on-qits-net is their contract. The profile
   hands the tenant the mock's public key and issuer instead of its address, so this process asks
   the idp nothing and the mock's recording stays `TokenValidationBootstrapIT`'s evidence alone.
@@ -810,9 +810,9 @@ wires stay open with the gate off.
 
 - `mvn verify` runs 478 tests (50 in `artifacts/`, 158 in `gc/`, 270 in `service/`) in about a
   minute — counted from the surefire reports — and then the failsafe ITs against the packaged
-  fast-jar: **39 tests across 24 IT classes**, of which the three `qits`-category stories and
+  fast-jar: **37 tests across 22 IT classes**, of which the three `qits`-category stories and
   `OciConformanceIT` skip without their gates. The `service` module opts back into ITs
-  (`skipITs=false` in its pom), because `TokenValidationBootstrapIT` and the 21 story classes under
+  (`skipITs=false` in its pom), because `TokenValidationBootstrapIT` and the 19 story classes under
   `eu.wohlben.qits.stories` are **userflows** and `target/userstories/` is a build product a plain
   verify regenerates. The userflow half of the release-request phase of `.config/qits/release.yml`
   (composed from its archetype) runs the same verify at the release-request fold in ONE step on
@@ -904,9 +904,9 @@ wires stay open with the gate off.
   `PackagedProcessIT` was the first suite to start a **process** rather than an in-JVM Quarkus; its
   siblings do too — `TokenValidationBootstrapIT` with the rollout gate on against a recording mock
   idp (the two `authentication` userflows, and the only stories with a profile of their own), and
-  the 21 classes under `eu.wohlben.qits.stories` all sharing `PackagedProcessIT.TargetDirState` so
+  the 19 classes under `eu.wohlben.qits.stories` all sharing `PackagedProcessIT.TargetDirState` so
   **one** boot serves every one of them and `PackagedProcessIT` besides — two launched processes in
-  the whole IT phase, not twenty-four. Seven of the stories drive headless Chromium over the
+  the whole IT phase, not twenty-two. Five of the stories drive headless Chromium over the
   embedded SPA (the UI ships inside the jar, so the browser runs through the service). It is where the
   route stacks are proved to coexist and where the binary is proved to boot at all.
   It is also the **only** place the web UI can be tested at all: Quinoa logs "Quinoa is disabled by
@@ -959,7 +959,7 @@ wires stay open with the gate off.
 
 ### The story catalogue
 
-Twenty-one classes under `service/src/test/java/eu/wohlben/qits/stories/`, plus the two
+Nineteen classes under `service/src/test/java/eu/wohlben/qits/stories/`, plus the two
 `authentication` stories in `TokenValidationBootstrapIT` — which are the only ones with a
 `@TestProfile` of their own (the mock idp with the rollout gate on). Everything else shares
 `PackagedProcessIT.TargetDirState`, so the whole catalogue plus `PackagedProcessIT` costs **two**
@@ -967,7 +967,8 @@ launched processes.
 
 **Seven categories, each named after the repository row it addresses** — `npm`, `maven`, `daemons`,
 `docs`, `qits` (the OCI registry; the category is the repository name, not the protocol), and the
-two CI media planes `ci-screenshots` and `ci-videos`. Every category is the same three-link chain:
+two CI media planes `ci-screenshots` and `ci-videos`. Every category is the same three-link chain,
+except that the two CI media planes stop at consume:
 
 | | publish | consume | explore |
 |---|---|---|---|
@@ -976,8 +977,18 @@ two CI media planes `ci-screenshots` and `ci-videos`. Every category is the same
 | `daemons` | `DaemonPublishIT` | `DaemonDownloadIT` | `DaemonExploreIT` |
 | `docs` | `DocsPublishIT` | `DocsReadIT` | `DocsExploreIT` |
 | `qits` | `OciPushIT` | `OciPullIT` | `OciExploreIT` |
-| `ci-screenshots` | `ScreenshotPublishIT` | `ScreenshotFetchIT` | `ScreenshotExploreIT` |
-| `ci-videos` | `VideoPublishIT` | `VideoFetchIT` | `VideoExploreIT` |
+| `ci-screenshots` | `ScreenshotPublishIT` | `ScreenshotFetchIT` | — |
+| `ci-videos` | `VideoPublishIT` | `VideoFetchIT` | — |
+
+- **The explore stories go straight to the detail page, and the CI media planes have none (qits-2316).**
+  The repository page — `repositories/:repo`, the listing between the store's repositories and one
+  image, package, coordinate, daemon or site — moved to the landing app, and this app's route now
+  hands the browser off to `<landing origin>/artifacts/repositories/<repo>`. So every explore story
+  opens the store's repositories at the root and then `flow.navigate`s to the detail page itself,
+  spelled the way the old listing's `routerLink` spelled it (one segment; a slash in a scoped npm or
+  docs name escaped to `%2F`, `@` and maven's `:` literal). A CI record's only screen was that
+  repository page's record filter, so `ScreenshotExploreIT` and `VideoExploreIT` were retired with
+  it rather than pointed at a page this app no longer draws.
 
 - **The chaining rule, and it is asymmetric on purpose.** The consume story carries
   `@UserflowPrecondition(<publish>)`; the explore story carries **the same precondition plus**
@@ -1030,7 +1041,7 @@ where its traffic actually is:
   is what a service that moved its probes would need instead. Do **not** install it from anywhere but
   a story class's `@BeforeAll`: `RestAssured.filters` is JVM-global across the whole failsafe fork,
   so an installation with no story border around it observes traffic that drains into no story.
-- **The 21 story classes** drive a real external tool — `npm`, `mvn`, `skopeo`, `curl` — over a socket
+- **The 19 story classes** drive a real external tool — `npm`, `mvn`, `skopeo`, `curl` — over a socket
   this JVM is not on. Nothing here can see that traffic, so the observation is the **server's own
   access log**: `PackagedProcessIT.TargetDirState` turns on `quarkus.http.access-log.*` with the
   pattern `%m %U %s` into an absolute directory under `service/target/`, and
@@ -1090,7 +1101,7 @@ where its traffic actually is:
 - **`ci-screenshots` and `ci-videos` document an INTENDED intake — no producer exists yet.** Nothing
   in the platform has ever uploaded a golden screenshot or a run recording: the repository rows are
   seeded, the validating upload path and the newest-per-branch-and-flow query are built, the two GC
-  stubs refuse to plan the day a row appears, and the two ends have never met. These six stories are
+  stubs refuse to plan the day a row appears, and the two ends have never met. These four stories are
   that contract written as something that runs, so the capture loop has a shape to build against.
   Keep the caveat attached wherever these categories are summarised — a reader who takes them for a
   live feature will go looking for the producer.

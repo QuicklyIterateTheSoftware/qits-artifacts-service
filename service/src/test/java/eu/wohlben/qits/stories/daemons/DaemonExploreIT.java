@@ -34,6 +34,10 @@ import org.junit.jupiter.api.condition.EnabledIf;
  * doubled segment is correct and not a typo: the wire carries no repository segment, while the
  * explorer's subject is a repository throughout, so the seeded {@code daemons} row is both the
  * repository and the listing under it.
+ *
+ * <p>That listing — the repository page — moved to the landing app in qits-2316 (this app's {@code
+ * repositories/:repo} now hands the browser off to it), so the story goes from the store's
+ * repositories straight to the daemon's own page.
  */
 @QuarkusIntegrationTest
 @TestProfile(PackagedProcessIT.TargetDirState.class)
@@ -56,8 +60,9 @@ public class DaemonExploreIT {
       """
       An operator asking what the platform would boot. The daemon wire is version-addressed from
       end to end and lists nothing, so this screen is the only place the question can be asked: the
-      store's repositories, the daemons repository one click in, and one daemon's versions with the
-      exact sha256 each one is — the string a deployment pin is written from.
+      store's repositories, then one daemon's versions with the exact sha256 each one is — the
+      string a deployment pin is written from. (The daemons repository's own listing moved to the
+      landing app in qits-2316, so the story addresses the daemon page directly.)
       """)
   void anOperatorFindsAPublishedDaemon(Flow flow, Interactions story, UserflowContext context) {
     String daemon = context.require("story.daemon.name", String.class);
@@ -76,16 +81,10 @@ public class DaemonExploreIT {
     flow.waitFor("table tbody th a");
     flow.screenshot("the store's repositories").as("repositories-listed");
 
-    // :text-is is exact, so the `daemon-binaries` type badge in the row's second cell cannot
-    // shadow the repository link in its header.
-    flow.click("tbody th a:text-is('daemons')");
-    flow.waitFor("tbody th[scope=\"row\"] a:text-is('" + daemon + "')");
-    flow.screenshot("the daemons repository's binaries").as("daemon-listed");
-
-    // A version's control leaves this application entirely — it downloads the wire binary at
-    // /artifacts/daemons/<name>/<version> — so the page is reached by clicking the daemon, never
-    // by clicking a version. The daemon's own link stays an anchor.
-    flow.click("tbody th[scope=\"row\"] a:text-is('" + daemon + "')");
+    // The repository page between the two — the daemon listing a click on the `daemons` row used
+    // to open — is the landing app's since qits-2316, so the daemon page is addressed directly.
+    // The doubled segment is the repository and then the listing under it, as on the wire.
+    flow.navigate("{}repositories/{}/daemons/{}", root, "daemons", daemon);
     // The version is waited for on its CONTROL, not on the row header around it: `:text-is()`
     // matches the SMALLEST element carrying the text, so on a page where the version cell is a
     // download control `th:text-is(…)` matches nothing at all — which is exactly the difference
@@ -103,7 +102,6 @@ public class DaemonExploreIT {
     }
     ReportAssertions.assertComplete(CATEGORY, SLUG, UserflowReport.PASSED);
     ReportAssertions.assertStepId(CATEGORY, SLUG, "repositories-listed");
-    ReportAssertions.assertStepId(CATEGORY, SLUG, "daemon-listed");
     ReportAssertions.assertStepId(CATEGORY, SLUG, "versions-shown");
     // No edge is pinned by name — a browser story fetches the SPA's own build-hashed bundle beside
     // the reads it is about, and NpmExploreIT carries the long form of that decision. What every
