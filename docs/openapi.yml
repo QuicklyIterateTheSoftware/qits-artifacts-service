@@ -16,7 +16,9 @@ paths:
           type: string
       responses:
         "200":
-          description: "The catalog, {sites:[{name, versionCount, latestVersion, latestPublishedAt}]}."
+          description: "The catalog, {sites:[{name, versionCount, latestVersion, latestPublishedAt,\
+            \ latestRepository?}]}; latestRepository is the git.repository.name the\
+            \ newest version was published with, absent when it carries none."
           content:
             application/json:
               schema:
@@ -1146,6 +1148,8 @@ components:
         latestPublishedAt:
           type: string
           format: date-time
+        latestRepository:
+          type: string
     DocsVersionList:
       type: object
       required:

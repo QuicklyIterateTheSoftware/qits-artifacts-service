@@ -25,7 +25,7 @@ paths:
         - { name: repository, in: path, required: true, schema: { type: string } }
       responses:
         "200":
-          description: "The catalog, {sites:[{name, versionCount, latestVersion, latestPublishedAt}]}."
+          description: "The catalog, {sites:[{name, versionCount, latestVersion, latestPublishedAt, latestRepository?}]}; latestRepository is the git.repository.name the newest version was published with, absent when it carries none."
           content:
             application/json: { schema: { $ref: "#/components/schemas/DocsSiteCatalog" } }
   /artifacts/docs/{repository}/{site}:
@@ -307,6 +307,7 @@ components:
         versionCount: { type: integer, format: int32 }
         latestVersion: { type: string }
         latestPublishedAt: { type: string, format: date-time }
+        latestRepository: { type: string }
     DocsVersionList:
       type: object
       required: [name, versions]

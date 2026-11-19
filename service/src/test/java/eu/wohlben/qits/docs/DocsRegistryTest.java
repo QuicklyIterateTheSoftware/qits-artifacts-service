@@ -361,6 +361,58 @@ class DocsRegistryTest {
   }
 
   @Test
+  void theCatalogNamesTheRepositoryTheNewestVersionWasPublishedFrom() {
+    // qits-2336: latestRepository is the newest version's git.repository.name and no other's — a
+    // site that moved repositories is owned by where it publishes from now — and a site whose
+    // newest version names none carries no key at all, not a null.
+    String salt = salt();
+    String moved = "@contracts/moved-" + salt;
+    String bare = "@guides/bare-" + salt;
+    try (DocsClient client = client()) {
+      client.publish(
+          moved,
+          "2026.806.1",
+          TinyBundle.storybookLike(salt).toTarGz(),
+          java.util.Map.of("git.repository.name", "qits-old-service"));
+      client.publish(
+          moved,
+          "2026.807.1",
+          TinyBundle.storybookLike(salt + "b").toTarGz(),
+          java.util.Map.of("git.repository.name", "qits-new-service", "git.branch.name", "main"));
+      // The older version names a repository, the newest does not: absence is the newest's answer.
+      client.publish(
+          bare,
+          "2026.806.1",
+          TinyBundle.storybookLike(salt + "c").toTarGz(),
+          java.util.Map.of("git.repository.name", "qits-old-service"));
+      client.publish(
+          bare,
+          "2026.807.1",
+          TinyBundle.storybookLike(salt + "d").toTarGz(),
+          java.util.Map.of("git.branch.name", "main"));
+
+      JsonArray listed =
+          new JsonObject(client.getAbsolute("/artifacts/docs/docs").body()).getJsonArray("sites");
+      JsonObject movedEntry = null;
+      JsonObject bareEntry = null;
+      for (int i = 0; i < listed.size(); i++) {
+        JsonObject entry = listed.getJsonObject(i);
+        if (moved.equals(entry.getString("name"))) {
+          movedEntry = entry;
+        } else if (bare.equals(entry.getString("name"))) {
+          bareEntry = entry;
+        }
+      }
+      assertNotNull(movedEntry, listed.toString());
+      assertNotNull(bareEntry, listed.toString());
+      assertEquals("qits-new-service", movedEntry.getString("latestRepository"), "newest wins");
+      assertTrue(
+          !bareEntry.containsKey("latestRepository"),
+          "omitted, not null, when the newest version names none: " + bareEntry);
+    }
+  }
+
+  @Test
   void anEmptyCatalogIsAnEmptyListAndNotAFourHundredAndFour() {
     // "Nothing is published yet" is a fact a catalog page has to be able to render. This suite has
     // published plenty, so the assertion is on the shape rather than on emptiness.

@@ -10,6 +10,7 @@ import eu.wohlben.qits.artifacts.persistence.DaemonBinaryRepository;
 import eu.wohlben.qits.artifacts.persistence.DocsSiteRepository;
 import eu.wohlben.qits.artifacts.persistence.SbomDocumentRepository;
 import eu.wohlben.qits.blobstore.control.BlobStore;
+import eu.wohlben.qits.blobstore.control.MetadataKeys;
 import io.quarkus.narayana.jta.QuarkusTransaction;
 import io.restassured.response.Response;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -1228,66 +1229,91 @@ public class ProviderStates {
   // --- the docs catalog (qits-2318) ------------------------------------------------------------
 
   /**
-   * The docs catalog state's sites, by name, each to its versions (oldest first) and the instant
-   * each was published at: one site per section qits-landing-app's docs page groups by — API docs,
-   * user flows, guides, contracts, routes, changelogs, and two unscoped storybooks, one under a
-   * package scope of its own and one bare. Three sites carry more than one version, and every
-   * site's newest instant differs from every other's, so a newest-first sort is visible.
+   * The docs catalog state's sites, by name, each to its versions (oldest first) with the instant
+   * each was published at and the {@code git.repository.name} it was published with: one site per
+   * section qits-landing-app's docs page groups by — API docs, user flows, guides, contracts,
+   * routes, changelogs, and two unscoped storybooks, one under a package scope of its own and one
+   * bare. Three sites carry more than one version, and every site's newest instant differs from
+   * every other's, so a newest-first sort is visible.
+   *
+   * <p>The repositories are shaped for {@code latestRepository} (qits-2336): {@code
+   * qits-ci-service} owns three sites in three sections, so a reader grouping by repository has a
+   * group of more than one; {@code @qits/ui-components}' older version names a different
+   * repository than its newest, so newest-wins is recorded; and the bare storybook names none, so
+   * the omitted key is recorded.
    */
-  static final Map<String, Map<String, Instant>> DOCS_CATALOG = docsCatalog();
+  static final Map<String, Map<String, CatalogVersion>> DOCS_CATALOG = docsCatalog();
 
-  private static Map<String, Map<String, Instant>> docsCatalog() {
+  /** One version of a catalog site: when it was published, and from where (null: unnamed). */
+  record CatalogVersion(Instant publishedAt, String repository) {}
+
+  private static Map<String, Map<String, CatalogVersion>> docsCatalog() {
     Instant base = Instant.parse("2026-01-01T00:00:00Z");
-    Map<String, Map<String, Instant>> catalog = new LinkedHashMap<>();
+    Map<String, Map<String, CatalogVersion>> catalog = new LinkedHashMap<>();
     catalog.put(
         "@apidocs/qits-ci",
         versions(
-            "2026.101.10000", base.plusSeconds(3600),
-            "2026.105.10000", base.plusSeconds(5 * 86400 + 3600),
-            "2026.112.10000", base.plusSeconds(12 * 86400 + 3600)));
+            "2026.101.10000", base.plusSeconds(3600), "qits-ci-service",
+            "2026.105.10000", base.plusSeconds(5 * 86400 + 3600), "qits-ci-service",
+            "2026.112.10000", base.plusSeconds(12 * 86400 + 3600), "qits-ci-service"));
     catalog.put(
-        "@userflows/qits-events", versions("2026.110.20000", base.plusSeconds(10 * 86400 + 7200)));
+        "@userflows/qits-events",
+        versions("2026.110.20000", base.plusSeconds(10 * 86400 + 7200), "qits-events-service"));
     catalog.put(
-        "@guides/qits-platform", versions("2026.103.30000", base.plusSeconds(3 * 86400 + 10800)));
-    catalog.put(CONTRACTS_SITE, versions("2026.114.40000", base.plusSeconds(14 * 86400 + 14400)));
+        "@guides/qits-platform",
+        versions("2026.103.30000", base.plusSeconds(3 * 86400 + 10800), "qits-qits"));
+    catalog.put(
+        "@contracts/qits-ci",
+        versions("2026.114.40000", base.plusSeconds(14 * 86400 + 14400), "qits-ci-service"));
     catalog.put(
         ROUTES_SITE,
         versions(
-            "2026.108.50000", base.plusSeconds(8 * 86400 + 18000),
-            "2026.116.50000", base.plusSeconds(16 * 86400 + 18000)));
+            "2026.108.50000", base.plusSeconds(8 * 86400 + 18000), "qits-landing-app",
+            "2026.116.50000", base.plusSeconds(16 * 86400 + 18000), "qits-landing-app"));
     catalog.put(
-        "@changelog/qits-landing-app",
-        versions("2026.115.60000", base.plusSeconds(15 * 86400 + 21600)));
+        "@changelog/qits-ci-service",
+        versions("2026.115.60000", base.plusSeconds(15 * 86400 + 21600), "qits-ci-service"));
     catalog.put(
         "@qits/ui-components",
         versions(
-            "2026.102.70000", base.plusSeconds(2 * 86400 + 25200),
-            "2026.113.70000", base.plusSeconds(13 * 86400 + 25200)));
-    catalog.put("qits-storybook", versions("1.0.0", base.plusSeconds(86400 + 28800)));
+            "2026.102.70000", base.plusSeconds(2 * 86400 + 25200), "qits-landing-app",
+            "2026.113.70000", base.plusSeconds(13 * 86400 + 25200), "qits-ui-components-jslib"));
+    catalog.put("qits-storybook", versions("1.0.0", base.plusSeconds(86400 + 28800), null));
     return Collections.unmodifiableMap(catalog);
   }
 
-  private static Map<String, Instant> versions(Object... versionsAndInstants) {
-    Map<String, Instant> versions = new LinkedHashMap<>();
-    for (int i = 0; i < versionsAndInstants.length; i += 2) {
-      versions.put((String) versionsAndInstants[i], (Instant) versionsAndInstants[i + 1]);
+  private static Map<String, CatalogVersion> versions(Object... versionsInstantsRepositories) {
+    Map<String, CatalogVersion> versions = new LinkedHashMap<>();
+    for (int i = 0; i < versionsInstantsRepositories.length; i += 3) {
+      versions.put(
+          (String) versionsInstantsRepositories[i],
+          new CatalogVersion(
+              (Instant) versionsInstantsRepositories[i + 1],
+              (String) versionsInstantsRepositories[i + 2]));
     }
     return Collections.unmodifiableMap(versions);
   }
 
   /**
    * Every site of {@link #DOCS_CATALOG}, each version published as {@link #aDocsSite} publishes its
-   * one, then stamped with its fixed instant: the server stamps a publish with the time it lands,
-   * which would leak into the recording. One param per site, its name, so the catalog listing is
-   * filtered to these sites in a store other suites share.
+   * one plus the {@code git.repository.name} the catalog names for it, then stamped with its fixed
+   * instant: the server stamps a publish with the time it lands, which would leak into the
+   * recording. One param per site, its name, so the catalog listing is filtered to these sites in a
+   * store other suites share.
    */
   private Setup aDocsCatalogOfEveryKind() {
     Map<String, String> params = new TreeMap<>();
     DOCS_CATALOG.forEach(
         (site, versions) -> {
-          versions
-              .keySet()
-              .forEach(version -> publishDocs(site, version, DOCS_BUNDLE, DOCS_BRANCH));
+          versions.forEach(
+              (version, published) -> {
+                Map<String, String> metadata = new TreeMap<>();
+                metadata.put(BRANCH_KEY, DOCS_BRANCH);
+                if (published.repository() != null) {
+                  metadata.put(MetadataKeys.GIT_REPOSITORY_NAME, published.repository());
+                }
+                publishDocs(site, version, DOCS_BUNDLE, metadata);
+              });
           params.put("site" + params.size(), site);
         });
     QuarkusTransaction.requiringNew()
@@ -1296,11 +1322,11 @@ public class ProviderStates {
                 DOCS_CATALOG.forEach(
                     (site, versions) ->
                         versions.forEach(
-                            (version, publishedAt) ->
+                            (version, published) ->
                                 docsSites.update(
                                     "publishedAt = ?1 where repository = ?2 and name = ?3 and"
                                         + " version = ?4",
-                                    publishedAt,
+                                    published.publishedAt(),
                                     DOCS,
                                     site,
                                     version))));

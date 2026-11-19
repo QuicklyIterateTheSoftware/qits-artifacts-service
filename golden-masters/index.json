@@ -227,9 +227,9 @@
         "site0": "@apidocs/qits-ci",
         "site1": "@userflows/qits-events",
         "site2": "@guides/qits-platform",
-        "site3": "@contracts/qits-projects",
+        "site3": "@contracts/qits-ci",
         "site4": "@routes/qits-landing",
-        "site5": "@changelog/qits-landing-app",
+        "site5": "@changelog/qits-ci-service",
         "site6": "@qits/ui-components",
         "site7": "qits-storybook"
       },

@@ -4,7 +4,8 @@
       "name": "@routes/qits-landing",
       "versionCount": 1,
       "latestVersion": "2026.1111.50732",
-      "latestPublishedAt": "2026-01-01T00:00:00Z"
+      "latestPublishedAt": "2026-01-01T00:00:00Z",
+      "latestRepository": "qits-landing-app"
     }
   ]
 }

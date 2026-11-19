@@ -224,7 +224,8 @@ public class DocsRoutes {
   }
 
   /**
-   * {@code GET …/<repository>} — every site, with its version count and its newest.
+   * {@code GET …/<repository>} — every site, with its version count and its newest, and the
+   * repository that newest version was published from where it says.
    *
    * <p>Flat, and ungrouped on purpose: a scope lives in a site's name, so a reader that wants to
    * show {@code @qits/ui-components} under {@code @qits} derives that itself. Deciding it here would
@@ -237,12 +238,19 @@ public class DocsRoutes {
 
     JsonArray listed = new JsonArray();
     for (DocsRegistryService.CatalogEntry entry : registry.listCatalog(repository)) {
-      listed.add(
+      JsonObject site =
           new JsonObject()
               .put("name", entry.name())
               .put("versionCount", entry.versionCount())
               .put("latestVersion", entry.latestVersion())
-              .put("latestPublishedAt", entry.latestPublishedAt().toString()));
+              .put("latestPublishedAt", entry.latestPublishedAt().toString());
+      // Omitted, never null, when the newest version names no repository (qits-2336): a reader
+      // asking "who publishes this" gets an absent answer rather than a null it must special-case,
+      // and every entry written before the field existed reads the same way.
+      if (entry.latestRepository() != null) {
+        site.put("latestRepository", entry.latestRepository());
+      }
+      listed.add(site);
     }
     // An empty store is an empty list and a 200, not a 404: "nothing is published yet" is a fact
     // about the platform that a catalog page has to be able to render.

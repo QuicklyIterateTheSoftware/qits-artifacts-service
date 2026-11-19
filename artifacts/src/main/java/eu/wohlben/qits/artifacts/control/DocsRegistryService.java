@@ -1,9 +1,11 @@
 package eu.wohlben.qits.artifacts.control;
 
 import eu.wohlben.qits.blobstore.control.ArtifactMetadataHeaders;
+import eu.wohlben.qits.blobstore.control.MetadataKeys;
 import eu.wohlben.qits.blobstore.entity.ArtifactRepository;
 import eu.wohlben.qits.artifacts.entity.DocsFile;
 import eu.wohlben.qits.artifacts.entity.DocsSite;
+import eu.wohlben.qits.artifacts.entity.DocsSiteId;
 import eu.wohlben.qits.artifacts.error.DocsException;
 import eu.wohlben.qits.blobstore.persistence.ArtifactRepositoryRepository;
 import eu.wohlben.qits.artifacts.persistence.DocsFileRepository;
@@ -143,9 +145,20 @@ public class DocsRegistryService {
     return files.listPaths(repository, name, version);
   }
 
-  /** One site in the catalog: what it is called, how many versions it has, and its newest. */
+  /**
+   * One site in the catalog: what it is called, how many versions it has, and its newest.
+   *
+   * <p>{@code latestRepository} is the {@code git.repository.name} the <b>newest</b> version was
+   * published with, and null when that version carries none (qits-2336). The newest version's and
+   * no other's: a site that moved repositories is owned by where it is published from now, and an
+   * older version naming another repository is history, not a second owner.
+   */
   public record CatalogEntry(
-      String name, int versionCount, String latestVersion, Instant latestPublishedAt) {}
+      String name,
+      int versionCount,
+      String latestVersion,
+      Instant latestPublishedAt,
+      String latestRepository) {}
 
   /**
    * The whole catalog of one repository — every site with its version count and its newest version.
@@ -158,6 +171,11 @@ public class DocsRegistryService {
   @ActivateRequestContext
   public List<CatalogEntry> listCatalog(String repository) {
     List<CatalogEntry> catalog = new ArrayList<>();
+    // One select for the one metadata key the catalog shows, never row.metadata: see
+    // DocsSiteRepository.metadataValues on why the collection's batch fetch would read every
+    // version's whole map to answer a question about the newest one.
+    Map<DocsSiteId, String> repositoryNames =
+        sites.metadataValues(repository, MetadataKeys.GIT_REPOSITORY_NAME);
     String current = null;
     int count = 0;
     DocsSite newest = null;
@@ -166,7 +184,7 @@ public class DocsRegistryService {
     for (DocsSite row : sites.listAllByRepository(repository)) {
       if (!row.name.equals(current)) {
         if (current != null) {
-          catalog.add(new CatalogEntry(current, count, newest.version, newest.publishedAt));
+          catalog.add(catalogEntry(newest, count, repositoryNames));
         }
         current = row.name;
         count = 0;
@@ -175,9 +193,19 @@ public class DocsRegistryService {
       count++;
     }
     if (current != null) {
-      catalog.add(new CatalogEntry(current, count, newest.version, newest.publishedAt));
+      catalog.add(catalogEntry(newest, count, repositoryNames));
     }
     return List.copyOf(catalog);
+  }
+
+  private static CatalogEntry catalogEntry(
+      DocsSite newest, int count, Map<DocsSiteId, String> repositoryNames) {
+    return new CatalogEntry(
+        newest.name,
+        count,
+        newest.version,
+        newest.publishedAt,
+        repositoryNames.get(new DocsSiteId(newest.repository, newest.name, newest.version)));
   }
 
   /**

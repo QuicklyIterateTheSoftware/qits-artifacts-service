@@ -5,7 +5,9 @@ import eu.wohlben.qits.artifacts.entity.DocsSiteId;
 import io.quarkus.hibernate.orm.panache.PanacheRepositoryBase;
 import jakarta.enterprise.context.ApplicationScoped;
 import java.time.Instant;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 /** Panache DAO for {@link DocsSite}, keyed by {@code (repository, name, version)}. */
@@ -44,6 +46,36 @@ public class DocsSiteRepository implements PanacheRepositoryBase<DocsSite, DocsS
    */
   public List<DocsSite> listAllByRepository(String repository) {
     return list("repository = ?1 order by name, publishedAt desc", repository);
+  }
+
+  /**
+   * One metadata key's value for every published version of one repository that carries it, as
+   * {@code (name, version) -> value} — one select over {@code docs_site_metadata}, behind the
+   * catalog's per-site {@code latestRepository}.
+   *
+   * <p><b>A query of its own rather than {@code row.metadata}</b>, and the reason is the
+   * collection's batch fetch: {@code @BatchSize} initializes the collection of <em>any</em> 50
+   * uninitialized owners in the persistence context, and after {@link #listAllByRepository} that is
+   * every version of every site — so touching only the newest rows' metadata would still pull the
+   * whole map of the old ones, in ⌈rows/50⌉ selects. This reads one key's rows in one statement,
+   * over the same cardinality {@link #listAllByRepository} already judged small, and the caller
+   * picks the newest row's value by the very row it already chose, so "newest" means one thing.
+   */
+  @SuppressWarnings("unchecked")
+  public Map<DocsSiteId, String> metadataValues(String repository, String key) {
+    List<Object[]> rows =
+        getEntityManager()
+            .createNativeQuery(
+                "select name, version, meta_value from docs_site_metadata"
+                    + " where repository = ?1 and meta_key = ?2")
+            .setParameter(1, repository)
+            .setParameter(2, key)
+            .getResultList();
+    Map<DocsSiteId, String> values = new HashMap<>();
+    for (Object[] row : rows) {
+      values.put(new DocsSiteId(repository, (String) row[0], (String) row[1]), (String) row[2]);
+    }
+    return values;
   }
 
   /**
