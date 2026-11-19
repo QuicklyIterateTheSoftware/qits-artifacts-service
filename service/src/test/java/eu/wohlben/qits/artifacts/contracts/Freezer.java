@@ -74,6 +74,7 @@ public final class Freezer {
   private final Set<String> idPaths = new LinkedHashSet<>();
   private final Set<String> instantPaths = new LinkedHashSet<>();
   private final Set<String> stringPaths = new LinkedHashSet<>();
+  private boolean keepInstants;
 
   /**
    * Numbers each UUID in {@code values}, in order, ahead of anything the answer holds — {@link
@@ -176,6 +177,16 @@ public final class Freezer {
     return this;
   }
 
+  /**
+   * Leaves every instant as answered, still listing its path in {@link #instantPaths}: for a state
+   * that pins its instants itself, to fixed values, because the order they put the answer in is
+   * what the consumer renders (qits-2318). A consumer still matches the path by type.
+   */
+  public Freezer keepInstants() {
+    keepInstants = true;
+    return this;
+  }
+
   /** The frozen form of a param value: its UUIDs through the same mapping as the answer. */
   public String freezeParam(String value) {
     return freezeIds(value);
@@ -237,7 +248,7 @@ public final class Freezer {
   private String freezeText(String value, String path) {
     if (INSTANT.matcher(value).matches()) {
       instantPaths.add(path);
-      return FROZEN_INSTANT;
+      return keepInstants ? value : FROZEN_INSTANT;
     }
     String result = freezeTokens(freezeIds(value));
     if (result.equals(value)) {
