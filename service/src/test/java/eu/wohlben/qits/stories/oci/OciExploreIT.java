@@ -23,20 +23,18 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.condition.EnabledIf;
 
 /**
- * The {@code qits} category's <b>browser</b> story: finding a pushed image and the digest its tag
- * publishes.
+ * The {@code qits} category's <b>browser</b> story: finding the platform image repository a pushed
+ * image landed in.
  *
- * <p>The registry answers {@code /v2/_catalog} and {@code /v2/<name>/tags/list}, so unlike the
- * daemon plane this listing is not the only enumeration — but it is the only one that puts a tag,
- * the manifest digest behind it and the bytes that digest references on one screen. That triple is
- * the whole subject: a deploy plan pins a digest, a human reads a tag, and the row is where the two
- * are seen to be the same thing.
- *
- * <p>The story opens the full-digest disclosure rather than asserting the shortened form. The table
- * prints {@code sha256:} plus twelve characters by default — enough to recognise, not enough to
- * pin — and the toggle is a local signal costing no request, which is exactly why the page offers
- * it. Asserting the full string is also what makes this a check against the pull story's digest
- * rather than against a prefix that a second image could share.
+ * <p>It used to go one page further — one image's tags, each with the manifest digest it points at
+ * and the bytes that digest references, with the full-digest disclosure opened and checked against
+ * the push story's digest. That page, {@code repositories/:repo/images/:image}, moved to the landing
+ * app in qits-2324, and this app's route becomes a full-document hand-off to it once the bundled
+ * client takes that change: a story addressing it would assert a page this process no longer
+ * draws. So the story ends at the one screen that stays here, the store's repositories at the root,
+ * and asserts only what that screen says about the push — that the {@code qits} registry is there,
+ * typed {@code oci-images}. The tag-and-digest triple is the landing app's to show now, and its golden
+ * masters ({@code listImageTagSummaries}, {@code listImageManifestSummaries}) are the contract for it.
  */
 @QuarkusIntegrationTest
 @TestProfile(PackagedProcessIT.TargetDirState.class)
@@ -44,7 +42,7 @@ import org.junit.jupiter.api.condition.EnabledIf;
 public class OciExploreIT {
 
   static final String CATEGORY = "qits";
-  static final String SLUG = "an-operator-finds-a-pushed-image-and-the-tag-it-published";
+  static final String SLUG = "an-operator-finds-the-registry-a-pushed-image-landed-in";
 
   /** How the diagram names the initiator of everything this story's browser fetches. */
   static final String ACTOR = "an operator";
@@ -53,23 +51,21 @@ public class OciExploreIT {
   URL root;
 
   @UserStory(
-      value = "An operator finds a pushed image and the tag it published",
+      value = "An operator finds the registry a pushed image landed in",
       category = "qits")
   @UserflowPrecondition(OciPushIT.class)
   @UserflowRunsAfter(OciPullIT.class)
   @UserStoryDescription(
       """
-      An operator asking what the platform would run. The store's repositories, then one image's
-      tags in the platform image repository — each with the manifest digest it points at and the
-      bytes that manifest references. The sizes on that screen deliberately do not add up:
-      consecutive builds share their base layers, so the same bytes appear on most rows and the
-      only honest total is the union printed above them. (The repository's own image listing moved
-      to the landing app in qits-2316, so the story addresses the image page directly.)
+      An operator asking what the platform would run. The store's repositories at the host root,
+      and among them the platform image repository a real client pushed into earlier in this chain
+      — an OCI registry, listed beside the npm, maven, daemon and docs rows it shares the store
+      with. (The repository's image listing moved to the landing app in qits-2316 and one image's
+      tags and manifests in qits-2324, so the story stops at the store's own screen.)
       """)
-  void anOperatorFindsAPushedImage(Flow flow, Interactions story, UserflowContext context) {
-    String image = context.require("story.qits.image", String.class);
-    String tag = context.require("story.qits.tag", String.class);
-    String digest = context.require("story.qits.manifest-digest", String.class);
+  void anOperatorFindsTheRegistry(Flow flow, Interactions story, UserflowContext context) {
+    // Required, not read: the chain's subject must exist, or this story has nothing to find.
+    context.require("story.qits.image", String.class);
 
     // The gateway's job, played for the browser, before the first navigate.
     StoryBrowser.asOperator(flow);
@@ -83,22 +79,14 @@ public class OciExploreIT {
     story.note("the image this operator is looking for was pushed by a real client, not seeded");
 
     flow.navigate("{}", root);
-    flow.waitFor("table tbody th a");
-    flow.screenshot("the store's repositories").as("repositories-listed");
-
-    // The repository page between the two — the image listing a click on the row used to open — is
-    // the landing app's since qits-2316 (this app's `repositories/:repo` now hands the browser off
-    // to it), so the image page is addressed directly, spelled the way that listing's routerLink
-    // spelled it. The fingerprint keeps `{}` for every part, as the root navigate does.
-    flow.navigate("{}repositories/{}/images/{}", root, OciPushIT.REPOSITORY, image);
-    // A tag that does not look like a git commit sha is the header cell's own text rather than a
-    // link out to the CI explorer, so :text-is matches the th itself here.
-    flow.waitFor("tbody th[scope=\"row\"].mono:text-is('" + tag + "')");
-
-    // The disclosure, so the digest on screen is the whole string a deploy plan would pin.
-    flow.click("button.disclosure");
-    flow.expectText("tbody tr:has(th:text-is('" + tag + "')) td.mono.subtle", digest);
-    flow.screenshot("the image's tags and the digest each one publishes").as("tags-shown");
+    // :text-is is exact, so the `oci-images` type badge in the row's second cell cannot shadow the
+    // repository link in its header. The link is not followed: `repositories/:repo` hands the
+    // browser off to the landing app (qits-2316).
+    flow.waitFor("tbody th a:text-is('" + OciPushIT.REPOSITORY + "')");
+    flow.expectText(
+        "tbody tr:has(th a:text-is('" + OciPushIT.REPOSITORY + "')) qits-badge", "oci-images");
+    flow.screenshot("the store's repositories, the platform registry among them")
+        .as("repositories-listed");
   }
 
   @AfterAll
@@ -108,7 +96,6 @@ public class OciExploreIT {
     }
     ReportAssertions.assertComplete(CATEGORY, SLUG, UserflowReport.PASSED);
     ReportAssertions.assertStepId(CATEGORY, SLUG, "repositories-listed");
-    ReportAssertions.assertStepId(CATEGORY, SLUG, "tags-shown");
     // No edge is pinned by name — a browser story fetches the SPA's own build-hashed bundle beside
     // the reads it is about, and NpmExploreIT carries the long form of that decision. What every
     // explore story does close is its initiator: every arrow here is the operator's, which is the
