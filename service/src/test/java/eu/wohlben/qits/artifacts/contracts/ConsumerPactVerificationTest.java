@@ -386,4 +386,9 @@ class ConsumerPactVerificationTest {
   Map<String, String> anImageWithAnUntaggedManifest() {
     return states.params(ProviderStates.AN_IMAGE_WITH_AN_UNTAGGED_MANIFEST);
   }
+
+  @State(ProviderStates.A_MAVEN_PACKAGE_WITH_AN_SBOM)
+  Map<String, String> aMavenPackageWithAnSbom() {
+    return states.params(ProviderStates.A_MAVEN_PACKAGE_WITH_AN_SBOM);
+  }
 }

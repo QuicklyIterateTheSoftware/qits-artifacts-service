@@ -777,6 +777,12 @@ DELETE anywhere under the base                    405 — no delete; the append-
 anything else under the base                      404 with a short text body, never HTML
 ```
 
+The version listing is in the served OpenAPI as `listSbomVersions` (qits-2325; qits-landing-app's
+maven package page reads it), answering `{packageType, packageName, versions:[{version, createdAt,
+sizeBytes, specVersion, digest}]}` or a 404 for a package no document was ever published for. Every
+`packageName` there is `allowReserved`: a scoped npm name is sent literally (`@qits/angular`), and
+the encoded `%40qits%2Fangular` names no package and answers 404.
+
 **The path IS the `SoftwareRelease` identity** — `(packageType, packageName, version)` spelled
 exactly as qits-ci announces it, so a consumer of that event fetches the document with no
 translation step. `packageType` is one of `npm`, `maven`, `docker`, `daemon`; the name is variable
@@ -847,8 +853,9 @@ the retired `ArtifactsTokenFilter` / `X-Artifacts-Token` scheme this section use
 The listings are in `docs/openapi.yml` under the operationIds the golden masters record —
 `listRepositories`, `listImages`, `listNpmPackages`, `listMavenPackages`, `listDaemons`,
 `listDocsSiteSummaries` and `listArtifactRecords` (qits-1149, qits-2316), and one image's
-`listImageTagSummaries` and `listImageManifestSummaries` (qits-2324) — plus `listDaemonVersions`;
-every other route here is still `@Operation(hidden = true)`, so the contract is written out below.
+`listImageTagSummaries` and `listImageManifestSummaries` (qits-2324), and one maven coordinate's
+`listMavenVersionSummaries` (qits-2325) — plus `listDaemonVersions`; every other route here is
+still `@Operation(hidden = true)`, so the contract is written out below.
 
 ```
 GET /artifacts/api/repositories                                          every repository

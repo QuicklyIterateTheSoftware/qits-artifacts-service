@@ -725,7 +725,27 @@ class GoldenMasterRecordingTest {
                           200)
                       .filtered("$.images", "image")
                       .build()),
-              imagePage(ProviderStates.AN_IMAGE_WITH_AN_UNTAGGED_MANIFEST))
+              imagePage(ProviderStates.AN_IMAGE_WITH_AN_UNTAGGED_MANIFEST),
+              // --- the maven package page (qits-2325): one coordinate's versions and its SBOM
+              // listing, which answers 404 where no document was ever published for it
+              mavenPackagePage(ProviderStates.A_STORE_HOLDING_EVERY_KIND, 404),
+              mavenPackagePage(ProviderStates.A_STORE_WITH_NOTHING_PUBLISHED, 404),
+              // --- a coordinate with two versions and an SBOM on the newer one (qits-2325): its row
+              // in the repository's listing, the page's two reads, and the document itself
+              List.of(
+                  op(
+                          ProviderStates.A_MAVEN_PACKAGE_WITH_AN_SBOM,
+                          "listMavenPackages",
+                          "GET",
+                          "/artifacts/api/repositories/{mavenRepository}/maven-packages",
+                          200)
+                      .filtered("$.packages", "mavenPackage")
+                      .build()),
+              mavenPackagePage(ProviderStates.A_MAVEN_PACKAGE_WITH_AN_SBOM, 200),
+              List.of(
+                  op(ProviderStates.A_MAVEN_PACKAGE_WITH_AN_SBOM, "getSbom", "GET", SBOM, 200)
+                      .headers("Content-Type", "Docker-Content-Digest", "ETag")
+                      .build()))
           .flatMap(List::stream)
           .toList();
 
@@ -802,6 +822,30 @@ class GoldenMasterRecordingTest {
                 "GET",
                 "/artifacts/api/repositories/{imagesRepository}/images/{image}/manifests",
                 200)
+            .build());
+  }
+
+  /**
+   * The maven package page's reads in one state (qits-2325): one coordinate's versions, each with
+   * its files, and the SBOM versions stored for it — {@code sbomStatus} 404 where none is. Recorded
+   * unfiltered — both are scoped to the state's own coordinate, whose maven rows and SBOMs every
+   * setup clears first, so nothing another suite stores can appear in them.
+   */
+  private static List<Interaction> mavenPackagePage(String state, int sbomStatus) {
+    return List.of(
+        op(
+                state,
+                "listMavenVersionSummaries",
+                "GET",
+                "/artifacts/api/repositories/{mavenRepository}/maven-packages/{mavenPackage}/versions",
+                200)
+            .build(),
+        op(
+                state,
+                "listSbomVersions",
+                "GET",
+                "/artifacts/sboms/{packageType}/{packageName}",
+                sbomStatus)
             .build());
   }
 

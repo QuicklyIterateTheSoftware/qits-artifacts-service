@@ -24,17 +24,18 @@ import org.junit.jupiter.api.condition.EnabledIf;
 
 /**
  * The maven category's <b>browser</b> story: headless Chromium over the explorer SPA, against the
- * same packaged process the two command-line stories drove.
+ * same packaged process the two command-line stories drove — finding the repository a deployed
+ * coordinate landed in.
  *
- * <p>It used to be the only story in this repository that used the explorer's <b>search box</b>,
- * over the maven repository's coordinate listing. That listing is the repository page, which moved
- * to the landing app in qits-2316 — this app's {@code repositories/:repo} now hands the browser off
- * to it — so the story addresses the coordinate page directly, spelling the coordinate the way that
- * listing's routerLink did: one segment, the {@code :} literal.
- *
- * <p>A selector fact learned the expensive way: on the coordinate page the version is the header's
- * <b>own text</b> rather than a link, so {@code th:text-is(…)} is right there and would be wrong on
- * the daemon page, where the same-looking cell wraps a download anchor.
+ * <p>It used to go one page further — the coordinate's versions, each with the files a deploy
+ * uploaded (the jar, the pom, every checksum sidecar) and the size each one occupies. That page,
+ * {@code repositories/:repo/maven-packages/:coordinate}, moves to the landing app in qits-2325, and
+ * this app's route becomes a full-document hand-off to it once the bundled client takes that
+ * change: a story addressing it would assert a page this process no longer draws. So the story ends
+ * at the one screen that stays here, the store's repositories at the root, and asserts only what
+ * that screen says about the deploy — that the {@code maven} repository is there, typed {@code
+ * maven-packages}. The versions-and-files view is the landing app's to show now, and its golden
+ * masters ({@code listMavenVersionSummaries}, {@code listSbomVersions}) are the contract for it.
  */
 @QuarkusIntegrationTest
 @TestProfile(PackagedProcessIT.TargetDirState.class)
@@ -42,7 +43,10 @@ import org.junit.jupiter.api.condition.EnabledIf;
 public class MavenExploreIT {
 
   static final String CATEGORY = "maven";
-  static final String SLUG = "an-operator-finds-a-deployed-coordinate-and-its-files";
+  static final String SLUG = "an-operator-finds-the-repository-a-deployed-coordinate-landed-in";
+
+  /** The hosted maven repository the deploy story's release pipeline deployed into. */
+  static final String REPOSITORY = "maven";
 
   /** How the diagram names the initiator of everything this story's browser fetches. */
   static final String ACTOR = "an operator";
@@ -50,22 +54,23 @@ public class MavenExploreIT {
   @TestHTTPResource("/")
   URL root;
 
-  @UserStory(value = "An operator finds a deployed coordinate and its files", category = "maven")
+  @UserStory(
+      value = "An operator finds the repository a deployed coordinate landed in",
+      category = "maven")
   @UserflowPrecondition(MavenDeployIT.class)
   @UserflowRunsAfter(MavenResolveIT.class)
   @UserStoryDescription(
       """
       The repository's own web UI, served by the same process that stores the bytes. An operator
-      opens the store's repositories at the host root, then the coordinate they want — the screen
-      that answers the question a maven client cannot be asked: not "is this version there?",
-      which a resolve answers, but "what files IS this version?", which is the jar, the pom and
-      every checksum sidecar a deploy uploaded, with the size each one occupies. (The maven
-      repository's own coordinate listing moved to the landing app in qits-2316.)
+      opens the store's repositories at the host root, and among them the maven repository a real
+      deploy wrote into earlier in this chain — listed beside the npm, image, daemon and docs rows
+      it shares the store with. (The maven repository's coordinate listing moved to the landing
+      app in qits-2316 and one coordinate's versions and files in qits-2325, so the story stops at
+      the store's own screen.)
       """)
-  void anOperatorFindsADeployedCoordinate(
-      Flow flow, Interactions story, UserflowContext context) {
-    String coordinate = context.require("story.maven.coordinate", String.class);
-    String version = context.require("story.maven.version", String.class);
+  void anOperatorFindsTheRepository(Flow flow, Interactions story, UserflowContext context) {
+    // Required, not read: the chain's subject must exist, or this story has nothing to find.
+    context.require("story.maven.coordinate", String.class);
 
     // The gateway's job, played for the browser, before the first navigate.
     StoryBrowser.asOperator(flow);
@@ -81,18 +86,13 @@ public class MavenExploreIT {
     // The template form keeps the definition hash stable although the launched process sits on a
     // random port: the fingerprint records `navigate {}`, the display the real URL.
     flow.navigate("{}", root);
-    flow.waitFor("table tbody th a");
-    flow.screenshot("the store's repositories").as("repositories-listed");
-
-    // The repository page between the two — the coordinate listing and its search box — is the
-    // landing app's since qits-2316, so the coordinate page is addressed directly.
-    flow.navigate("{}repositories/{}/maven-packages/{}", root, "maven", coordinate);
-    // The version is the header cell's own text here, so :text-is matches the th itself.
-    flow.waitFor("tbody th.mono:text-is('" + version + "')");
-    // The files column, which is the whole reason this page exists rather than a version list.
-    flow.expectText("tbody td.subtle", MavenDeployIT.ARTIFACT_ID + "-" + version + ".jar");
-    flow.expectText("tbody td.subtle", MavenDeployIT.ARTIFACT_ID + "-" + version + ".pom");
-    flow.screenshot("the coordinate's versions and the files behind one").as("files-shown");
+    // :text-is is exact, so the `maven-packages` type badge in the row's second cell cannot shadow
+    // the repository link in its header. The link is not followed: `repositories/:repo` hands the
+    // browser off to the landing app (qits-2316).
+    flow.waitFor("tbody th a:text-is('" + REPOSITORY + "')");
+    flow.expectText("tbody tr:has(th a:text-is('" + REPOSITORY + "')) qits-badge", "maven-packages");
+    flow.screenshot("the store's repositories, the maven repository among them")
+        .as("repositories-listed");
   }
 
   @AfterAll
@@ -102,7 +102,6 @@ public class MavenExploreIT {
     }
     ReportAssertions.assertComplete(CATEGORY, SLUG, UserflowReport.PASSED);
     ReportAssertions.assertStepId(CATEGORY, SLUG, "repositories-listed");
-    ReportAssertions.assertStepId(CATEGORY, SLUG, "files-shown");
     // No edge is pinned by name — a browser story fetches the SPA's own build-hashed bundle beside
     // the reads it is about, and NpmExploreIT carries the long form of that decision. What every
     // explore story does close is its initiator: every arrow here is the operator's, which is the
