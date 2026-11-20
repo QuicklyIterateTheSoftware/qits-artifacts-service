@@ -45,9 +45,9 @@ import org.eclipse.microprofile.openapi.annotations.Operation;
  * reached from a browser, so it has to answer both.
  *
  * <p>Reads, so unguarded by {@code AdminWriteGuard}, which covers write methods only — but
- * open to people, agents, platform services and CI runs like every browse surface. Hidden from the
- * OpenAPI document like every operation this service ships; the contract is written out in the
- * README.
+ * open to people, agents, platform services and CI runs like every browse surface. Both are in the
+ * OpenAPI document under the operationIds the golden masters record ({@code listDocsSiteSummaries},
+ * qits-2316; {@code listDocsVersionSummaries}, qits-2328).
  */
 @Path("/repositories/{repo}/docs")
 @Produces(MediaType.APPLICATION_JSON)
@@ -75,7 +75,9 @@ public class DocsBrowseController {
    */
   @GET
   @Path("/{site:.+}/versions")
-  @Operation(hidden = true)
+  // Named: golden-masters/ records it under this operationId (qits-2328); qits-landing-app's
+  // artifacts docs site page reads it. Not listDocsVersions: that is the docs wire's own listing.
+  @Operation(operationId = "listDocsVersionSummaries")
   public ListDocsVersionsResponse versions(
       @PathParam("repo") String repo, @PathParam("site") String site) {
     return new ListDocsVersionsResponse(explorer.listDocsVersions(repo, site));

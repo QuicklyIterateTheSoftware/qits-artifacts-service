@@ -1,0 +1,14 @@
+{
+  "versions": [
+    {
+      "version": "2100.1.0",
+      "fileCount": 1,
+      "sizeBytes": 44,
+      "publishedAt": "2026-01-01T00:00:00Z",
+      "accessedAt": null,
+      "metadata": {
+        "git.branch.name": "main"
+      }
+    }
+  ]
+}

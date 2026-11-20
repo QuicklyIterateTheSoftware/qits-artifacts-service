@@ -1,0 +1,29 @@
+{
+  "versions": [
+    {
+      "version": "2100.2.0",
+      "fileCount": 1,
+      "sizeBytes": 87,
+      "publishedAt": "2026-01-01T00:00:00Z",
+      "accessedAt": null,
+      "metadata": {
+        "git.branch.name": "main",
+        "git.commit.hash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "git.repository.name": "contract-repository",
+        "release.request.qualified-id": "qits-contract-rr-2"
+      }
+    },
+    {
+      "version": "2100.1.0",
+      "fileCount": 1,
+      "sizeBytes": 46,
+      "publishedAt": "2026-01-01T00:00:00Z",
+      "accessedAt": "2026-01-01T00:00:00Z",
+      "metadata": {
+        "git.commit.hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "git.repository.name": "contract-repository",
+        "release.request.qualified-id": "qits-contract-rr-1"
+      }
+    }
+  ]
+}

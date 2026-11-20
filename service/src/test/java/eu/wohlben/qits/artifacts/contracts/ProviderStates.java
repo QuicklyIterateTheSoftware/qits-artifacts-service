@@ -114,6 +114,12 @@ public class ProviderStates {
    */
   public static final String A_REPOSITORY_WITH_UNPINNED_IDENTITIES =
       "a repository with unpinned identities";
+  /**
+   * qits-2329: the daemon repository holding only what the last-two rule keeps, so one
+   * repository's plan condemns nothing — the "nothing to delete" answer qits-landing-app renders.
+   */
+  public static final String A_REPOSITORY_WITH_NOTHING_TO_COLLECT =
+      "a repository with nothing to collect";
   public static final String A_MAVEN_ARTIFACT = "a maven artifact published at a version";
   public static final String NO_MAVEN_ARTIFACT = "no maven artifact published at the version";
   public static final String AN_NPM_PACKAGE = "an npm package published at a version";
@@ -143,6 +149,10 @@ public class ProviderStates {
   // each a pom and a jar, and an SBOM published for the newer one only.
   public static final String A_MAVEN_PACKAGE_WITH_AN_SBOM =
       "a maven coordinate with an sbom on one of two versions";
+  // qits-2328: qits-landing-app's artifacts docs site page — one site two releases published, the
+  // older one read since and the newer one never.
+  public static final String A_DOCS_SITE_PUBLISHED_BY_TWO_RELEASES =
+      "a docs site published by two releases";
 
   /** The daemon repository every deployment carries, and the one consumers name. */
   static final String DAEMONS = ArtifactsRepositorySeeder.DAEMONS;
@@ -152,6 +162,12 @@ public class ProviderStates {
 
   /** The newer of the two versions; the one a HEAD names. */
   static final String DAEMON_VERSION = "2026.2.0";
+
+  /**
+   * The version older than both of {@link #seedTwoDaemonVersions()}'s, which the GC's last-two rule
+   * condemns (qits-2329).
+   */
+  static final String CONDEMNED_DAEMON_VERSION = "2026.0.1";
 
   /** The version a publish into the empty daemon creates. */
   static final String NEW_DAEMON_VERSION = "2026.3.0";
@@ -965,6 +981,7 @@ public class ProviderStates {
     states.put(UNPINNED_IDENTITIES, this::unpinnedIdentities);
     states.put(PIN_SOURCES_SILENT, this::pinSourcesSilent);
     states.put(A_REPOSITORY_WITH_UNPINNED_IDENTITIES, this::aRepositoryWithUnpinnedIdentities);
+    states.put(A_REPOSITORY_WITH_NOTHING_TO_COLLECT, this::aRepositoryWithNothingToCollect);
     states.put(A_MAVEN_ARTIFACT, this::aMavenArtifact);
     states.put(NO_MAVEN_ARTIFACT, this::noMavenArtifact);
     states.put(AN_NPM_PACKAGE, this::anNpmPackage);
@@ -981,6 +998,7 @@ public class ProviderStates {
     states.put(A_STORE_WITH_NOTHING_PUBLISHED, this::aStoreWithNothingPublished);
     states.put(AN_IMAGE_WITH_AN_UNTAGGED_MANIFEST, this::anImageWithAnUntaggedManifest);
     states.put(A_MAVEN_PACKAGE_WITH_AN_SBOM, this::aMavenPackageWithAnSbom);
+    states.put(A_DOCS_SITE_PUBLISHED_BY_TWO_RELEASES, this::aDocsSitePublishedByTwoReleases);
   }
 
   /** Every state name this provider answers for. */
@@ -1587,8 +1605,33 @@ public class ProviderStates {
    * Seeded as {@link #unpinnedIdentities()}, with the repository and the daemon named: the
    * per-repository routes take the one as their path segment, and the recordings keep only the
    * entries naming the other, since other suites' rows share the store.
+   *
+   * <p>qits-2329: plus a third, older version, {@link #CONDEMNED_DAEMON_VERSION}. The rule keeps the
+   * last two releases of an identity whatever the pins say, so two versions alone leave the plan's
+   * {@code dead} empty; the third is what it condemns. It is published in the past, since a row's
+   * last access is its publish at the latest and one in the future would be "accessed inside the
+   * window"; its blob is written now, so a sweep withholds it under the grace window.
    */
   private Setup aRepositoryWithUnpinnedIdentities() {
+    seedTwoDaemonVersions();
+    DaemonBinary condemned =
+        daemonRow(
+            CONDEMNED_DAEMON_VERSION,
+            "contract-daemon " + CONDEMNED_DAEMON_VERSION,
+            Instant.parse("2020-01-01T00:00:00Z"));
+    QuarkusTransaction.requiringNew().run(() -> daemonBinaries.persist(condemned));
+    Map<String, String> params = new TreeMap<>();
+    params.put("daemon", DAEMON);
+    params.put("repository", DAEMONS);
+    return new Setup(params, List.of());
+  }
+
+  /**
+   * Only the two versions {@link #seedTwoDaemonVersions()} writes, both among the last two releases
+   * the rule keeps whatever the pins say: the repository's plan has nothing in {@code dead}
+   * (qits-2329). Named as {@link #aRepositoryWithUnpinnedIdentities()} is.
+   */
+  private Setup aRepositoryWithNothingToCollect() {
     seedTwoDaemonVersions();
     Map<String, String> params = new TreeMap<>();
     params.put("daemon", DAEMON);
@@ -1730,6 +1773,65 @@ public class ProviderStates {
     params.put("version", MAVEN_PAGE_NEWER_VERSION);
     return new Setup(params, List.of());
   }
+
+  /**
+   * {@link #DOCS_SITE} published by two releases, changelog-shaped (qits-2328): {@link
+   * #DOCS_VERSION} carrying the repository, the commit and the release request that published it,
+   * then read once through the docs wire — so its access stamp is set — and {@link
+   * #DOCS_FEATURE_VERSION} carrying the branch besides, and never read. The docs site page lists
+   * both, newest first: a read and an unread version, a version with a branch and one without.
+   */
+  private Setup aDocsSitePublishedByTwoReleases() {
+    publishDocs(
+        DOCS_SITE,
+        DOCS_VERSION,
+        RELEASE_DOCS_BUNDLE,
+        Map.of(
+            "git.repository.name",
+            CHANGELOG_REPOSITORY,
+            "git.commit.hash",
+            "a".repeat(40),
+            RELEASE_REQUEST_KEY,
+            "qits-contract-rr-1"));
+    expect(
+        200,
+        given()
+            .urlEncodingEnabled(false)
+            .get("/artifacts/docs/" + DOCS + "/" + DOCS_SITE + "/-/" + DOCS_VERSION + "/CHANGELOG.md"),
+        "the read of " + DOCS_SITE + "@" + DOCS_VERSION);
+    publishDocs(
+        DOCS_SITE,
+        DOCS_FEATURE_VERSION,
+        NEXT_RELEASE_DOCS_BUNDLE,
+        Map.of(
+            "git.repository.name",
+            CHANGELOG_REPOSITORY,
+            "git.commit.hash",
+            "b".repeat(40),
+            RELEASE_REQUEST_KEY,
+            "qits-contract-rr-2",
+            BRANCH_KEY,
+            DOCS_BRANCH));
+    Map<String, String> params = new TreeMap<>();
+    params.put("docsRepository", DOCS);
+    params.put("docsSite", DOCS_SITE);
+    return new Setup(params, List.of());
+  }
+
+  /** The metadata key a release's publish names its release request under. */
+  static final String RELEASE_REQUEST_KEY = "release.request.qualified-id";
+
+  /** {@link #aDocsSitePublishedByTwoReleases}' first release: one {@code CHANGELOG.md}. */
+  static final byte[] RELEASE_DOCS_BUNDLE =
+      tarGz(Map.of("CHANGELOG.md", "# Changelog\n\n## 2100.1.0\n\n- A contract entry.\n"));
+
+  /** Its second release: the same changelog with one more entry. */
+  static final byte[] NEXT_RELEASE_DOCS_BUNDLE =
+      tarGz(
+          Map.of(
+              "CHANGELOG.md",
+              "# Changelog\n\n## 2100.2.0\n\n- A second contract entry.\n\n"
+                  + "## 2100.1.0\n\n- A contract entry.\n"));
 
   /**
    * The explorer states' params: each listing's repository under a name of its own, since one

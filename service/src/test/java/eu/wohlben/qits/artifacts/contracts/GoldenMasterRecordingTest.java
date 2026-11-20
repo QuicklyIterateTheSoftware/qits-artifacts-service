@@ -65,8 +65,11 @@ import org.junit.jupiter.api.Test;
  *       Docker-Content-Digest}, {@code ETag}, {@code Content-Type}, {@code Content-Length}): the key
  *       every provider's index and the consumers' golden-master reader use (qits-2041).
  *   <li>{@code frozen.volatile} — the paths whose value depends on the whole shared store rather
- *       than on the state (the store figures, the GC counts). The recording holds {@code 0} or
- *       {@code ""} there; a consumer matches them by type, as it does every unfrozen leaf.
+ *       than on the state (the store figures, the GC counts). The recording holds {@code 0},
+ *       {@code ""} or {@code []} there; a consumer matches them by type, as it does every unfrozen
+ *       leaf.
+ *   <li>{@code frozen.alsoFilteredTo} — present only when the answer has more than one list the
+ *       recorder reduced to the state's own entries: the ones beside {@code listFilteredTo}.
  * </ul>
  *
  * <p>Every recorded operationId must be declared in the served OpenAPI document under the same
@@ -105,6 +108,9 @@ class GoldenMasterRecordingTest {
    *     mentioning a param — for a list whose entries the state did not create (the seeded
    *     repositories), where a substring would also keep another suite's {@code unauthenticated-npm}
    * @param keptValues see {@code keptField}; empty keeps no entry at all
+   * @param alsoFilteredTo further arrays reduced the same way as {@code listFilteredTo}, by the same
+   *     ids — the index's {@code frozen.alsoFilteredTo}, present only when there are any (qits-2329:
+   *     a repository plan's {@code dead} beside its {@code kept})
    * @param sortedBy for an array the provider answers in no guaranteed order: {@code
    *     <$.path-to-array>:<field.path in each entry>}, sorted by that field's value before freezing.
    *     Null when the order is the provider's own.
@@ -112,6 +118,9 @@ class GoldenMasterRecordingTest {
    *     depend on what the whole shared store holds, which no consumer reads
    * @param zeroNumbers every number in the answer depends on the whole store: record {@code 0}
    * @param blanked string paths ({@code $.a.b}) that depend on the whole store: record {@code ""}
+   * @param emptied array paths ({@code $.a.b}) whose length and content depend on the whole store,
+   *     and which no state can reduce to its own entries (blob ids): record {@code []}, listed in
+   *     {@code frozen.volatile} like a zeroed number
    */
   record Interaction(
       String state,
@@ -131,10 +140,12 @@ class GoldenMasterRecordingTest {
       String filteredOn,
       String keptField,
       List<String> keptValues,
+      List<String> alsoFilteredTo,
       String sortedBy,
       List<String> dropped,
       boolean zeroNumbers,
-      List<String> blanked) {
+      List<String> blanked,
+      List<String> emptied) {
 
     boolean sendsBody() {
       return jsonBody != null || textBody != null || binaryBody != null;
@@ -165,10 +176,12 @@ class GoldenMasterRecordingTest {
     private String filteredOn;
     private String keptField;
     private List<String> keptValues = List.of();
+    private final List<String> alsoFilteredTo = new ArrayList<>();
     private String sortedBy;
     private final List<String> dropped = new ArrayList<>();
     private boolean zeroNumbers;
     private final List<String> blanked = new ArrayList<>();
+    private final List<String> emptied = new ArrayList<>();
 
     private Op(String state, String operationId, String method, String path, int status) {
       this.state = state;
@@ -246,6 +259,15 @@ class GoldenMasterRecordingTest {
     }
 
     /**
+     * A further {@code array} reduced exactly as the {@link #filtered(String, String)} one is, by
+     * the same ids (qits-2329).
+     */
+    Op alsoFiltered(String array) {
+      alsoFilteredTo.add(array);
+      return this;
+    }
+
+    /**
      * The {@code array} keeps exactly the entries whose top-level {@code field} equals one of the
      * {@code values} — none, when there are none (qits-2316).
      */
@@ -277,6 +299,12 @@ class GoldenMasterRecordingTest {
       return this;
     }
 
+    /** Record these arrays as {@code []}: their entries are the whole store's (qits-2329). */
+    Op emptied(String... paths) {
+      emptied.addAll(List.of(paths));
+      return this;
+    }
+
     Interaction build() {
       return new Interaction(
           state,
@@ -296,10 +324,12 @@ class GoldenMasterRecordingTest {
           filteredOn,
           keptField,
           keptValues,
+          List.copyOf(alsoFilteredTo),
           sortedBy,
           List.copyOf(dropped),
           zeroNumbers,
-          List.copyOf(blanked));
+          List.copyOf(blanked),
+          List.copyOf(emptied));
     }
   }
 
@@ -630,7 +660,26 @@ class GoldenMasterRecordingTest {
                       200)
                   .json("application/json", ProviderStates.GC_PINS)
                   .filtered("$.kept", "daemon")
-                  .drop("configuration", "dead", "sweep", "structural", "untouchable")
+                  // qits-2329: the whole plan a reviewer reads, as qits-landing-app renders it — the
+                  // dead beside the kept, both filtered to the state's daemon; the two blob figures
+                  // with their store-wide blob ids emptied. Only the row-less pool stays dropped.
+                  .alsoFiltered("$.dead")
+                  .emptied("$.sweep.blobIds", "$.structural.blobIds")
+                  .drop("untouchable")
+                  .zeroNumbers()
+                  .build(),
+              // qits-2329: the same plan where the rule condemns nothing — dead records as [].
+              op(
+                      ProviderStates.A_REPOSITORY_WITH_NOTHING_TO_COLLECT,
+                      "planGcRepositoryWithSuppliedPins",
+                      "POST",
+                      "/artifacts/api/gc/repositories/{repository}/plan",
+                      200)
+                  .json("application/json", ProviderStates.GC_PINS)
+                  .filtered("$.kept", "daemon")
+                  .alsoFiltered("$.dead")
+                  .emptied("$.sweep.blobIds", "$.structural.blobIds")
+                  .drop("untouchable")
                   .zeroNumbers()
                   .build(),
               op(
@@ -696,7 +745,12 @@ class GoldenMasterRecordingTest {
               List.of(
                   op(ProviderStates.A_MAVEN_PACKAGE_WITH_AN_SBOM, "getSbom", "GET", SBOM, 200)
                       .headers("Content-Type", "Docker-Content-Digest", "ETag")
-                      .build()))
+                      .build()),
+              // --- the docs site page (qits-2328): one site's versions, over the two explorer
+              // states and over a site two releases published, one of them read and one never
+              docsSitePage(ProviderStates.A_STORE_HOLDING_EVERY_KIND),
+              docsSitePage(ProviderStates.A_STORE_WITH_NOTHING_PUBLISHED),
+              docsSitePage(ProviderStates.A_DOCS_SITE_PUBLISHED_BY_TWO_RELEASES))
           .flatMap(List::stream)
           .toList();
 
@@ -797,6 +851,23 @@ class GoldenMasterRecordingTest {
                 "GET",
                 "/artifacts/sboms/{packageType}/{packageName}",
                 sbomStatus)
+            .build());
+  }
+
+  /**
+   * The docs site page's read in one state (qits-2328): one site's versions, newest first, with
+   * each version's figures, its access stamp and its publish metadata. Recorded unfiltered and with
+   * its figures kept — the listing is scoped to the state's own site, whose rows every setup clears
+   * first, so nothing another suite publishes can appear in it.
+   */
+  private static List<Interaction> docsSitePage(String state) {
+    return List.of(
+        op(
+                state,
+                "listDocsVersionSummaries",
+                "GET",
+                "/artifacts/api/repositories/{docsRepository}/docs/{docsSite}/versions",
+                200)
             .build());
   }
 
@@ -906,6 +977,9 @@ class GoldenMasterRecordingTest {
         frozen.putNull("listFilteredTo");
       } else {
         frozen.put("listFilteredTo", interaction.listFilteredTo());
+      }
+      if (!interaction.alsoFilteredTo().isEmpty()) {
+        frozen.set("alsoFilteredTo", strings(interaction.alsoFilteredTo()));
       }
       if (indexOperations
               .computeIfAbsent(slug, k -> new TreeMap<>())
@@ -1154,8 +1228,13 @@ class GoldenMasterRecordingTest {
       Collection<String> createdIds,
       Collection<String> uniqueTokens) {
     JsonNode out = body.deepCopy();
+    List<String> filteredArrays = new ArrayList<>();
     if (interaction.listFilteredTo() != null) {
-      ArrayNode list = array(out, interaction.listFilteredTo());
+      filteredArrays.add(interaction.listFilteredTo());
+    }
+    filteredArrays.addAll(interaction.alsoFilteredTo());
+    for (String path : filteredArrays) {
+      ArrayNode list = array(out, path);
       ArrayNode kept = JsonNodeFactory.instance.arrayNode();
       for (JsonNode entry : list) {
         String text = entry.toString();
@@ -1201,6 +1280,10 @@ class GoldenMasterRecordingTest {
   static JsonNode storeIndependent(JsonNode body, Interaction interaction, List<String> changed) {
     Set<String> paths = new LinkedHashSet<>();
     JsonNode out = body.deepCopy();
+    for (String path : interaction.emptied()) {
+      array(out, path).removeAll();
+      paths.add(path);
+    }
     for (String path : interaction.blanked()) {
       if (blank(out, path.substring(2).split("\\."), 0) == 0) {
         throw new IllegalStateException(path + " names no string in " + body);

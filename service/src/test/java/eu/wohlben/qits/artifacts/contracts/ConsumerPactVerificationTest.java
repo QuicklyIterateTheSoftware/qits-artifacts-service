@@ -302,6 +302,11 @@ class ConsumerPactVerificationTest {
     return states.params(ProviderStates.A_REPOSITORY_WITH_UNPINNED_IDENTITIES);
   }
 
+  @State(ProviderStates.A_REPOSITORY_WITH_NOTHING_TO_COLLECT)
+  Map<String, String> aRepositoryWithNothingToCollect() {
+    return states.params(ProviderStates.A_REPOSITORY_WITH_NOTHING_TO_COLLECT);
+  }
+
   @State(ProviderStates.PIN_SOURCES_SILENT)
   Map<String, String> pinSourcesSilent() {
     return states.params(ProviderStates.PIN_SOURCES_SILENT);
@@ -385,5 +390,10 @@ class ConsumerPactVerificationTest {
   @State(ProviderStates.A_MAVEN_PACKAGE_WITH_AN_SBOM)
   Map<String, String> aMavenPackageWithAnSbom() {
     return states.params(ProviderStates.A_MAVEN_PACKAGE_WITH_AN_SBOM);
+  }
+
+  @State(ProviderStates.A_DOCS_SITE_PUBLISHED_BY_TWO_RELEASES)
+  Map<String, String> aDocsSitePublishedByTwoReleases() {
+    return states.params(ProviderStates.A_DOCS_SITE_PUBLISHED_BY_TWO_RELEASES);
   }
 }

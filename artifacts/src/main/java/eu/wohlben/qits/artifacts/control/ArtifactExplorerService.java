@@ -43,6 +43,7 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -414,7 +415,9 @@ public class ArtifactExplorerService {
               OciManifestFootprints.sum(blobsByVersion.getOrDefault(row.version, Map.of())),
               row.publishedAt,
               row.accessedAt,
-              Map.copyOf(row.metadata)));
+              // Sorted by key, as the docs wire answers it: Map.copyOf iterates in an order salted
+              // per JVM, which would reorder the JSON from one boot to the next (qits-2328).
+              Collections.unmodifiableMap(new TreeMap<>(row.metadata))));
     }
     return versions;
   }

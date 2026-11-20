@@ -984,8 +984,9 @@ except that the two CI media planes stop at consume:
   The repository page — `repositories/:repo`, the listing between the store's repositories and one
   image, package, coordinate, daemon or site — moved to the landing app, and this app's route now
   hands the browser off to `<landing origin>/artifacts/repositories/<repo>`. So every explore story
-  but `OciExploreIT` and `MavenExploreIT` (below) opens the store's repositories at the root and then `flow.navigate`s
-  to the detail page itself, spelled the way the old listing's `routerLink` spelled it (one segment; a slash in a scoped npm or
+  but `OciExploreIT`, `MavenExploreIT`, `DaemonExploreIT` and `DocsExploreIT` (below) opens the store's
+  repositories at the root and then `flow.navigate`s to the detail page itself, spelled the way the old
+  listing's `routerLink` spelled it (one segment; a slash in a scoped npm or
   docs name escaped to `%2F`, `@` and maven's `:` literal). A CI record's only screen was that
   repository page's record filter, so `ScreenshotExploreIT` and `VideoExploreIT` were retired with
   it rather than pointed at a page this app no longer draws.
@@ -1001,6 +1002,17 @@ except that the two CI media planes stop at consume:
   explore story finds the `maven` row typed `maven-packages` at the root and ends there; the
   versions-and-files view is held by the `listMavenVersionSummaries` and `listSbomVersions` golden
   masters.
+- **`DocsExploreIT` stops at the store's repositories too (qits-2328).** The docs site page —
+  `repositories/:repo/docs/:site`, one site's versions with the branch and commit each was
+  published from and its `open-bundle` link — moved to the landing app, and its route here becomes
+  the same hand-off. So the `docs` explore story finds the `docs` row typed `docs` on the root page
+  and ends there, in one step (`repositories-listed`); the versions it used to check are the
+  landing app's, held by the `listDocsVersionSummaries` golden masters.
+- **`DaemonExploreIT` stops at the store's repositories too (qits-2327).** The daemon page —
+  `repositories/:repo/daemons/:daemon`, one daemon's versions and the sha256 each one is — moves to
+  the landing app, and its route here becomes the same full-document hand-off once the bundled
+  client takes it. So the `daemons` explore story finds the `daemons` row typed `daemon-binaries`
+  at the root and ends there; the versions-and-digests view is the landing app's to show now.
 
 - **The chaining rule, and it is asymmetric on purpose.** The consume story carries
   `@UserflowPrecondition(<publish>)`; the explore story carries **the same precondition plus**
