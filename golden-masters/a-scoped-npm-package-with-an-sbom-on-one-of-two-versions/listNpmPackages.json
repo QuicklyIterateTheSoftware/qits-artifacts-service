@@ -1,0 +1,9 @@
+{
+  "packages": [
+    {
+      "name": "@contract/contract-scoped",
+      "versionCount": 2,
+      "latest": "2100.2.0"
+    }
+  ]
+}

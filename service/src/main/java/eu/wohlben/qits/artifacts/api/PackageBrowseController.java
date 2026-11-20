@@ -48,11 +48,15 @@ public class PackageBrowseController {
     return new ListPackagesResponse(explorer.listPackages(repo));
   }
 
+  // Named apart for the same reason: the maven version listing declares a ListVersionsResponse too.
+  @Schema(name = "ListNpmVersionsResponse")
   public record ListVersionsResponse(List<PackageVersionSummary> versions) {}
 
   @GET
   @Path("/{package:.+}/versions")
-  @Operation(hidden = true)
+  // Named: golden-masters/ records it under this operationId (qits-2326); qits-landing-app's npm
+  // package page reads it.
+  @Operation(operationId = "listNpmVersionSummaries")
   public ListVersionsResponse versions(
       @PathParam("repo") String repo, @PathParam("package") String packageName) {
     return new ListVersionsResponse(explorer.listVersions(repo, packageName));

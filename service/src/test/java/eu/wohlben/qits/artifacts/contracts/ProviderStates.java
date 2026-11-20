@@ -162,6 +162,10 @@ public class ProviderStates {
   // each a pom and a jar, and an SBOM published for the newer one only.
   public static final String A_MAVEN_PACKAGE_WITH_AN_SBOM =
       "a maven coordinate with an sbom on one of two versions";
+  // qits-2326: qits-landing-app's artifacts npm package page — a scoped package with two versions,
+  // the newer carrying both dist-tags, and an SBOM published for the newer one only.
+  public static final String A_SCOPED_NPM_PACKAGE_WITH_AN_SBOM =
+      "a scoped npm package with an sbom on one of two versions";
   // qits-2328: qits-landing-app's artifacts docs site page — one site two releases published, the
   // older one read since and the newer one never.
   public static final String A_DOCS_SITE_PUBLISHED_BY_TWO_RELEASES =
@@ -1017,6 +1021,37 @@ public class ProviderStates {
   static final String NPM_VERSION = "2100.1.0";
   static final String NPM_TAG = "main";
 
+  /**
+   * The scoped package {@link #aScopedNpmPackageWithAnSbom} publishes (qits-2326): its name holds the
+   * {@code @} and the {@code /} a scoped name carries, which the npm package page's reads and the
+   * sbom wire's allowReserved {@code packageName} must take literally.
+   */
+  static final String NPM_SCOPED_PACKAGE = "@contract/contract-scoped";
+
+  /** The sbom wire's {@code packageType} for an npm package. */
+  static final String NPM_SBOM_TYPE = "npm";
+
+  /**
+   * The two versions {@link #aScopedNpmPackageWithAnSbom} publishes of {@link #NPM_SCOPED_PACKAGE};
+   * both dist-tags end on the newer one, and the SBOM is published for it only.
+   */
+  static final String NPM_PAGE_OLDER_VERSION = "2100.1.0";
+  static final String NPM_PAGE_NEWER_VERSION = "2100.2.0";
+
+  /**
+   * {@link #SBOM_DOCUMENT}'s shape with {@link #NPM_SCOPED_PACKAGE} at {@link
+   * #NPM_PAGE_NEWER_VERSION} as its root: what the npm package page's package has published for its
+   * newer version.
+   */
+  static final String NPM_PAGE_SBOM_DOCUMENT =
+      SBOM_DOCUMENT
+          .replace(
+              "pkg:maven/eu.wohlben.qits/contract-artifact@2100.1.0",
+              "pkg:npm/%40contract/contract-scoped@" + NPM_PAGE_NEWER_VERSION)
+          .replace(
+              "\"name\":\"contract-artifact\",\"version\":\"2100.1.0\"",
+              "\"name\":\"" + NPM_SCOPED_PACKAGE + "\",\"version\":\"" + NPM_PAGE_NEWER_VERSION + "\"");
+
   /** The image the pushed-image state pushes, in the {@code qits} images repository. */
   static final String IMAGE = "contract-image";
   static final String ABSENT_IMAGE = "contract-absent-image";
@@ -1138,6 +1173,7 @@ public class ProviderStates {
     states.put(A_STORE_WITH_NOTHING_PUBLISHED, this::aStoreWithNothingPublished);
     states.put(AN_IMAGE_WITH_AN_UNTAGGED_MANIFEST, this::anImageWithAnUntaggedManifest);
     states.put(A_MAVEN_PACKAGE_WITH_AN_SBOM, this::aMavenPackageWithAnSbom);
+    states.put(A_SCOPED_NPM_PACKAGE_WITH_AN_SBOM, this::aScopedNpmPackageWithAnSbom);
     states.put(A_DOCS_SITE_PUBLISHED_BY_TWO_RELEASES, this::aDocsSitePublishedByTwoReleases);
   }
 
@@ -1165,9 +1201,11 @@ public class ProviderStates {
 
   /**
    * Deletes every row on the contract coordinates: the daemon's versions (and the CLI's), the sboms
-   * (the contract artifact's, and the {@code contract-maven} coordinate's), the docs sites
+   * (the contract artifact's, the {@code contract-maven} coordinate's and the scoped npm
+   * package's), the docs sites
    * (their files and metadata cascade), the {@code contract-maven} and {@code contract-absent} maven
-   * files with their content hashes, the npm packages' versions and tags, and the contract images'
+   * files with their content hashes, the npm packages' versions, tags and tombstones (the scoped
+   * one's too), and the contract images'
    * tags and manifests. The wires have no delete for most of these, so it is SQL on their own
    * tables. Blobs stay — they are content-addressed, the next run writes the same ones, and the GC
    * owns them. The content-hash pom of {@code contract-artifact} stays too: re-publishing the same
@@ -1186,6 +1224,13 @@ public class ProviderStates {
                       ArtifactsRepositorySeeder.SBOMS,
                       SBOM_TYPE,
                       List.of(SBOM_NAME, MAVEN_GROUP + ":" + MAVEN_ARTIFACT))
+                  .forEach(sboms::delete);
+              sboms
+                  .list(
+                      "repository = ?1 and packageType = ?2 and packageName = ?3",
+                      ArtifactsRepositorySeeder.SBOMS,
+                      NPM_SBOM_TYPE,
+                      NPM_SCOPED_PACKAGE)
                   .forEach(sboms::delete);
               docsSites
                   .list(
@@ -1231,18 +1276,22 @@ public class ProviderStates {
                   List.of("npm_dist_tag", "npm_version", "npm_version_tombstone")) {
                 entityManager
                     .createNativeQuery(
-                        "delete from " + table + " where repository = ?1 and package_name in (?2, ?3)")
+                        "delete from " + table
+                            + " where repository = ?1 and package_name in (?2, ?3, ?4)")
                     .setParameter(1, ArtifactsRepositorySeeder.NPM)
                     .setParameter(2, NPM_PACKAGE)
                     .setParameter(3, NPM_ABSENT_PACKAGE)
+                    .setParameter(4, NPM_SCOPED_PACKAGE)
                     .executeUpdate();
               }
               entityManager
                   .createNativeQuery(
-                      "delete from content_hash where repository = ?1 and package_name in (?2, ?3)")
+                      "delete from content_hash where repository = ?1 and package_name in (?2, ?3,"
+                          + " ?4)")
                   .setParameter(1, ArtifactsRepositorySeeder.NPM)
                   .setParameter(2, NPM_PACKAGE)
                   .setParameter(3, NPM_ABSENT_PACKAGE)
+                  .setParameter(4, NPM_SCOPED_PACKAGE)
                   .executeUpdate();
               for (String table : List.of("oci_tag", "oci_manifest")) {
                 entityManager
@@ -1364,13 +1413,18 @@ public class ProviderStates {
 
   /** Publishes {@code document} as the {@link #SBOM_TYPE} package {@code name} at {@code version}. */
   private void publishSbom(String name, String version, String document) {
+    publishSbom(SBOM_TYPE, name, version, document);
+  }
+
+  /** Publishes {@code document} as the {@code type} package {@code name} at {@code version}. */
+  private void publishSbom(String type, String name, String version, String document) {
     expect(
         201,
         given()
             .urlEncodingEnabled(false)
             .contentType(CYCLONEDX_JSON)
             .body(document.getBytes(StandardCharsets.UTF_8))
-            .put("/artifacts/sboms/" + SBOM_TYPE + "/" + name + "/-/" + version),
+            .put("/artifacts/sboms/" + type + "/" + name + "/-/" + version),
         "the sbom publish");
   }
 
@@ -2013,6 +2067,50 @@ public class ProviderStates {
   }
 
   /**
+   * {@link #NPM_SCOPED_PACKAGE} published at two versions (qits-2326), as {@code npm publish} sends
+   * each — {@code latest} moving to the newer — then {@link #NPM_TAG} put on the newer too, and a
+   * CycloneDX document ({@link #NPM_PAGE_SBOM_DOCUMENT}) published for the newer one only. So the
+   * npm package page has one version carrying both dist-tags and an SBOM, and one carrying neither.
+   * The writes spell the scoped name as the npm CLI does ({@code @contract%2fcontract-scoped}); the
+   * sbom publish spells it literally, as the wire's allowReserved {@code packageName} says. The
+   * setup's {@link #cleanUp} clears the package's npm rows and its SBOM first, so both versions,
+   * the tags and the document are this state's own.
+   */
+  private Setup aScopedNpmPackageWithAnSbom() {
+    String escaped = NPM_SCOPED_PACKAGE.replace("/", "%2f");
+    for (String version : List.of(NPM_PAGE_OLDER_VERSION, NPM_PAGE_NEWER_VERSION)) {
+      expect(
+          201,
+          given()
+              .urlEncodingEnabled(false)
+              .contentType("application/json")
+              .body(
+                  npmPublishDocument(NPM_SCOPED_PACKAGE, version).getBytes(StandardCharsets.UTF_8))
+              .put("/artifacts/npm/" + ArtifactsRepositorySeeder.NPM + "/" + escaped),
+          "the npm publish of " + NPM_SCOPED_PACKAGE + "@" + version);
+    }
+    expect(
+        200,
+        given()
+            .urlEncodingEnabled(false)
+            .contentType("application/json")
+            .body("\"" + NPM_PAGE_NEWER_VERSION + "\"")
+            .put(
+                "/artifacts/npm/" + ArtifactsRepositorySeeder.NPM + "/-/package/" + escaped
+                    + "/dist-tags/" + NPM_TAG),
+        "the dist-tag " + NPM_TAG + " onto " + NPM_PAGE_NEWER_VERSION);
+    publishSbom(
+        NPM_SBOM_TYPE, NPM_SCOPED_PACKAGE, NPM_PAGE_NEWER_VERSION, NPM_PAGE_SBOM_DOCUMENT);
+    Map<String, String> params = new TreeMap<>();
+    params.put("npmPackage", NPM_SCOPED_PACKAGE);
+    params.put("npmRepository", ArtifactsRepositorySeeder.NPM);
+    params.put("packageName", NPM_SCOPED_PACKAGE);
+    params.put("packageType", NPM_SBOM_TYPE);
+    params.put("version", NPM_PAGE_NEWER_VERSION);
+    return new Setup(params, List.of());
+  }
+
+  /**
    * {@link #DOCS_SITE} published by two releases, changelog-shaped (qits-2328): {@link
    * #DOCS_VERSION} carrying the repository, the commit and the release request that published it,
    * then read once through the docs wire — so its access stamp is set — and {@link
@@ -2201,28 +2299,41 @@ public class ProviderStates {
 
   /** The tarball of {@code name} at {@link #NPM_VERSION}: {@code package/package.json}, packed byte-stable. */
   static byte[] npmTarball(String name) {
-    return tarGz(Map.of("package/package.json", npmManifest(name) + "\n"));
+    return npmTarball(name, NPM_VERSION);
   }
 
-  private static String npmManifest(String name) {
-    return "{\"name\":\"" + name + "\",\"version\":\"" + NPM_VERSION
+  /** The tarball of {@code name} at {@code version}, packed byte-stable. */
+  static byte[] npmTarball(String name, String version) {
+    return tarGz(Map.of("package/package.json", npmManifest(name, version) + "\n"));
+  }
+
+  private static String npmManifest(String name, String version) {
+    return "{\"name\":\"" + name + "\",\"version\":\"" + version
         + "\",\"description\":\"a contract package\",\"license\":\"MIT\"}";
   }
 
   /** The document {@code npm publish} PUTs for {@code name}: manifest, dist-tag and attachment. */
   public static String npmPublishDocument(String name) {
-    byte[] tarball = npmTarball(name);
-    String manifest = npmManifest(name);
+    return npmPublishDocument(name, NPM_VERSION);
+  }
+
+  /**
+   * The document {@code npm publish} PUTs for {@code name} at {@code at}, moving {@code latest} to
+   * it; the attachment is keyed by the full (scoped) name, as npm keys it.
+   */
+  static String npmPublishDocument(String name, String at) {
+    byte[] tarball = npmTarball(name, at);
+    String manifest = npmManifest(name, at);
     String version =
         manifest.substring(0, manifest.length() - 1)
-            + ",\"_id\":\"" + name + "@" + NPM_VERSION + "\",\"dist\":{\"shasum\":\""
+            + ",\"_id\":\"" + name + "@" + at + "\",\"dist\":{\"shasum\":\""
             + hex("SHA-1", tarball) + "\",\"integrity\":\"sha512-"
             + java.util.Base64.getEncoder().encodeToString(digest("SHA-512", tarball)) + "\"}}";
     return "{\"_id\":\"" + name + "\",\"name\":\"" + name + "\","
-        + "\"dist-tags\":{\"latest\":\"" + NPM_VERSION + "\"},"
-        + "\"versions\":{\"" + NPM_VERSION + "\":" + version + "},"
+        + "\"dist-tags\":{\"latest\":\"" + at + "\"},"
+        + "\"versions\":{\"" + at + "\":" + version + "},"
         + "\"access\":\"public\","
-        + "\"_attachments\":{\"" + name + "-" + NPM_VERSION + ".tgz\":{"
+        + "\"_attachments\":{\"" + name + "-" + at + ".tgz\":{"
         + "\"content_type\":\"application/octet-stream\",\"data\":\""
         + java.util.Base64.getEncoder().encodeToString(tarball) + "\",\"length\":"
         + tarball.length + "}}}";

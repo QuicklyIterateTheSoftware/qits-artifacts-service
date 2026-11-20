@@ -412,6 +412,11 @@ class ConsumerPactVerificationTest {
     return states.params(ProviderStates.A_MAVEN_PACKAGE_WITH_AN_SBOM);
   }
 
+  @State(ProviderStates.A_SCOPED_NPM_PACKAGE_WITH_AN_SBOM)
+  Map<String, String> aScopedNpmPackageWithAnSbom() {
+    return states.params(ProviderStates.A_SCOPED_NPM_PACKAGE_WITH_AN_SBOM);
+  }
+
   @State(ProviderStates.A_DOCS_SITE_PUBLISHED_BY_TWO_RELEASES)
   Map<String, String> aDocsSitePublishedByTwoReleases() {
     return states.params(ProviderStates.A_DOCS_SITE_PUBLISHED_BY_TWO_RELEASES);

@@ -1,0 +1,13 @@
+{
+  "packageType": "npm",
+  "packageName": "@contract/contract-scoped",
+  "versions": [
+    {
+      "version": "2100.2.0",
+      "createdAt": "2026-01-01T00:00:00Z",
+      "sizeBytes": 905,
+      "specVersion": "1.6",
+      "digest": "sha256:784116a03937521cbcd4121ea2c71e549f4a7fe070fc70aef0cfc6cc1d42dbea"
+    }
+  ]
+}
