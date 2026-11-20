@@ -139,6 +139,10 @@ public class ProviderStates {
   // of its two manifests is reachable by digest only and no tag names it.
   public static final String AN_IMAGE_WITH_AN_UNTAGGED_MANIFEST =
       "an image with a manifest no tag names";
+  // qits-2325: qits-landing-app's artifacts maven package page — a coordinate with two versions,
+  // each a pom and a jar, and an SBOM published for the newer one only.
+  public static final String A_MAVEN_PACKAGE_WITH_AN_SBOM =
+      "a maven coordinate with an sbom on one of two versions";
 
   /** The daemon repository every deployment carries, and the one consumers name. */
   static final String DAEMONS = ArtifactsRepositorySeeder.DAEMONS;
@@ -833,6 +837,26 @@ public class ProviderStates {
    */
   public static final String MAVEN_JAR_BYTES = "contract jar 2100.1.0\n";
 
+  /**
+   * The two versions {@link #aMavenPackageWithAnSbom} deploys of {@link #MAVEN_ARTIFACT}; the SBOM
+   * is published for the second only.
+   */
+  static final String MAVEN_PAGE_OLDER_VERSION = "2100.1.0";
+  static final String MAVEN_PAGE_NEWER_VERSION = "2100.2.0";
+
+  /**
+   * {@link #SBOM_DOCUMENT}'s shape with {@code contract-maven} at {@link #MAVEN_PAGE_NEWER_VERSION}
+   * as its root: what the maven package page's coordinate has published for its newer version.
+   */
+  static final String MAVEN_PAGE_SBOM_DOCUMENT =
+      SBOM_DOCUMENT
+          .replace(
+              "eu.wohlben.qits/contract-artifact@2100.1.0",
+              "eu.wohlben.qits/" + MAVEN_ARTIFACT + "@" + MAVEN_PAGE_NEWER_VERSION)
+          .replace(
+              "\"name\":\"contract-artifact\",\"version\":\"2100.1.0\"",
+              "\"name\":\"" + MAVEN_ARTIFACT + "\",\"version\":\"" + MAVEN_PAGE_NEWER_VERSION + "\"");
+
   /** The coordinate nothing deploys, except the recorded publish into it (cleaned up after). */
   static final String MAVEN_ABSENT_ARTIFACT = "contract-absent";
 
@@ -956,6 +980,7 @@ public class ProviderStates {
     states.put(A_STORE_HOLDING_EVERY_KIND, this::aStoreHoldingEveryKind);
     states.put(A_STORE_WITH_NOTHING_PUBLISHED, this::aStoreWithNothingPublished);
     states.put(AN_IMAGE_WITH_AN_UNTAGGED_MANIFEST, this::anImageWithAnUntaggedManifest);
+    states.put(A_MAVEN_PACKAGE_WITH_AN_SBOM, this::aMavenPackageWithAnSbom);
   }
 
   /** Every state name this provider answers for. */
@@ -981,7 +1006,8 @@ public class ProviderStates {
   }
 
   /**
-   * Deletes every row on the contract coordinates: the daemon's versions (and the CLI's), the sbom, the docs sites
+   * Deletes every row on the contract coordinates: the daemon's versions (and the CLI's), the sboms
+   * (the contract artifact's, and the {@code contract-maven} coordinate's), the docs sites
    * (their files and metadata cascade), the {@code contract-maven} and {@code contract-absent} maven
    * files with their content hashes, the npm packages' versions and tags, and the contract images'
    * tags and manifests. The wires have no delete for most of these, so it is SQL on their own
@@ -998,10 +1024,10 @@ public class ProviderStates {
                   .forEach(daemonBinaries::delete);
               sboms
                   .list(
-                      "repository = ?1 and packageType = ?2 and packageName = ?3",
+                      "repository = ?1 and packageType = ?2 and packageName in ?3",
                       ArtifactsRepositorySeeder.SBOMS,
                       SBOM_TYPE,
-                      SBOM_NAME)
+                      List.of(SBOM_NAME, MAVEN_GROUP + ":" + MAVEN_ARTIFACT))
                   .forEach(sboms::delete);
               docsSites
                   .list(
@@ -1171,13 +1197,18 @@ public class ProviderStates {
   }
 
   private void publishSbom() {
+    publishSbom(SBOM_NAME, SBOM_VERSION, SBOM_DOCUMENT);
+  }
+
+  /** Publishes {@code document} as the {@link #SBOM_TYPE} package {@code name} at {@code version}. */
+  private void publishSbom(String name, String version, String document) {
     expect(
         201,
         given()
             .urlEncodingEnabled(false)
             .contentType(CYCLONEDX_JSON)
-            .body(SBOM_DOCUMENT.getBytes(StandardCharsets.UTF_8))
-            .put("/artifacts/sboms/" + SBOM_TYPE + "/" + SBOM_NAME + "/-/" + SBOM_VERSION),
+            .body(document.getBytes(StandardCharsets.UTF_8))
+            .put("/artifacts/sboms/" + SBOM_TYPE + "/" + name + "/-/" + version),
         "the sbom publish");
   }
 
@@ -1663,8 +1694,47 @@ public class ProviderStates {
   }
 
   /**
+   * {@link #MAVEN_ARTIFACT} deployed whole at two versions (qits-2325), each a jar and then its pom
+   * as a release deploys them, and a CycloneDX document ({@link #MAVEN_PAGE_SBOM_DOCUMENT})
+   * published for the newer one only — so the maven package page has one version with an SBOM and
+   * one without. The setup's {@link #cleanUp} clears the coordinate's maven rows and its SBOM first:
+   * SBOMs are first-write-wins with no delete door, so the rows go by SQL, and both versions and
+   * the document are this state's own.
+   */
+  private Setup aMavenPackageWithAnSbom() {
+    for (String version : List.of(MAVEN_PAGE_OLDER_VERSION, MAVEN_PAGE_NEWER_VERSION)) {
+      expect(
+          201,
+          given()
+              .urlEncodingEnabled(false)
+              .contentType("application/java-archive")
+              .body(("contract jar " + version + "\n").getBytes(StandardCharsets.UTF_8))
+              .put(mavenFilePath(MAVEN_ARTIFACT, version, ".jar")),
+          "the maven jar deploy of " + version);
+      expect(
+          201,
+          given()
+              .urlEncodingEnabled(false)
+              .contentType("application/xml")
+              .body(mavenPom(MAVEN_ARTIFACT, version).getBytes(StandardCharsets.UTF_8))
+              .put(mavenFilePath(MAVEN_ARTIFACT, version, ".pom")),
+          "the maven pom deploy of " + version);
+    }
+    String coordinate = MAVEN_GROUP + ":" + MAVEN_ARTIFACT;
+    publishSbom(coordinate, MAVEN_PAGE_NEWER_VERSION, MAVEN_PAGE_SBOM_DOCUMENT);
+    Map<String, String> params = new TreeMap<>();
+    params.put("mavenPackage", coordinate);
+    params.put("mavenRepository", ArtifactsRepositorySeeder.MAVEN);
+    params.put("packageName", coordinate);
+    params.put("packageType", SBOM_TYPE);
+    params.put("version", MAVEN_PAGE_NEWER_VERSION);
+    return new Setup(params, List.of());
+  }
+
+  /**
    * The explorer states' params: each listing's repository under a name of its own, since one
-   * state addresses six, and the contract name each listing is filtered to.
+   * state addresses six, and the contract name each listing is filtered to. {@code packageType}
+   * and {@code packageName} address the maven coordinate's SBOM listing (qits-2325).
    */
   private static Map<String, String> explorerParams() {
     Map<String, String> params = new TreeMap<>();
@@ -1678,6 +1748,8 @@ public class ProviderStates {
     params.put("mavenRepository", ArtifactsRepositorySeeder.MAVEN);
     params.put("npmPackage", NPM_PACKAGE);
     params.put("npmRepository", ArtifactsRepositorySeeder.NPM);
+    params.put("packageName", MAVEN_GROUP + ":" + MAVEN_ARTIFACT);
+    params.put("packageType", SBOM_TYPE);
     params.put("screenshotsRepository", ArtifactsRepositorySeeder.CI_SCREENSHOTS);
     return params;
   }
@@ -1729,11 +1801,16 @@ public class ProviderStates {
 
   /** The pom a deploy of {@code artifactId} at {@link #MAVEN_VERSION} sends. */
   public static String mavenPom(String artifactId) {
+    return mavenPom(artifactId, MAVEN_VERSION);
+  }
+
+  /** The pom a deploy of {@code artifactId} at {@code version} sends. */
+  static String mavenPom(String artifactId, String version) {
     return "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<project>\n"
         + "  <modelVersion>4.0.0</modelVersion>\n"
         + "  <groupId>" + MAVEN_GROUP + "</groupId>\n"
         + "  <artifactId>" + artifactId + "</artifactId>\n"
-        + "  <version>" + MAVEN_VERSION + "</version>\n"
+        + "  <version>" + version + "</version>\n"
         + "</project>\n";
   }
 
@@ -1742,9 +1819,13 @@ public class ProviderStates {
   }
 
   private static String mavenFilePath(String artifactId, String extension) {
+    return mavenFilePath(artifactId, MAVEN_VERSION, extension);
+  }
+
+  private static String mavenFilePath(String artifactId, String version, String extension) {
     return "/artifacts/maven/" + ArtifactsRepositorySeeder.MAVEN + "/"
-        + MAVEN_GROUP.replace('.', '/') + "/" + artifactId + "/" + MAVEN_VERSION + "/"
-        + artifactId + "-" + MAVEN_VERSION + extension;
+        + MAVEN_GROUP.replace('.', '/') + "/" + artifactId + "/" + version + "/"
+        + artifactId + "-" + version + extension;
   }
 
   private static Map<String, String> mavenParams(String artifactId) {

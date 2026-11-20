@@ -1,0 +1,12 @@
+{
+  "versions": [
+    {
+      "version": "2100.1.0",
+      "files": [
+        "contract-maven-2100.1.0.pom"
+      ],
+      "sizeBytes": 206,
+      "publishedAt": "2026-01-01T00:00:00Z"
+    }
+  ]
+}

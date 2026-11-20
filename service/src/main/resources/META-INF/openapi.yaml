@@ -14,7 +14,8 @@
 # qits/<image>, a maven group path), which an OpenAPI path parameter cannot express; the routes
 # accept them all the same. The docs doors' {site} and {path} say so with allowReserved: true (qits-1951), which a
 # generated client reads as "send the slashes and the @ literally" — an encoded %40routes%2F… names
-# no site and answers 404.
+# no site and answers 404. The sbom doors' {packageName} says the same (qits-2325): a scoped npm
+# name is sent as @qits/angular, and %40qits%2Fangular names no package.
 openapi: 3.1.0
 paths:
   /artifacts/docs/{repository}:
@@ -84,13 +85,26 @@ paths:
           content:
             "*/*": { schema: { type: string, format: binary } }
         "404": { description: "No such file." }
+  /artifacts/sboms/{packageType}/{packageName}:
+    get:
+      operationId: listSbomVersions
+      summary: Every stored SBOM version of one package, newest first.
+      parameters:
+        - { name: packageType, in: path, required: true, schema: { type: string } }
+        - { name: packageName, in: path, required: true, allowReserved: true, schema: { type: string } }
+      responses:
+        "200":
+          description: "{packageType, packageName, versions:[{version, createdAt, sizeBytes, specVersion, digest}]}; never an empty list — a package is known only by a stored document."
+          content:
+            application/json: { schema: { $ref: "#/components/schemas/SbomVersionList" } }
+        "404": { description: "No SBOM for the package." }
   /artifacts/sboms/{packageType}/{packageName}/-/{version}:
     get:
       operationId: getSbom
       summary: The CycloneDX document published for one release, byte for byte.
       parameters:
         - { name: packageType, in: path, required: true, schema: { type: string } }
-        - { name: packageName, in: path, required: true, schema: { type: string } }
+        - { name: packageName, in: path, required: true, allowReserved: true, schema: { type: string } }
         - { name: version, in: path, required: true, schema: { type: string } }
       responses:
         "200": { description: "The document, application/vnd.cyclonedx+json." }
@@ -100,7 +114,7 @@ paths:
       summary: Whether a document is published for one release; its digest in Docker-Content-Digest.
       parameters:
         - { name: packageType, in: path, required: true, schema: { type: string } }
-        - { name: packageName, in: path, required: true, schema: { type: string } }
+        - { name: packageName, in: path, required: true, allowReserved: true, schema: { type: string } }
         - { name: version, in: path, required: true, schema: { type: string } }
       responses:
         "200": { description: "Published." }
@@ -110,7 +124,7 @@ paths:
       summary: Publishes the CycloneDX document of one release. First write wins.
       parameters:
         - { name: packageType, in: path, required: true, schema: { type: string } }
-        - { name: packageName, in: path, required: true, schema: { type: string } }
+        - { name: packageName, in: path, required: true, allowReserved: true, schema: { type: string } }
         - { name: version, in: path, required: true, schema: { type: string } }
       requestBody:
         required: true
@@ -335,3 +349,21 @@ components:
         publishedAt: { type: string, format: date-time }
         metadata: { type: object, additionalProperties: { type: string } }
         files: { type: array, items: { type: string } }
+    # The sbom wire's version listing (qits-2325), as SbomRoutes writes it. digest is
+    # sha256:<hex>; createdAt is when the document was first published.
+    SbomVersionList:
+      type: object
+      required: [packageType, packageName, versions]
+      properties:
+        packageType: { type: string }
+        packageName: { type: string }
+        versions: { type: array, items: { $ref: "#/components/schemas/SbomVersionEntry" } }
+    SbomVersionEntry:
+      type: object
+      required: [version, createdAt, sizeBytes, specVersion, digest]
+      properties:
+        version: { type: string }
+        createdAt: { type: string, format: date-time }
+        sizeBytes: { type: integer, format: int64 }
+        specVersion: { type: string }
+        digest: { type: string }

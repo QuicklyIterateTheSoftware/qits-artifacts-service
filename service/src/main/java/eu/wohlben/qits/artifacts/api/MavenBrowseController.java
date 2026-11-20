@@ -23,6 +23,8 @@ public class MavenBrowseController {
   // with one simple name would be numbered rather than named in the OpenAPI document (qits-2316).
   @Schema(name = "ListMavenPackagesResponse")
   public record ListPackagesResponse(List<MavenPackageSummary> packages) {}
+  // Named apart for the same reason: the npm version listing declares a ListVersionsResponse too.
+  @Schema(name = "ListMavenVersionsResponse")
   public record ListVersionsResponse(List<MavenVersionSummary> versions) {}
   @GET
   // Named: golden-masters/ records it under this operationId (qits-2316); qits-landing-app's
@@ -31,7 +33,11 @@ public class MavenBrowseController {
   public ListPackagesResponse packages(@PathParam("repo") String repo) {
     return new ListPackagesResponse(explorer.listMavenPackages(repo));
   }
-  @GET @Path("/{coordinate:.+}/versions") @Operation(hidden = true)
+  @GET
+  @Path("/{coordinate:.+}/versions")
+  // Named: golden-masters/ records it under this operationId (qits-2325); qits-landing-app's
+  // artifacts maven package page reads it.
+  @Operation(operationId = "listMavenVersionSummaries")
   public ListVersionsResponse versions(@PathParam("repo") String repo, @PathParam("coordinate") String coordinate) {
     return new ListVersionsResponse(explorer.listMavenVersions(repo, coordinate));
   }
