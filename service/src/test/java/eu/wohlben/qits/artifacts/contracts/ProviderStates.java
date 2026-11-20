@@ -71,6 +71,12 @@ public class ProviderStates {
   // different times, so a newest-first sort shows), and once with no site at all.
   public static final String A_DOCS_CATALOG_OF_EVERY_KIND = "a docs catalog of every kind";
   public static final String AN_EMPTY_DOCS_CATALOG = "an empty docs catalog";
+  // qits-2337: qits-landing-app's docs page again — a catalog naming exactly two sites, each with a
+  // git.repository.name, so listDocsSites' per-site latestRepository is in the recorded body (the
+  // every-kind catalog above has one site with no repository, which would leave the field out of
+  // that recording's filtered entries).
+  public static final String A_DOCS_CATALOG_NAMING_CONTRACT_REPOSITORIES =
+      "a docs catalog naming contract repositories";
   // qits-2337: qits-landing-app's docs reader page — a markdown user-flows site published from two
   // branches, whose newest bundle holds categorised and uncategorised stories, a README, a mermaid
   // block and an image; and an API-docs site holding one OpenAPI document. Two states over the
@@ -238,6 +244,20 @@ public class ProviderStates {
 
   static final byte[] CHANGELOG_BUNDLE =
       tarGz(Map.of("CHANGELOG.md", "# Changelog\n\n## 2100.1.0\n\n- A contract entry.\n"));
+
+  // --- the docs catalog naming contract repositories (qits-2337) -------------------------------
+
+  /** The two sites {@link #A_DOCS_CATALOG_NAMING_CONTRACT_REPOSITORIES} publishes. */
+  static final String NAMING_ROUTES_SITE = "@routes/contract-frontend";
+
+  static final String NAMING_CONTRACTS_SITE = "@contracts/contract-service";
+  static final String NAMING_ROUTES_REPOSITORY = "contract-frontend";
+  static final String NAMING_CONTRACTS_REPOSITORY = "contract-service";
+
+  /** When each site's one version was published: fixed, so the recorded instants are stable. */
+  static final Instant NAMING_ROUTES_PUBLISHED_AT = Instant.parse("2026-02-05T10:00:00Z");
+
+  static final Instant NAMING_CONTRACTS_PUBLISHED_AT = Instant.parse("2026-02-06T11:00:00Z");
 
   // --- the markdown and apidocs bundles (qits-2337) -------------------------------------------
 
@@ -1033,6 +1053,8 @@ public class ProviderStates {
     states.put(A_DOCS_SITE_WITH_A_CONTENT_HASH, this::aDocsSiteWithAContentHash);
     states.put(A_DOCS_CATALOG_OF_EVERY_KIND, this::aDocsCatalogOfEveryKind);
     states.put(AN_EMPTY_DOCS_CATALOG, this::anEmptyDocsCatalog);
+    states.put(
+        A_DOCS_CATALOG_NAMING_CONTRACT_REPOSITORIES, this::aDocsCatalogNamingContractRepositories);
     states.put(A_MARKDOWN_DOCS_BUNDLE, () -> aMarkdownDocsBundle(USERFLOWS_FIRST_STORY));
     states.put(A_MARKDOWN_DOCS_BUNDLE_IMAGE, () -> aMarkdownDocsBundle(USERFLOWS_SCREENSHOT));
     states.put(AN_APIDOCS_BUNDLE, this::anApidocsBundle);
@@ -1133,7 +1155,9 @@ public class ProviderStates {
                           CONTRACTS_SITE,
                           GITHOST_CONTRACTS_SITE,
                           USERFLOWS_SITE,
-                          APIDOCS_SITE))
+                          APIDOCS_SITE,
+                          NAMING_ROUTES_SITE,
+                          NAMING_CONTRACTS_SITE))
                   .forEach(docsSites::delete);
               docsSites
                   .list("repository = ?1 and name in ?2", DOCS, DOCS_CATALOG.keySet())
@@ -1465,6 +1489,35 @@ public class ProviderStates {
    */
   private Setup anEmptyDocsCatalog() {
     return new Setup(Map.of(), List.of());
+  }
+
+  /**
+   * {@link #NAMING_ROUTES_SITE} and {@link #NAMING_CONTRACTS_SITE}, each at one version carrying a
+   * {@code git.repository.name}, then stamped with its fixed instant as {@link
+   * #aDocsCatalogOfEveryKind} stamps its sites. Both sites name a repository (unlike {@link
+   * #DOCS_CATALOG}'s {@code qits-storybook}, which names none), so {@code listDocsSites}' per-site
+   * {@code latestRepository} is in the recorded body for both entries. One param per site, its name,
+   * so the catalog listing is filtered to these two sites in a store other suites share.
+   */
+  private Setup aDocsCatalogNamingContractRepositories() {
+    publishDocs(
+        NAMING_ROUTES_SITE,
+        DOCS_VERSION,
+        DOCS_BUNDLE,
+        Map.of(
+            BRANCH_KEY, DOCS_BRANCH, MetadataKeys.GIT_REPOSITORY_NAME, NAMING_ROUTES_REPOSITORY));
+    publishDocs(
+        NAMING_CONTRACTS_SITE,
+        DOCS_VERSION,
+        DOCS_BUNDLE,
+        Map.of(
+            BRANCH_KEY, DOCS_BRANCH, MetadataKeys.GIT_REPOSITORY_NAME, NAMING_CONTRACTS_REPOSITORY));
+    stampPublishedAt(NAMING_ROUTES_SITE, DOCS_VERSION, NAMING_ROUTES_PUBLISHED_AT);
+    stampPublishedAt(NAMING_CONTRACTS_SITE, DOCS_VERSION, NAMING_CONTRACTS_PUBLISHED_AT);
+    Map<String, String> params = new TreeMap<>();
+    params.put("site0", NAMING_ROUTES_SITE);
+    params.put("site1", NAMING_CONTRACTS_SITE);
+    return new Setup(params, List.of());
   }
 
   // --- the markdown and apidocs bundles (qits-2337) -------------------------------------------

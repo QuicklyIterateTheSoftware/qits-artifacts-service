@@ -232,6 +232,11 @@ class ConsumerPactVerificationTest {
     return states.params(ProviderStates.AN_EMPTY_DOCS_CATALOG);
   }
 
+  @State(ProviderStates.A_DOCS_CATALOG_NAMING_CONTRACT_REPOSITORIES)
+  Map<String, String> aDocsCatalogNamingContractRepositories() {
+    return states.params(ProviderStates.A_DOCS_CATALOG_NAMING_CONTRACT_REPOSITORIES);
+  }
+
   @State(ProviderStates.A_MARKDOWN_DOCS_BUNDLE)
   Map<String, String> aMarkdownDocsBundle() {
     return states.params(ProviderStates.A_MARKDOWN_DOCS_BUNDLE);

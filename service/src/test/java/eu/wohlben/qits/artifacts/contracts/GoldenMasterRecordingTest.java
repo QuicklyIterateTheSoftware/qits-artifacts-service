@@ -808,6 +808,16 @@ class GoldenMasterRecordingTest {
               .build(),
           op(ProviderStates.AN_EMPTY_DOCS_CATALOG, "listDocsSites", "GET", DOCS_SITES, 200)
               .filtered("$.sites")
+              .build(),
+          // qits-2337: both sites name a git.repository.name, so listDocsSites' per-site
+          // latestRepository is in the recorded body.
+          op(
+                  ProviderStates.A_DOCS_CATALOG_NAMING_CONTRACT_REPOSITORIES,
+                  "listDocsSites",
+                  "GET",
+                  DOCS_SITES,
+                  200)
+              .filtered("$.sites")
               .build());
 
   /**

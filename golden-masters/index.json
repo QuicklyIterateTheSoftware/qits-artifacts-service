@@ -221,6 +221,32 @@
       ]
     },
     {
+      "name": "a docs catalog naming contract repositories",
+      "slug": "a-docs-catalog-naming-contract-repositories",
+      "params": {
+        "site0": "@routes/contract-frontend",
+        "site1": "@contracts/contract-service"
+      },
+      "dependsOn": [],
+      "operations": [
+        {
+          "operationId": "listDocsSites",
+          "method": "GET",
+          "path": "/artifacts/docs/docs",
+          "status": 200,
+          "file": "a-docs-catalog-naming-contract-repositories/listDocsSites.json",
+          "frozen": {
+            "ids": [],
+            "instants": [
+              "$.sites[*].latestPublishedAt"
+            ],
+            "strings": [],
+            "listFilteredTo": "$.sites"
+          }
+        }
+      ]
+    },
+    {
       "name": "a docs catalog of every kind",
       "slug": "a-docs-catalog-of-every-kind",
       "params": {
