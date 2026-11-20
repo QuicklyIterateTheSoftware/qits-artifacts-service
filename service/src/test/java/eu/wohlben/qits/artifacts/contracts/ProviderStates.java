@@ -71,6 +71,13 @@ public class ProviderStates {
   // different times, so a newest-first sort shows), and once with no site at all.
   public static final String A_DOCS_CATALOG_OF_EVERY_KIND = "a docs catalog of every kind";
   public static final String AN_EMPTY_DOCS_CATALOG = "an empty docs catalog";
+  // qits-2337: qits-landing-app's docs reader page — a markdown user-flows site published from two
+  // branches, whose newest bundle holds categorised and uncategorised stories, a README, a mermaid
+  // block and an image; and an API-docs site holding one OpenAPI document. Two states over the
+  // markdown bundle, one per file the consumer reads: the {path} param picks the file.
+  public static final String A_MARKDOWN_DOCS_BUNDLE = "a published markdown docs bundle";
+  public static final String A_MARKDOWN_DOCS_BUNDLE_IMAGE = "a published markdown docs bundle image";
+  public static final String AN_APIDOCS_BUNDLE = "a published apidocs bundle";
   // qits-1951: the landing app's routes bundle. Three states over the same bundle, one per file the
   // consumer reads, because a state records one answer per operation and getDocsFile is one
   // operation: the state's {path} param is what picks the file.
@@ -231,6 +238,114 @@ public class ProviderStates {
 
   static final byte[] CHANGELOG_BUNDLE =
       tarGz(Map.of("CHANGELOG.md", "# Changelog\n\n## 2100.1.0\n\n- A contract entry.\n"));
+
+  // --- the markdown and apidocs bundles (qits-2337) -------------------------------------------
+
+  /**
+   * A user-flows site as a service's release publishes it: a directory of markdown stories, one
+   * {@code user-story.md} per story at {@code <category>/<story>/} or, uncategorised, at {@code
+   * <story>/}, with a {@code README.md} at the root. Its versions are commit hashes, as the live
+   * user-flows sites' are.
+   */
+  static final String USERFLOWS_SITE = "@userflows/contract-userflows";
+
+  /** The older version, published from {@link #USERFLOWS_OTHER_BRANCH}. */
+  static final String USERFLOWS_OTHER_VERSION = "1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b";
+
+  /** The newest version, published from {@code main}: the one holding every story. */
+  static final String USERFLOWS_VERSION = "9f8e7d6c5b4a39281706f5e4d3c2b1a098765432";
+
+  static final String USERFLOWS_OTHER_BRANCH = "feature/other";
+  static final String USERFLOWS_REPOSITORY = "contract-userflows-service";
+  static final String USERFLOWS_README = "README.md";
+  static final String USERFLOWS_FIRST_STORY = "alpha/first-story/user-story.md";
+  static final String USERFLOWS_SECOND_STORY = "beta/second-story/user-story.md";
+  static final String USERFLOWS_THIRD_STORY = "third-story/user-story.md";
+  static final String USERFLOWS_SCREENSHOT = "alpha/first-story/screenshot.png";
+
+  /** When each user-flows version was published: fixed, so the recorded instants are stable. */
+  static final Instant USERFLOWS_OTHER_PUBLISHED_AT = Instant.parse("2026-02-01T08:00:00Z");
+
+  static final Instant USERFLOWS_PUBLISHED_AT = Instant.parse("2026-02-03T09:30:00Z");
+
+  /**
+   * The story the reader renders in full: a fenced {@code mermaid} block and an image referenced
+   * relative to the story's own directory, which sits beside it in the bundle.
+   */
+  static final String USERFLOWS_FIRST_STORY_MD =
+      """
+      # First story
+
+      The operator opens the page and sees the flow.
+
+      ```mermaid
+      graph LR
+        a --> b
+      ```
+
+      ![screenshot](screenshot.png)
+      """;
+
+  /**
+   * A 1×1 transparent PNG — a real, decodable one (70 bytes), so a consumer's image element loads
+   * it.
+   */
+  static final byte[] USERFLOWS_SCREENSHOT_BYTES =
+      HexFormat.of()
+          .parseHex(
+              "89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c489"
+                  + "0000000d4944415478da636460f85f0f0002870180eb47ba92"
+                  + "0000000049454e44ae426082");
+
+  /** The newest user-flows bundle: two categories of one story each, one uncategorised story. */
+  static final byte[] USERFLOWS_BUNDLE =
+      tarGzBytes(
+          Map.of(
+              USERFLOWS_README,
+              utf8("# Contract user flows\n\nThe stories of the contract service.\n"),
+              USERFLOWS_FIRST_STORY,
+              utf8(USERFLOWS_FIRST_STORY_MD),
+              USERFLOWS_SCREENSHOT,
+              USERFLOWS_SCREENSHOT_BYTES,
+              USERFLOWS_SECOND_STORY,
+              utf8("# Second story\n\nThe operator filters the list.\n"),
+              USERFLOWS_THIRD_STORY,
+              utf8("# Third story\n\nA story in no category.\n")));
+
+  /** The older bundle, from the other branch: the README alone. */
+  static final byte[] USERFLOWS_OTHER_BUNDLE =
+      tarGz(Map.of(USERFLOWS_README, "# Contract user flows\n\nAn earlier draft.\n"));
+
+  /** An API-docs site: one OpenAPI document per version, as a service's release publishes it. */
+  static final String APIDOCS_SITE = "@apidocs/contract-service";
+
+  static final String APIDOCS_VERSION = "2100.1.0";
+  static final String APIDOCS_PATH = "openapi.yml";
+  static final String APIDOCS_REPOSITORY = "contract-service";
+
+  static final String APIDOCS_OPENAPI_YML =
+      """
+      openapi: 3.0.3
+      info:
+        title: contract-service
+        version: 2100.1.0
+      paths:
+        /contract/api/things:
+          get:
+            operationId: listThings
+            summary: Lists the things
+            responses:
+              "200":
+                description: The things
+                content:
+                  application/json:
+                    schema:
+                      type: array
+                      items:
+                        type: string
+      """;
+
+  static final byte[] APIDOCS_BUNDLE = tarGz(Map.of(APIDOCS_PATH, APIDOCS_OPENAPI_YML));
 
   // --- the routes bundle (qits-1951) ----------------------------------------------------------
 
@@ -918,6 +1033,9 @@ public class ProviderStates {
     states.put(A_DOCS_SITE_WITH_A_CONTENT_HASH, this::aDocsSiteWithAContentHash);
     states.put(A_DOCS_CATALOG_OF_EVERY_KIND, this::aDocsCatalogOfEveryKind);
     states.put(AN_EMPTY_DOCS_CATALOG, this::anEmptyDocsCatalog);
+    states.put(A_MARKDOWN_DOCS_BUNDLE, () -> aMarkdownDocsBundle(USERFLOWS_FIRST_STORY));
+    states.put(A_MARKDOWN_DOCS_BUNDLE_IMAGE, () -> aMarkdownDocsBundle(USERFLOWS_SCREENSHOT));
+    states.put(AN_APIDOCS_BUNDLE, this::anApidocsBundle);
     states.put(A_ROUTES_BUNDLE, () -> aRoutesBundle(ROUTES_MANIFEST));
     states.put(A_ROUTES_BUNDLE_FREEZE, () -> aRoutesBundle(ROUTES_FREEZE));
     states.put(A_ROUTES_BUNDLE_FONT, () -> aRoutesBundle(ROUTES_FONT));
@@ -1013,7 +1131,9 @@ public class ProviderStates {
                           PURGE_SITE,
                           ROUTES_SITE,
                           CONTRACTS_SITE,
-                          GITHOST_CONTRACTS_SITE))
+                          GITHOST_CONTRACTS_SITE,
+                          USERFLOWS_SITE,
+                          APIDOCS_SITE))
                   .forEach(docsSites::delete);
               docsSites
                   .list("repository = ?1 and name in ?2", DOCS, DOCS_CATALOG.keySet())
@@ -1345,6 +1465,71 @@ public class ProviderStates {
    */
   private Setup anEmptyDocsCatalog() {
     return new Setup(Map.of(), List.of());
+  }
+
+  // --- the markdown and apidocs bundles (qits-2337) -------------------------------------------
+
+  /**
+   * {@link #USERFLOWS_SITE} at two versions: {@link #USERFLOWS_OTHER_VERSION} from {@link
+   * #USERFLOWS_OTHER_BRANCH}, then {@link #USERFLOWS_VERSION} from {@code main} — the newest, and the
+   * one holding every story — each with the {@code git.repository.name} it came from, then stamped
+   * with its fixed instant, as {@link #aDocsCatalogOfEveryKind} stamps its sites. The {@code path}
+   * param names the one file of the newest version this state's {@code getDocsFile} reads.
+   */
+  private Setup aMarkdownDocsBundle(String path) {
+    publishDocs(
+        USERFLOWS_SITE,
+        USERFLOWS_OTHER_VERSION,
+        USERFLOWS_OTHER_BUNDLE,
+        Map.of(
+            BRANCH_KEY,
+            USERFLOWS_OTHER_BRANCH,
+            MetadataKeys.GIT_REPOSITORY_NAME,
+            USERFLOWS_REPOSITORY));
+    publishDocs(
+        USERFLOWS_SITE,
+        USERFLOWS_VERSION,
+        USERFLOWS_BUNDLE,
+        Map.of(BRANCH_KEY, DOCS_BRANCH, MetadataKeys.GIT_REPOSITORY_NAME, USERFLOWS_REPOSITORY));
+    stampPublishedAt(USERFLOWS_SITE, USERFLOWS_OTHER_VERSION, USERFLOWS_OTHER_PUBLISHED_AT);
+    stampPublishedAt(USERFLOWS_SITE, USERFLOWS_VERSION, USERFLOWS_PUBLISHED_AT);
+    Map<String, String> params = new TreeMap<>();
+    params.put("path", path);
+    params.put("site", USERFLOWS_SITE);
+    params.put("version", USERFLOWS_VERSION);
+    return new Setup(params, List.of());
+  }
+
+  /**
+   * {@link #APIDOCS_SITE} at {@link #APIDOCS_VERSION}, from {@code main}, holding {@link
+   * #APIDOCS_PATH} — the site's only (so newest) version, stamped with a fixed instant. The {@code
+   * path} param is that document.
+   */
+  private Setup anApidocsBundle() {
+    publishDocs(
+        APIDOCS_SITE,
+        APIDOCS_VERSION,
+        APIDOCS_BUNDLE,
+        Map.of(BRANCH_KEY, DOCS_BRANCH, MetadataKeys.GIT_REPOSITORY_NAME, APIDOCS_REPOSITORY));
+    stampPublishedAt(APIDOCS_SITE, APIDOCS_VERSION, USERFLOWS_PUBLISHED_AT);
+    Map<String, String> params = new TreeMap<>();
+    params.put("path", APIDOCS_PATH);
+    params.put("site", APIDOCS_SITE);
+    params.put("version", APIDOCS_VERSION);
+    return new Setup(params, List.of());
+  }
+
+  /** Overwrites the instant the server stamped a docs publish with, which would leak otherwise. */
+  private void stampPublishedAt(String site, String version, Instant publishedAt) {
+    QuarkusTransaction.requiringNew()
+        .run(
+            () ->
+                docsSites.update(
+                    "publishedAt = ?1 where repository = ?2 and name = ?3 and version = ?4",
+                    publishedAt,
+                    DOCS,
+                    site,
+                    version));
   }
 
   /**

@@ -1,0 +1,18 @@
+openapi: 3.0.3
+info:
+  title: contract-service
+  version: 2100.1.0
+paths:
+  /contract/api/things:
+    get:
+      operationId: listThings
+      summary: Lists the things
+      responses:
+        "200":
+          description: The things
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: string

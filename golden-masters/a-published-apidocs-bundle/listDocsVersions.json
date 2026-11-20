@@ -1,0 +1,16 @@
+{
+  "name": "@apidocs/contract-service",
+  "versions": [
+    {
+      "name": "@apidocs/contract-service",
+      "version": "2100.1.0",
+      "fileCount": 1,
+      "totalBytes": 388,
+      "publishedAt": "2026-02-03T09:30:00Z",
+      "metadata": {
+        "git.branch.name": "main",
+        "git.repository.name": "contract-service"
+      }
+    }
+  ]
+}
