@@ -23,18 +23,18 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.condition.EnabledIf;
 
 /**
- * The docs category's browser story: finding a published site without knowing its URL.
+ * The docs category's browser story: finding the docs repository a published site landed in.
  *
- * <p>The site segment is where the two spellings of a name with a slash in it meet, and they are
- * not interchangeable. The SPA's router encodes {@code @userflows/story-site} to {@code %2F} on the
- * way into its route and decodes it back out, so the address bar carries the escape — while the
- * "Open" link on the page spells the slashes <b>literally</b>, because it leaves the application
- * for the docs wire, whose grammar accepts no percent-encoded separator. Asserting {@code %2F} on
- * that link would be asserting a 404.
- *
- * <p>The story writes the escaped spelling itself: the docs repository's site listing — the
- * repository page whose routerLink used to produce it — moved to the landing app in qits-2316, so
- * the site page is addressed directly.
+ * <p>It used to go one page further — one site's versions, each with the branch and commit it was
+ * published from and an "Open" link straight into the bundle, with the site addressed by the
+ * {@code %2F}-escaped spelling the old listing's routerLink produced. That page, {@code
+ * repositories/:repo/docs/:site}, moved to the landing app in qits-2328, and this app's route
+ * becomes a full-document hand-off to it once the bundled client takes that change: a story
+ * addressing it would wait for an {@code open-bundle} link this process no longer draws. So the
+ * story ends at the one screen that stays here, the store's repositories at the root, and asserts
+ * only what that screen says about the publish — that the {@code docs} repository is there, typed
+ * {@code docs}. A site's versions are the landing app's to show now, and its golden master ({@code
+ * listDocsVersionSummaries}) is the contract for it.
  */
 @QuarkusIntegrationTest
 @TestProfile(PackagedProcessIT.TargetDirState.class)
@@ -42,30 +42,33 @@ import org.junit.jupiter.api.condition.EnabledIf;
 public class DocsExploreIT {
 
   static final String CATEGORY = "docs";
-  static final String SLUG = "an-operator-finds-a-published-site-and-its-versions";
+  static final String SLUG = "an-operator-finds-the-repository-a-published-site-landed-in";
 
   /** How the diagram names the initiator of everything this story's browser fetches. */
   static final String ACTOR = "an operator";
 
+  /** The seeded docs repository every publish in this chain lands in. */
+  static final String REPOSITORY = "docs";
+
   @TestHTTPResource("/")
   URL root;
 
-  @UserStory(value = "An operator finds a published site and its versions", category = "docs")
+  @UserStory(
+      value = "An operator finds the repository a published site landed in",
+      category = "docs")
   @UserflowPrecondition(DocsPublishIT.class)
   @UserflowRunsAfter(DocsReadIT.class)
   @UserStoryDescription(
       """
-      An operator who has a documentation site and no link to it. The store's repositories, then
-      the site's versions — each with the branch and commit it
-      was published from printed beside it, and a way straight into the bundle. Those two columns
-      are what the publisher declared on the upload rather than anything this store verified, which
-      is why they are printed to match against a build and are deliberately not links. (The docs
-      repository's own site listing moved to the landing app in qits-2316, so the story addresses
-      the site page directly.)
+      An operator who has a documentation site and no link to it. The store's repositories at the
+      host root, and among them the docs repository a real publish landed in earlier in this chain
+      — listed beside the image, npm, maven and daemon rows it shares the store with. (The docs
+      repository's site listing moved to the landing app in qits-2316 and one site's versions in
+      qits-2328, so the story stops at the store's own screen.)
       """)
-  void anOperatorFindsAPublishedSite(Flow flow, Interactions story, UserflowContext context) {
-    String site = context.require("story.docs.site", String.class);
-    String version = context.require("story.docs.version", String.class);
+  void anOperatorFindsTheRepository(Flow flow, Interactions story, UserflowContext context) {
+    // Required, not read: the chain's subject must exist, or this story has nothing to find.
+    context.require("story.docs.site", String.class);
 
     StoryBrowser.asOperator(flow);
     // A browser is a caller like any other and the launched process' access log records everything
@@ -74,22 +77,17 @@ public class DocsExploreIT {
     // setting it here is also what stops a preceding package story's kind carrying over, since the
     // framework resets the actor for us and nothing can reset a kind this repository invented.
     AccessLogSource.attribute(ACTOR, NetworkEdge.HTTP);
-    story.note("a site name may contain a slash: this is one site, not a scope and a name");
+    story.note("the site this operator is looking for was published by a real client, not seeded");
 
     flow.navigate("{}", root);
-    flow.waitFor("table tbody th a");
-    flow.screenshot("the store's repositories").as("repositories-listed");
-
-    // The repository page between the two is the landing app's since qits-2316, so the site page
-    // is addressed directly — the name ONE route segment, the slash escaped to %2F and the `@`
-    // literal, exactly as the old listing's routerLink spelled it.
-    flow.navigate("{}repositories/{}/docs/{}", root, "docs", site.replace("/", "%2F"));
-    flow.waitFor("th:text-is('" + version + "')");
-    // The branch/commit cell, which is the whole reason those two columns exist.
-    flow.expectText("tbody tr td.mono.subtle", DocsPublishIT.BRANCH);
-    // And the way out of the explorer and into the bundle itself.
-    flow.waitFor("[data-testid=\"open-bundle\"]");
-    flow.screenshot("the site's versions, with the build each came from").as("versions-shown");
+    // :text-is is exact, and the repository and its type share the word: the header link is the
+    // row's name and the qits-badge in its second cell the type, so each is matched by its own
+    // element. The link is not followed: `repositories/:repo` hands the browser off to the landing
+    // app (qits-2316).
+    flow.waitFor("tbody th a:text-is('" + REPOSITORY + "')");
+    flow.expectText("tbody tr:has(th a:text-is('" + REPOSITORY + "')) qits-badge", "docs");
+    flow.screenshot("the store's repositories, the docs repository among them")
+        .as("repositories-listed");
   }
 
   @AfterAll
@@ -99,7 +97,6 @@ public class DocsExploreIT {
     }
     ReportAssertions.assertComplete(CATEGORY, SLUG, UserflowReport.PASSED);
     ReportAssertions.assertStepId(CATEGORY, SLUG, "repositories-listed");
-    ReportAssertions.assertStepId(CATEGORY, SLUG, "versions-shown");
     // No edge is pinned by name — a browser story fetches the SPA's own build-hashed bundle beside
     // the reads it is about, and NpmExploreIT carries the long form of that decision. What every
     // explore story does close is its initiator: every arrow here is the operator's, which is the
