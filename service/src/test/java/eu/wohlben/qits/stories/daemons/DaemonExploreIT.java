@@ -23,21 +23,22 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.condition.EnabledIf;
 
 /**
- * The daemon category's browser story — and the only way to answer "what daemons are in there?" at
- * all.
+ * The daemon category's <b>browser</b> story: finding the platform repository a published daemon
+ * landed in.
  *
- * <p>The wire under this listing has <b>no enumeration of its own</b>: every route below {@code
- * /artifacts/daemons} is version-addressed, so what exists is only askable through the explorer.
- * That makes this screen the daemon plane's index rather than a convenience over one.
+ * <p>It used to go one page further — one daemon's versions, each with the exact sha256 it is, the
+ * string a deployment pin is written from. That page, {@code repositories/:repo/daemons/:daemon},
+ * moved to the landing app in qits-2327, and this app's route becomes a full-document hand-off to
+ * it once the bundled client takes that change: a story addressing it would assert a page this
+ * process no longer draws. So the story ends at the one screen that stays here, the store's
+ * repositories at the root, and asserts only what that screen says about the publish — that the
+ * {@code daemons} repository is there, typed {@code daemon-binaries}. The versions-and-digests view
+ * is the landing app's to show now.
  *
- * <p>The browse endpoint behind it reads {@code /artifacts/api/repositories/daemons/daemons} — the
- * doubled segment is correct and not a typo: the wire carries no repository segment, while the
- * explorer's subject is a repository throughout, so the seeded {@code daemons} row is both the
- * repository and the listing under it.
- *
- * <p>That listing — the repository page — moved to the landing app in qits-2316 (this app's {@code
- * repositories/:repo} now hands the browser off to it), so the story goes from the store's
- * repositories straight to the daemon's own page.
+ * <p>The wire under that listing has <b>no enumeration of its own</b>: every route below {@code
+ * /artifacts/daemons} is version-addressed, so the repositories screen — not a convenience over the
+ * daemon listing, but the only place the question "what daemons are in there?" could ever be
+ * asked from this app — is now also the only screen this story can still assert against.
  */
 @QuarkusIntegrationTest
 @TestProfile(PackagedProcessIT.TargetDirState.class)
@@ -45,7 +46,10 @@ import org.junit.jupiter.api.condition.EnabledIf;
 public class DaemonExploreIT {
 
   static final String CATEGORY = "daemons";
-  static final String SLUG = "an-operator-finds-a-published-daemon-and-its-versions";
+  static final String SLUG = "an-operator-finds-the-repository-a-published-daemon-landed-in";
+
+  /** The seeded daemon-binaries repository every daemon publish lands in. */
+  static final String REPOSITORY = "daemons";
 
   /** How the diagram names the initiator of everything this story's browser fetches. */
   static final String ACTOR = "an operator";
@@ -53,20 +57,22 @@ public class DaemonExploreIT {
   @TestHTTPResource("/")
   URL root;
 
-  @UserStory(value = "An operator finds a published daemon and its versions", category = "daemons")
+  @UserStory(
+      value = "An operator finds the repository a published daemon landed in",
+      category = "daemons")
   @UserflowPrecondition(DaemonPublishIT.class)
   @UserflowRunsAfter(DaemonDownloadIT.class)
   @UserStoryDescription(
       """
-      An operator asking what the platform would boot. The daemon wire is version-addressed from
-      end to end and lists nothing, so this screen is the only place the question can be asked: the
-      store's repositories, then one daemon's versions with the exact sha256 each one is — the
-      string a deployment pin is written from. (The daemons repository's own listing moved to the
-      landing app in qits-2316, so the story addresses the daemon page directly.)
+      An operator asking what the platform would boot. The store's repositories at the host root,
+      and among them the daemons repository a real publish wrote into earlier in this chain —
+      listed beside the npm, maven, image and docs rows it shares the store with. (The daemon
+      listing moved to the landing app in qits-2316 and one daemon's own versions in qits-2327, so
+      the story stops at the store's own screen.)
       """)
-  void anOperatorFindsAPublishedDaemon(Flow flow, Interactions story, UserflowContext context) {
-    String daemon = context.require("story.daemon.name", String.class);
-    String version = context.require("story.daemon.version", String.class);
+  void anOperatorFindsTheRepository(Flow flow, Interactions story, UserflowContext context) {
+    // Required, not read: the chain's subject must exist, or this story has nothing to find.
+    context.require("story.daemon.name", String.class);
 
     StoryBrowser.asOperator(flow);
     // A browser is a caller like any other and the launched process' access log records everything
@@ -78,21 +84,14 @@ public class DaemonExploreIT {
     story.note("the daemon wire lists nothing of its own: this screen is the only enumeration");
 
     flow.navigate("{}", root);
-    flow.waitFor("table tbody th a");
-    flow.screenshot("the store's repositories").as("repositories-listed");
-
-    // The repository page between the two — the daemon listing a click on the `daemons` row used
-    // to open — is the landing app's since qits-2316, so the daemon page is addressed directly.
-    // The doubled segment is the repository and then the listing under it, as on the wire.
-    flow.navigate("{}repositories/{}/daemons/{}", root, "daemons", daemon);
-    // The version is waited for on its CONTROL, not on the row header around it: `:text-is()`
-    // matches the SMALLEST element carrying the text, so on a page where the version cell is a
-    // download control `th:text-is(…)` matches nothing at all — which is exactly the difference
-    // between this table and the npm package page's, where the version is the header's own text.
-    // Since qits-543 that control is a download BUTTON, not an anchor — a plain href cannot carry
-    // the bearer the download needs — so the selector matches either element.
-    flow.waitFor("tbody th[scope=\"row\"] :is(a,button):text-is('" + version + "')");
-    flow.screenshot("the daemon's versions and their digests").as("versions-shown");
+    // :text-is is exact, so the `daemon-binaries` type badge in the row's second cell cannot shadow
+    // the repository link in its header. The link is not followed: `repositories/:repo` hands the
+    // browser off to the landing app (qits-2316).
+    flow.waitFor("tbody th a:text-is('" + REPOSITORY + "')");
+    flow.expectText(
+        "tbody tr:has(th a:text-is('" + REPOSITORY + "')) qits-badge", "daemon-binaries");
+    flow.screenshot("the store's repositories, the daemons repository among them")
+        .as("repositories-listed");
   }
 
   @AfterAll
@@ -102,7 +101,6 @@ public class DaemonExploreIT {
     }
     ReportAssertions.assertComplete(CATEGORY, SLUG, UserflowReport.PASSED);
     ReportAssertions.assertStepId(CATEGORY, SLUG, "repositories-listed");
-    ReportAssertions.assertStepId(CATEGORY, SLUG, "versions-shown");
     // No edge is pinned by name — a browser story fetches the SPA's own build-hashed bundle beside
     // the reads it is about, and NpmExploreIT carries the long form of that decision. What every
     // explore story does close is its initiator: every arrow here is the operator's, which is the

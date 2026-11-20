@@ -72,7 +72,13 @@
   "note": null,
   "error": null,
   "deleted": [],
-  "withheldByGraceWindow": [],
+  "withheldByGraceWindow": [
+    {
+      "repository": "daemons",
+      "identity": "contract-daemon@2026.0.1",
+      "rule": "superseded and unaccessed for longer than P0D"
+    }
+  ],
   "sweep": {
     "blobsUnlinked": 0,
     "bytesReclaimed": 0,
