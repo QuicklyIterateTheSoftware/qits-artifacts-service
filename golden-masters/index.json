@@ -1432,6 +1432,7 @@
           "method": "GET",
           "path": "/artifacts/docs/docs/@changelog/{repository}/-/{version}/CHANGELOG.md",
           "status": 200,
+          "file": "a-repository-with-published-changelogs/getDocsFile.md",
           "responseHeaders": {
             "Content-Length": "46",
             "Content-Type": "text/markdown; charset=utf-8",
@@ -1440,6 +1441,21 @@
           "frozen": {
             "ids": [],
             "instants": [],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        },
+        {
+          "operationId": "getDocsVersion",
+          "method": "GET",
+          "path": "/artifacts/docs/docs/@changelog/{repository}/-/{version}",
+          "status": 200,
+          "file": "a-repository-with-published-changelogs/getDocsVersion.json",
+          "frozen": {
+            "ids": [],
+            "instants": [
+              "$.publishedAt"
+            ],
             "strings": [],
             "listFilteredTo": null
           }

@@ -318,6 +318,8 @@ class GoldenMasterRecordingTest {
   private static final String DOCS_VERSION = "/artifacts/docs/docs/{site}/-/{version}";
   private static final String DOCS_FILE = "/artifacts/docs/docs/{site}/-/{version}/{path}";
   private static final String CHANGELOG_SITE = "/artifacts/docs/docs/@changelog/{repository}";
+  private static final String CHANGELOG_VERSION =
+      "/artifacts/docs/docs/@changelog/{repository}/-/{version}";
   private static final String CHANGELOG_FILE =
       "/artifacts/docs/docs/@changelog/{repository}/-/{version}/CHANGELOG.md";
   private static final String CONTENT_HASH = "/artifacts/content-hashes/{type}/{name}/-/{version}";
@@ -516,10 +518,13 @@ class GoldenMasterRecordingTest {
                   .textAnswer("yml")
                   .headers("Content-Length", "Content-Type", "ETag")
                   .build(),
-              // --- changelogs: qits-maintenance (ChangelogClient), the qits CLI (bump-message)
+              // --- changelogs: qits-maintenance (ChangelogClient), the qits CLI (bump-message). The
+              // version's file list (getDocsVersion) and the CHANGELOG.md body itself (recorded
+              // verbatim) are qits-2337, the same way the markdown bundle's are above.
               op(ProviderStates.CHANGELOGS, "listDocsVersions", "GET", CHANGELOG_SITE, 200).build(),
+              op(ProviderStates.CHANGELOGS, "getDocsVersion", "GET", CHANGELOG_VERSION, 200).build(),
               op(ProviderStates.CHANGELOGS, "getDocsFile", "GET", CHANGELOG_FILE, 200)
-                  .raw()
+                  .textAnswer("md")
                   .headers("Content-Length", "Content-Type", "ETag")
                   .build(),
               op(ProviderStates.NO_CHANGELOG, "listDocsVersions", "GET", CHANGELOG_SITE, 404).build(),
