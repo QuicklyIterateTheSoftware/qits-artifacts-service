@@ -149,6 +149,12 @@ public class ProviderStates {
   /** The newer of the two versions; the one a HEAD names. */
   static final String DAEMON_VERSION = "2026.2.0";
 
+  /**
+   * The version older than both of {@link #seedTwoDaemonVersions()}'s, which the GC's last-two rule
+   * condemns (qits-2329).
+   */
+  static final String CONDEMNED_DAEMON_VERSION = "2026.0.1";
+
   /** The version a publish into the empty daemon creates. */
   static final String NEW_DAEMON_VERSION = "2026.3.0";
 
@@ -1556,9 +1562,21 @@ public class ProviderStates {
    * Seeded as {@link #unpinnedIdentities()}, with the repository and the daemon named: the
    * per-repository routes take the one as their path segment, and the recordings keep only the
    * entries naming the other, since other suites' rows share the store.
+   *
+   * <p>qits-2329: plus a third, older version, {@link #CONDEMNED_DAEMON_VERSION}. The rule keeps the
+   * last two releases of an identity whatever the pins say, so two versions alone leave the plan's
+   * {@code dead} empty; the third is what it condemns. It is published in the past, since a row's
+   * last access is its publish at the latest and one in the future would be "accessed inside the
+   * window"; its blob is written now, so a sweep withholds it under the grace window.
    */
   private Setup aRepositoryWithUnpinnedIdentities() {
     seedTwoDaemonVersions();
+    DaemonBinary condemned =
+        daemonRow(
+            CONDEMNED_DAEMON_VERSION,
+            "contract-daemon " + CONDEMNED_DAEMON_VERSION,
+            Instant.parse("2020-01-01T00:00:00Z"));
+    QuarkusTransaction.requiringNew().run(() -> daemonBinaries.persist(condemned));
     Map<String, String> params = new TreeMap<>();
     params.put("daemon", DAEMON);
     params.put("repository", DAEMONS);

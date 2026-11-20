@@ -1478,10 +1478,23 @@
             ],
             "strings": [],
             "volatile": [
+              "$.sweep.blobIds",
+              "$.structural.blobIds",
               "$.pins[*].tookMillis",
-              "$.pins[*].pinCount"
+              "$.pins[*].pinCount",
+              "$.sweep.blobCount",
+              "$.sweep.reclaimableBytes",
+              "$.sweep.withheldByGraceWindow",
+              "$.sweep.withheldBytes",
+              "$.structural.blobCount",
+              "$.structural.reclaimableBytes",
+              "$.structural.withheldByGraceWindow",
+              "$.structural.withheldBytes"
             ],
-            "listFilteredTo": "$.kept"
+            "listFilteredTo": "$.kept",
+            "alsoFilteredTo": [
+              "$.dead"
+            ]
           }
         },
         {
