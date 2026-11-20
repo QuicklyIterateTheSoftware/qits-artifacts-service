@@ -427,14 +427,6 @@
       ],
       "operations" : [
         {
-          "operationId" : "DocsBrowseController.versions",
-          "method" : "GET",
-          "path" : "/repositories/{repo}/docs/{site:.+}/versions",
-          "dto" : "eu.wohlben.qits.artifacts.api.DocsBrowseController$ListDocsVersionsResponse",
-          "kind" : "returns",
-          "cardinality" : "collection"
-        },
-        {
           "operationId" : "GcPlanController.repositories",
           "method" : "GET",
           "path" : "/gc/repositories",
@@ -465,6 +457,14 @@
           "dto" : "eu.wohlben.qits.artifacts.dto.StoreSummary",
           "kind" : "returns",
           "cardinality" : "single"
+        },
+        {
+          "operationId" : "listDocsVersionSummaries",
+          "method" : "GET",
+          "path" : "/repositories/{repo}/docs/{site:.+}/versions",
+          "dto" : "eu.wohlben.qits.artifacts.api.DocsBrowseController$ListDocsVersionsResponse",
+          "kind" : "returns",
+          "cardinality" : "collection"
         },
         {
           "operationId" : "planGcRepositoriesWithSuppliedPins",
@@ -585,14 +585,6 @@
       ],
       "operations" : [
         {
-          "operationId" : "DocsBrowseController.versions",
-          "method" : "GET",
-          "path" : "/repositories/{repo}/docs/{site:.+}/versions",
-          "dto" : "eu.wohlben.qits.artifacts.api.DocsBrowseController$ListDocsVersionsResponse",
-          "kind" : "returns",
-          "cardinality" : "collection"
-        },
-        {
           "operationId" : "GcPlanController.repositoryPlan",
           "method" : "GET",
           "path" : "/gc/repositories/{repository}/plan",
@@ -613,6 +605,14 @@
           "method" : "GET",
           "path" : "/repositories/{repo}/docs",
           "dto" : "eu.wohlben.qits.artifacts.api.DocsBrowseController$ListDocsSitesResponse",
+          "kind" : "returns",
+          "cardinality" : "collection"
+        },
+        {
+          "operationId" : "listDocsVersionSummaries",
+          "method" : "GET",
+          "path" : "/repositories/{repo}/docs/{site:.+}/versions",
+          "dto" : "eu.wohlben.qits.artifacts.api.DocsBrowseController$ListDocsVersionsResponse",
           "kind" : "returns",
           "cardinality" : "collection"
         },
