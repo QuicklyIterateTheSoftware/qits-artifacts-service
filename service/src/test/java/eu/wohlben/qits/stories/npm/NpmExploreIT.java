@@ -24,7 +24,18 @@ import org.junit.jupiter.api.condition.EnabledIf;
 
 /**
  * The npm category's <b>browser</b> story: headless Chromium over the explorer SPA, against the
- * same packaged process the two command-line stories drove.
+ * same packaged process the two command-line stories drove — finding the repository a published
+ * package landed in.
+ *
+ * <p>It used to go one page further — the package's versions, the one screen that said out loud
+ * what immutability means here. That page, {@code repositories/:repo/packages/:package}, moves to
+ * the landing app in qits-2326, and this app's route becomes a full-document hand-off to it once
+ * the bundled client takes that change: a story addressing it would assert a page this process no
+ * longer draws. So the story ends at the one screen that stays here, the store's repositories at
+ * the root, and asserts only what that screen says about the publish — that the {@code npm}
+ * repository is there, typed {@code npm-packages}. The versions view is the landing app's to show
+ * now, and its golden masters ({@code listNpmVersionSummaries}, {@code listSbomVersions}) are the
+ * contract for it.
  *
  * <p>The web UI is <b>embedded</b> — Quinoa builds {@code src/main/webui} into the artifact and the
  * process serves it at {@code /} — so this flow runs through the service itself and there is no
@@ -43,7 +54,10 @@ import org.junit.jupiter.api.condition.EnabledIf;
 public class NpmExploreIT {
 
   static final String CATEGORY = "npm";
-  static final String SLUG = "an-operator-finds-a-published-package-and-its-immutable-versions";
+  static final String SLUG = "an-operator-finds-the-repository-a-published-package-landed-in";
+
+  /** The hosted npm repository the publish story's pipeline published into. */
+  static final String REPOSITORY = "npm";
 
   /** How the diagram names the initiator of everything this story's browser fetches. */
   static final String ACTOR = "an operator";
@@ -52,22 +66,22 @@ public class NpmExploreIT {
   URL root;
 
   @UserStory(
-      value = "An operator finds a published package and its immutable versions",
+      value = "An operator finds the repository a published package landed in",
       category = "npm")
   @UserflowPrecondition(NpmPublishIT.class)
   @UserflowRunsAfter(NpmInstallIT.class)
   @UserStoryDescription(
       """
       The registry's own web UI, served by the same process that stores the bytes. An operator
-      opens the store's repositories at the host root, then the package a pipeline published earlier
-      in this chain — its version list, which is the one screen that says out loud what
-      immutability means here: a version appears once and never changes. (The npm repository's own
-      package listing moved to the landing app in qits-2316, so the story addresses the package
-      page directly.)
+      opens the store's repositories at the host root, and among them the npm repository a
+      pipeline published into earlier in this chain — listed beside the maven, image, daemon and
+      docs rows it shares the store with. (The npm repository's package listing moved to the
+      landing app in qits-2316 and one package's versions in qits-2326, so the story stops at the
+      store's own screen.)
       """)
-  void anOperatorFindsAPublishedPackage(Flow flow, Interactions story, UserflowContext context) {
-    String name = context.require("story.npm.name", String.class);
-    String version = context.require("story.npm.version", String.class);
+  void anOperatorFindsTheRepository(Flow flow, Interactions story, UserflowContext context) {
+    // Required, not read: the chain's subject must exist, or this story has nothing to find.
+    context.require("story.npm.name", String.class);
 
     // The gateway's job, played for the browser, before the first navigate.
     StoryBrowser.asOperator(flow);
@@ -83,17 +97,13 @@ public class NpmExploreIT {
     // The template form keeps the definition hash stable although the launched process sits on a
     // random port: the fingerprint records `navigate {}`, the display the real URL.
     flow.navigate("{}", root);
-    flow.waitFor("table tbody th a");
-    flow.screenshot("the store's repositories").as("repositories-listed");
-
-    // The repository page between the two — the package listing a click on the `npm` row used to
-    // open — is the landing app's since qits-2316 (this app's `repositories/:repo` now hands the
-    // browser off to it), so the package page is addressed directly. A scoped name is ONE route
-    // segment, spelled the way that listing's routerLink spelled it: the slash escaped to %2F, the
-    // `@` literal.
-    flow.navigate("{}repositories/{}/packages/{}", root, "npm", name.replace("/", "%2F"));
-    flow.waitFor("th:text-is('" + version + "')");
-    flow.screenshot("the package's immutable versions").as("versions-shown");
+    // :text-is is exact, so the `npm-packages` type badge in the row's second cell cannot shadow
+    // the repository link in its header. The link is not followed: `repositories/:repo` hands the
+    // browser off to the landing app (qits-2316).
+    flow.waitFor("tbody th a:text-is('" + REPOSITORY + "')");
+    flow.expectText("tbody tr:has(th a:text-is('" + REPOSITORY + "')) qits-badge", "npm-packages");
+    flow.screenshot("the store's repositories, the npm repository among them")
+        .as("repositories-listed");
   }
 
   @AfterAll
@@ -103,7 +113,6 @@ public class NpmExploreIT {
     }
     ReportAssertions.assertComplete(CATEGORY, SLUG, UserflowReport.PASSED);
     ReportAssertions.assertStepId(CATEGORY, SLUG, "repositories-listed");
-    ReportAssertions.assertStepId(CATEGORY, SLUG, "versions-shown");
     // No edge is pinned by NAME here, and that is a decision rather than a gap. A browser story
     // fetches the SPA's own bundle beside the reads it is about, and those filenames carry a build
     // hash — so the diagram records what the run really made and the assertions stay on the
