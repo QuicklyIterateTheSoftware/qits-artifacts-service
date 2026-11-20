@@ -668,6 +668,20 @@ class GoldenMasterRecordingTest {
                   .drop("untouchable")
                   .zeroNumbers()
                   .build(),
+              // qits-2329: the same plan where the rule condemns nothing — dead records as [].
+              op(
+                      ProviderStates.A_REPOSITORY_WITH_NOTHING_TO_COLLECT,
+                      "planGcRepositoryWithSuppliedPins",
+                      "POST",
+                      "/artifacts/api/gc/repositories/{repository}/plan",
+                      200)
+                  .json("application/json", ProviderStates.GC_PINS)
+                  .filtered("$.kept", "daemon")
+                  .alsoFiltered("$.dead")
+                  .emptied("$.sweep.blobIds", "$.structural.blobIds")
+                  .drop("untouchable")
+                  .zeroNumbers()
+                  .build(),
               op(
                       ProviderStates.A_REPOSITORY_WITH_UNPINNED_IDENTITIES,
                       "sweepGcRepository",
