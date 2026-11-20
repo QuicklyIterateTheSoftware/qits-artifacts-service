@@ -253,6 +253,33 @@
       ]
     },
     {
+      "name": "a docs site published by two releases",
+      "slug": "a-docs-site-published-by-two-releases",
+      "params": {
+        "docsRepository": "docs",
+        "docsSite": "contract-docs-site"
+      },
+      "dependsOn": [],
+      "operations": [
+        {
+          "operationId": "listDocsVersionSummaries",
+          "method": "GET",
+          "path": "/artifacts/api/repositories/{docsRepository}/docs/{docsSite}/versions",
+          "status": 200,
+          "file": "a-docs-site-published-by-two-releases/listDocsVersionSummaries.json",
+          "frozen": {
+            "ids": [],
+            "instants": [
+              "$.versions[*].publishedAt",
+              "$.versions[*].accessedAt"
+            ],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        }
+      ]
+    },
+    {
       "name": "a docs site published from two branches",
       "slug": "a-docs-site-published-from-two-branches",
       "params": {
@@ -1644,6 +1671,21 @@
           }
         },
         {
+          "operationId": "listDocsVersionSummaries",
+          "method": "GET",
+          "path": "/artifacts/api/repositories/{docsRepository}/docs/{docsSite}/versions",
+          "status": 200,
+          "file": "a-store-holding-one-artifact-of-every-kind/listDocsVersionSummaries.json",
+          "frozen": {
+            "ids": [],
+            "instants": [
+              "$.versions[*].publishedAt"
+            ],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        },
+        {
           "operationId": "listImageManifestSummaries",
           "method": "GET",
           "path": "/artifacts/api/repositories/{imagesRepository}/images/{image}/manifests",
@@ -1788,6 +1830,19 @@
             "instants": [],
             "strings": [],
             "listFilteredTo": "$.sites"
+          }
+        },
+        {
+          "operationId": "listDocsVersionSummaries",
+          "method": "GET",
+          "path": "/artifacts/api/repositories/{docsRepository}/docs/{docsSite}/versions",
+          "status": 200,
+          "file": "a-store-with-nothing-published/listDocsVersionSummaries.json",
+          "frozen": {
+            "ids": [],
+            "instants": [],
+            "strings": [],
+            "listFilteredTo": null
           }
         },
         {

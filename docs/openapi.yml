@@ -1009,6 +1009,41 @@ paths:
         - qits:agent
         - qits:system
         - qits:ci-run
+  /artifacts/api/repositories/{repo}/docs/{site}/versions:
+    get:
+      operationId: listDocsVersionSummaries
+      parameters:
+      - name: repo
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: site
+        in: path
+        required: true
+        schema:
+          type: string
+          pattern: .+
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListDocsVersionsResponse"
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+      summary: Versions
+      tags:
+      - Docs Browse Controller
+      security:
+      - SecurityScheme:
+        - qits:admin
+        - qits:agent
+        - qits:system
+        - qits:ci-run
   /artifacts/api/repositories/{repo}/images:
     get:
       operationId: listImages
@@ -1418,6 +1453,25 @@ components:
         sizeBytes:
           type: integer
           format: int64
+    DocsVersionSummary:
+      type: object
+      properties:
+        version:
+          type: string
+        fileCount:
+          type: integer
+          format: int32
+        sizeBytes:
+          type: integer
+          format: int64
+        publishedAt:
+          $ref: "#/components/schemas/Instant"
+        accessedAt:
+          $ref: "#/components/schemas/Instant"
+        metadata:
+          type: object
+          additionalProperties:
+            type: string
     GcDiskReport:
       type: object
       properties:
@@ -1898,6 +1952,13 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/DocsSiteSummary"
+    ListDocsVersionsResponse:
+      type: object
+      properties:
+        versions:
+          type: array
+          items:
+            $ref: "#/components/schemas/DocsVersionSummary"
     ListImagesResponse:
       type: object
       properties:

@@ -139,6 +139,10 @@ public class ProviderStates {
   // of its two manifests is reachable by digest only and no tag names it.
   public static final String AN_IMAGE_WITH_AN_UNTAGGED_MANIFEST =
       "an image with a manifest no tag names";
+  // qits-2328: qits-landing-app's artifacts docs site page — one site two releases published, the
+  // older one read since and the newer one never.
+  public static final String A_DOCS_SITE_PUBLISHED_BY_TWO_RELEASES =
+      "a docs site published by two releases";
 
   /** The daemon repository every deployment carries, and the one consumers name. */
   static final String DAEMONS = ArtifactsRepositorySeeder.DAEMONS;
@@ -956,6 +960,7 @@ public class ProviderStates {
     states.put(A_STORE_HOLDING_EVERY_KIND, this::aStoreHoldingEveryKind);
     states.put(A_STORE_WITH_NOTHING_PUBLISHED, this::aStoreWithNothingPublished);
     states.put(AN_IMAGE_WITH_AN_UNTAGGED_MANIFEST, this::anImageWithAnUntaggedManifest);
+    states.put(A_DOCS_SITE_PUBLISHED_BY_TWO_RELEASES, this::aDocsSitePublishedByTwoReleases);
   }
 
   /** Every state name this provider answers for. */
@@ -1661,6 +1666,65 @@ public class ProviderStates {
     params.put("imagesRepository", ArtifactsRepositorySeeder.IMAGES);
     return new Setup(params, List.of());
   }
+
+  /**
+   * {@link #DOCS_SITE} published by two releases, changelog-shaped (qits-2328): {@link
+   * #DOCS_VERSION} carrying the repository, the commit and the release request that published it,
+   * then read once through the docs wire — so its access stamp is set — and {@link
+   * #DOCS_FEATURE_VERSION} carrying the branch besides, and never read. The docs site page lists
+   * both, newest first: a read and an unread version, a version with a branch and one without.
+   */
+  private Setup aDocsSitePublishedByTwoReleases() {
+    publishDocs(
+        DOCS_SITE,
+        DOCS_VERSION,
+        RELEASE_DOCS_BUNDLE,
+        Map.of(
+            "git.repository.name",
+            CHANGELOG_REPOSITORY,
+            "git.commit.hash",
+            "a".repeat(40),
+            RELEASE_REQUEST_KEY,
+            "qits-contract-rr-1"));
+    expect(
+        200,
+        given()
+            .urlEncodingEnabled(false)
+            .get("/artifacts/docs/" + DOCS + "/" + DOCS_SITE + "/-/" + DOCS_VERSION + "/CHANGELOG.md"),
+        "the read of " + DOCS_SITE + "@" + DOCS_VERSION);
+    publishDocs(
+        DOCS_SITE,
+        DOCS_FEATURE_VERSION,
+        NEXT_RELEASE_DOCS_BUNDLE,
+        Map.of(
+            "git.repository.name",
+            CHANGELOG_REPOSITORY,
+            "git.commit.hash",
+            "b".repeat(40),
+            RELEASE_REQUEST_KEY,
+            "qits-contract-rr-2",
+            BRANCH_KEY,
+            DOCS_BRANCH));
+    Map<String, String> params = new TreeMap<>();
+    params.put("docsRepository", DOCS);
+    params.put("docsSite", DOCS_SITE);
+    return new Setup(params, List.of());
+  }
+
+  /** The metadata key a release's publish names its release request under. */
+  static final String RELEASE_REQUEST_KEY = "release.request.qualified-id";
+
+  /** {@link #aDocsSitePublishedByTwoReleases}' first release: one {@code CHANGELOG.md}. */
+  static final byte[] RELEASE_DOCS_BUNDLE =
+      tarGz(Map.of("CHANGELOG.md", "# Changelog\n\n## 2100.1.0\n\n- A contract entry.\n"));
+
+  /** Its second release: the same changelog with one more entry. */
+  static final byte[] NEXT_RELEASE_DOCS_BUNDLE =
+      tarGz(
+          Map.of(
+              "CHANGELOG.md",
+              "# Changelog\n\n## 2100.2.0\n\n- A second contract entry.\n\n"
+                  + "## 2100.1.0\n\n- A contract entry.\n"));
 
   /**
    * The explorer states' params: each listing's repository under a name of its own, since one

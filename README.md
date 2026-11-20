@@ -847,8 +847,9 @@ the retired `ArtifactsTokenFilter` / `X-Artifacts-Token` scheme this section use
 The listings are in `docs/openapi.yml` under the operationIds the golden masters record —
 `listRepositories`, `listImages`, `listNpmPackages`, `listMavenPackages`, `listDaemons`,
 `listDocsSiteSummaries` and `listArtifactRecords` (qits-1149, qits-2316), and one image's
-`listImageTagSummaries` and `listImageManifestSummaries` (qits-2324) — plus `listDaemonVersions`;
-every other route here is still `@Operation(hidden = true)`, so the contract is written out below.
+`listImageTagSummaries` and `listImageManifestSummaries` (qits-2324), and one docs site's
+`listDocsVersionSummaries` (qits-2328) — plus `listDaemonVersions`; every other route here is still
+`@Operation(hidden = true)`, so the contract is written out below.
 
 ```
 GET /artifacts/api/repositories                                          every repository

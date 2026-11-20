@@ -676,7 +676,12 @@ class GoldenMasterRecordingTest {
                           200)
                       .filtered("$.images", "image")
                       .build()),
-              imagePage(ProviderStates.AN_IMAGE_WITH_AN_UNTAGGED_MANIFEST))
+              imagePage(ProviderStates.AN_IMAGE_WITH_AN_UNTAGGED_MANIFEST),
+              // --- the docs site page (qits-2328): one site's versions, over the two explorer
+              // states and over a site two releases published, one of them read and one never
+              docsSitePage(ProviderStates.A_STORE_HOLDING_EVERY_KIND),
+              docsSitePage(ProviderStates.A_STORE_WITH_NOTHING_PUBLISHED),
+              docsSitePage(ProviderStates.A_DOCS_SITE_PUBLISHED_BY_TWO_RELEASES))
           .flatMap(List::stream)
           .toList();
 
@@ -752,6 +757,23 @@ class GoldenMasterRecordingTest {
                 "listImageManifestSummaries",
                 "GET",
                 "/artifacts/api/repositories/{imagesRepository}/images/{image}/manifests",
+                200)
+            .build());
+  }
+
+  /**
+   * The docs site page's read in one state (qits-2328): one site's versions, newest first, with
+   * each version's figures, its access stamp and its publish metadata. Recorded unfiltered and with
+   * its figures kept — the listing is scoped to the state's own site, whose rows every setup clears
+   * first, so nothing another suite publishes can appear in it.
+   */
+  private static List<Interaction> docsSitePage(String state) {
+    return List.of(
+        op(
+                state,
+                "listDocsVersionSummaries",
+                "GET",
+                "/artifacts/api/repositories/{docsRepository}/docs/{docsSite}/versions",
                 200)
             .build());
   }
