@@ -114,6 +114,12 @@ public class ProviderStates {
    */
   public static final String A_REPOSITORY_WITH_UNPINNED_IDENTITIES =
       "a repository with unpinned identities";
+  /**
+   * qits-2329: the daemon repository holding only what the last-two rule keeps, so one
+   * repository's plan condemns nothing — the "nothing to delete" answer qits-landing-app renders.
+   */
+  public static final String A_REPOSITORY_WITH_NOTHING_TO_COLLECT =
+      "a repository with nothing to collect";
   public static final String A_MAVEN_ARTIFACT = "a maven artifact published at a version";
   public static final String NO_MAVEN_ARTIFACT = "no maven artifact published at the version";
   public static final String AN_NPM_PACKAGE = "an npm package published at a version";
@@ -152,6 +158,12 @@ public class ProviderStates {
 
   /** The newer of the two versions; the one a HEAD names. */
   static final String DAEMON_VERSION = "2026.2.0";
+
+  /**
+   * The version older than both of {@link #seedTwoDaemonVersions()}'s, which the GC's last-two rule
+   * condemns (qits-2329).
+   */
+  static final String CONDEMNED_DAEMON_VERSION = "2026.0.1";
 
   /** The version a publish into the empty daemon creates. */
   static final String NEW_DAEMON_VERSION = "2026.3.0";
@@ -965,6 +977,7 @@ public class ProviderStates {
     states.put(UNPINNED_IDENTITIES, this::unpinnedIdentities);
     states.put(PIN_SOURCES_SILENT, this::pinSourcesSilent);
     states.put(A_REPOSITORY_WITH_UNPINNED_IDENTITIES, this::aRepositoryWithUnpinnedIdentities);
+    states.put(A_REPOSITORY_WITH_NOTHING_TO_COLLECT, this::aRepositoryWithNothingToCollect);
     states.put(A_MAVEN_ARTIFACT, this::aMavenArtifact);
     states.put(NO_MAVEN_ARTIFACT, this::noMavenArtifact);
     states.put(AN_NPM_PACKAGE, this::anNpmPackage);
@@ -1587,8 +1600,33 @@ public class ProviderStates {
    * Seeded as {@link #unpinnedIdentities()}, with the repository and the daemon named: the
    * per-repository routes take the one as their path segment, and the recordings keep only the
    * entries naming the other, since other suites' rows share the store.
+   *
+   * <p>qits-2329: plus a third, older version, {@link #CONDEMNED_DAEMON_VERSION}. The rule keeps the
+   * last two releases of an identity whatever the pins say, so two versions alone leave the plan's
+   * {@code dead} empty; the third is what it condemns. It is published in the past, since a row's
+   * last access is its publish at the latest and one in the future would be "accessed inside the
+   * window"; its blob is written now, so a sweep withholds it under the grace window.
    */
   private Setup aRepositoryWithUnpinnedIdentities() {
+    seedTwoDaemonVersions();
+    DaemonBinary condemned =
+        daemonRow(
+            CONDEMNED_DAEMON_VERSION,
+            "contract-daemon " + CONDEMNED_DAEMON_VERSION,
+            Instant.parse("2020-01-01T00:00:00Z"));
+    QuarkusTransaction.requiringNew().run(() -> daemonBinaries.persist(condemned));
+    Map<String, String> params = new TreeMap<>();
+    params.put("daemon", DAEMON);
+    params.put("repository", DAEMONS);
+    return new Setup(params, List.of());
+  }
+
+  /**
+   * Only the two versions {@link #seedTwoDaemonVersions()} writes, both among the last two releases
+   * the rule keeps whatever the pins say: the repository's plan has nothing in {@code dead}
+   * (qits-2329). Named as {@link #aRepositoryWithUnpinnedIdentities()} is.
+   */
+  private Setup aRepositoryWithNothingToCollect() {
     seedTwoDaemonVersions();
     Map<String, String> params = new TreeMap<>();
     params.put("daemon", DAEMON);
