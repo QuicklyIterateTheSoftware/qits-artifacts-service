@@ -1993,6 +1993,81 @@
       ]
     },
     {
+      "name": "a scoped npm package with an sbom on one of two versions",
+      "slug": "a-scoped-npm-package-with-an-sbom-on-one-of-two-versions",
+      "params": {
+        "npmPackage": "@contract/contract-scoped",
+        "npmRepository": "npm",
+        "packageName": "@contract/contract-scoped",
+        "packageType": "npm",
+        "version": "2100.2.0"
+      },
+      "dependsOn": [],
+      "operations": [
+        {
+          "operationId": "getSbom",
+          "method": "GET",
+          "path": "/artifacts/sboms/{packageType}/{packageName}/-/{version}",
+          "status": 200,
+          "file": "a-scoped-npm-package-with-an-sbom-on-one-of-two-versions/getSbom.json",
+          "responseHeaders": {
+            "Content-Type": "application/vnd.cyclonedx+json; version=1.6",
+            "Docker-Content-Digest": "sha256:784116a03937521cbcd4121ea2c71e549f4a7fe070fc70aef0cfc6cc1d42dbea",
+            "ETag": "\"784116a03937521cbcd4121ea2c71e549f4a7fe070fc70aef0cfc6cc1d42dbea\""
+          },
+          "frozen": {
+            "ids": [],
+            "instants": [],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        },
+        {
+          "operationId": "listNpmPackages",
+          "method": "GET",
+          "path": "/artifacts/api/repositories/{npmRepository}/packages",
+          "status": 200,
+          "file": "a-scoped-npm-package-with-an-sbom-on-one-of-two-versions/listNpmPackages.json",
+          "frozen": {
+            "ids": [],
+            "instants": [],
+            "strings": [],
+            "listFilteredTo": "$.packages"
+          }
+        },
+        {
+          "operationId": "listNpmVersionSummaries",
+          "method": "GET",
+          "path": "/artifacts/api/repositories/{npmRepository}/packages/{npmPackage}/versions",
+          "status": 200,
+          "file": "a-scoped-npm-package-with-an-sbom-on-one-of-two-versions/listNpmVersionSummaries.json",
+          "frozen": {
+            "ids": [],
+            "instants": [
+              "$.versions[*].publishedAt"
+            ],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        },
+        {
+          "operationId": "listSbomVersions",
+          "method": "GET",
+          "path": "/artifacts/sboms/{packageType}/{packageName}",
+          "status": 200,
+          "file": "a-scoped-npm-package-with-an-sbom-on-one-of-two-versions/listSbomVersions.json",
+          "frozen": {
+            "ids": [],
+            "instants": [
+              "$.versions[*].createdAt"
+            ],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        }
+      ]
+    },
+    {
       "name": "a store holding one artifact of every kind",
       "slug": "a-store-holding-one-artifact-of-every-kind",
       "params": {
@@ -2152,6 +2227,21 @@
             "instants": [],
             "strings": [],
             "listFilteredTo": "$.packages"
+          }
+        },
+        {
+          "operationId": "listNpmVersionSummaries",
+          "method": "GET",
+          "path": "/artifacts/api/repositories/{npmRepository}/packages/{npmPackage}/versions",
+          "status": 200,
+          "file": "a-store-holding-one-artifact-of-every-kind/listNpmVersionSummaries.json",
+          "frozen": {
+            "ids": [],
+            "instants": [
+              "$.versions[*].publishedAt"
+            ],
+            "strings": [],
+            "listFilteredTo": null
           }
         },
         {
@@ -2335,6 +2425,19 @@
             "instants": [],
             "strings": [],
             "listFilteredTo": "$.packages"
+          }
+        },
+        {
+          "operationId": "listNpmVersionSummaries",
+          "method": "GET",
+          "path": "/artifacts/api/repositories/{npmRepository}/packages/{npmPackage}/versions",
+          "status": 200,
+          "file": "a-store-with-nothing-published/listNpmVersionSummaries.json",
+          "frozen": {
+            "ids": [],
+            "instants": [],
+            "strings": [],
+            "listFilteredTo": null
           }
         },
         {

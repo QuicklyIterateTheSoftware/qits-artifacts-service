@@ -1322,6 +1322,41 @@ paths:
         - qits:agent
         - qits:system
         - qits:ci-run
+  /artifacts/api/repositories/{repo}/packages/{package}/versions:
+    get:
+      operationId: listNpmVersionSummaries
+      parameters:
+      - name: package
+        in: path
+        required: true
+        schema:
+          type: string
+          pattern: .+
+      - name: repo
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListNpmVersionsResponse"
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+      summary: Versions
+      tags:
+      - Package Browse Controller
+      security:
+      - SecurityScheme:
+        - qits:admin
+        - qits:agent
+        - qits:system
+        - qits:ci-run
   /artifacts/api/store/summary:
     get:
       operationId: getStoreSummary
@@ -2095,6 +2130,13 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/PackageSummary"
+    ListNpmVersionsResponse:
+      type: object
+      properties:
+        versions:
+          type: array
+          items:
+            $ref: "#/components/schemas/PackageVersionSummary"
     ListRepositoriesResponse:
       type: object
       properties:
@@ -2144,6 +2186,22 @@ components:
           format: int64
         latest:
           type: string
+    PackageVersionSummary:
+      type: object
+      properties:
+        version:
+          type: string
+        tarballSizeBytes:
+          type: integer
+          format: int64
+        publishedAt:
+          $ref: "#/components/schemas/Instant"
+        accessedAt:
+          $ref: "#/components/schemas/Instant"
+        distTags:
+          type: array
+          items:
+            type: string
     PurgedPackage:
       type: object
       properties:

@@ -776,6 +776,36 @@ class GoldenMasterRecordingTest {
                   op(ProviderStates.A_MAVEN_PACKAGE_WITH_AN_SBOM, "getSbom", "GET", SBOM, 200)
                       .headers("Content-Type", "Docker-Content-Digest", "ETag")
                       .build()),
+              // --- the npm package page (qits-2326): one package's versions with the dist-tags on
+              // each. Its SBOM listing is not recorded again in these two states: each already
+              // records listSbomVersions for the maven coordinate (qits-2325), a 404 there as it
+              // would be for the npm package, and a state records an operationId once.
+              npmPackageVersions(ProviderStates.A_STORE_HOLDING_EVERY_KIND),
+              npmPackageVersions(ProviderStates.A_STORE_WITH_NOTHING_PUBLISHED),
+              // --- a scoped package with two versions and an SBOM on the newer one (qits-2326): its
+              // row in the repository's listing, the page's two reads, and the document itself —
+              // the sbom paths carrying the scoped name's `@` and `/` literally (allowReserved)
+              List.of(
+                  op(
+                          ProviderStates.A_SCOPED_NPM_PACKAGE_WITH_AN_SBOM,
+                          "listNpmPackages",
+                          "GET",
+                          "/artifacts/api/repositories/{npmRepository}/packages",
+                          200)
+                      .filtered("$.packages", "npmPackage")
+                      .build()),
+              npmPackageVersions(ProviderStates.A_SCOPED_NPM_PACKAGE_WITH_AN_SBOM),
+              List.of(
+                  op(
+                          ProviderStates.A_SCOPED_NPM_PACKAGE_WITH_AN_SBOM,
+                          "listSbomVersions",
+                          "GET",
+                          "/artifacts/sboms/{packageType}/{packageName}",
+                          200)
+                      .build(),
+                  op(ProviderStates.A_SCOPED_NPM_PACKAGE_WITH_AN_SBOM, "getSbom", "GET", SBOM, 200)
+                      .headers("Content-Type", "Docker-Content-Digest", "ETag")
+                      .build()),
               // --- the docs site page (qits-2328): one site's versions, over the two explorer
               // states and over a site two releases published, one of them read and one never
               docsSitePage(ProviderStates.A_STORE_HOLDING_EVERY_KIND),
@@ -881,6 +911,23 @@ class GoldenMasterRecordingTest {
                 "GET",
                 "/artifacts/sboms/{packageType}/{packageName}",
                 sbomStatus)
+            .build());
+  }
+
+  /**
+   * The npm package page's version read in one state (qits-2326): one package's versions, newest
+   * publish order as the explorer answers it, each with its size, its times and the dist-tags on
+   * it. Recorded unfiltered — the listing is scoped to the state's own package, whose npm rows every
+   * setup clears first, so nothing another suite publishes can appear in it.
+   */
+  private static List<Interaction> npmPackageVersions(String state) {
+    return List.of(
+        op(
+                state,
+                "listNpmVersionSummaries",
+                "GET",
+                "/artifacts/api/repositories/{npmRepository}/packages/{npmPackage}/versions",
+                200)
             .build());
   }
 
