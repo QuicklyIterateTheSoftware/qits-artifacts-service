@@ -1,0 +1,27 @@
+{
+  "name": "@userflows/contract-userflows",
+  "versions": [
+    {
+      "name": "@userflows/contract-userflows",
+      "version": "9f8e7d6c5b4a39281706f5e4d3c2b1a098765432",
+      "fileCount": 5,
+      "totalBytes": 344,
+      "publishedAt": "2026-02-03T09:30:00Z",
+      "metadata": {
+        "git.branch.name": "main",
+        "git.repository.name": "contract-userflows-service"
+      }
+    },
+    {
+      "name": "@userflows/contract-userflows",
+      "version": "1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b",
+      "fileCount": 1,
+      "totalBytes": 41,
+      "publishedAt": "2026-02-01T08:00:00Z",
+      "metadata": {
+        "git.branch.name": "feature/other",
+        "git.repository.name": "contract-userflows-service"
+      }
+    }
+  ]
+}

@@ -232,6 +232,26 @@ class ConsumerPactVerificationTest {
     return states.params(ProviderStates.AN_EMPTY_DOCS_CATALOG);
   }
 
+  @State(ProviderStates.A_DOCS_CATALOG_NAMING_CONTRACT_REPOSITORIES)
+  Map<String, String> aDocsCatalogNamingContractRepositories() {
+    return states.params(ProviderStates.A_DOCS_CATALOG_NAMING_CONTRACT_REPOSITORIES);
+  }
+
+  @State(ProviderStates.A_MARKDOWN_DOCS_BUNDLE)
+  Map<String, String> aMarkdownDocsBundle() {
+    return states.params(ProviderStates.A_MARKDOWN_DOCS_BUNDLE);
+  }
+
+  @State(ProviderStates.A_MARKDOWN_DOCS_BUNDLE_IMAGE)
+  Map<String, String> aMarkdownDocsBundleImage() {
+    return states.params(ProviderStates.A_MARKDOWN_DOCS_BUNDLE_IMAGE);
+  }
+
+  @State(ProviderStates.AN_APIDOCS_BUNDLE)
+  Map<String, String> anApidocsBundle() {
+    return states.params(ProviderStates.AN_APIDOCS_BUNDLE);
+  }
+
   @State(ProviderStates.A_ROUTES_BUNDLE)
   Map<String, String> aRoutesBundle() {
     return states.params(ProviderStates.A_ROUTES_BUNDLE);

@@ -92,9 +92,11 @@ class GoldenMasterRecordingTest {
 
   /**
    * The extensions a recorded answer is written under — what the stale-file sweep looks for: JSON
-   * documents, and the text documents {@link Op#textAnswer} records.
+   * documents, and the text documents {@link Op#textAnswer} records: a screenshot freeze ({@code
+   * html}, qits-2041), a markdown story and an OpenAPI document ({@code md}, {@code yml},
+   * qits-2337).
    */
-  static final Set<String> RECORDED_EXTENSIONS = Set.of("json", "html");
+  static final Set<String> RECORDED_EXTENSIONS = Set.of("json", "html", "md", "yml");
 
   /**
    * One recorded interaction. Build it with {@link #op}.
@@ -346,6 +348,8 @@ class GoldenMasterRecordingTest {
   private static final String DOCS_VERSION = "/artifacts/docs/docs/{site}/-/{version}";
   private static final String DOCS_FILE = "/artifacts/docs/docs/{site}/-/{version}/{path}";
   private static final String CHANGELOG_SITE = "/artifacts/docs/docs/@changelog/{repository}";
+  private static final String CHANGELOG_VERSION =
+      "/artifacts/docs/docs/@changelog/{repository}/-/{version}";
   private static final String CHANGELOG_FILE =
       "/artifacts/docs/docs/@changelog/{repository}/-/{version}/CHANGELOG.md";
   private static final String CONTENT_HASH = "/artifacts/content-hashes/{type}/{name}/-/{version}";
@@ -521,10 +525,36 @@ class GoldenMasterRecordingTest {
               op(ProviderStates.A_CONTRACTS_BUNDLE_WITH_A_PROJECTION, "getDocsFile", "GET", DOCS_FILE, 200)
                   .headers("Content-Length", "Content-Type", "ETag")
                   .build(),
-              // --- changelogs: qits-maintenance (ChangelogClient), the qits CLI (bump-message)
-              op(ProviderStates.CHANGELOGS, "listDocsVersions", "GET", CHANGELOG_SITE, 200).build(),
-              op(ProviderStates.CHANGELOGS, "getDocsFile", "GET", CHANGELOG_FILE, 200)
+              // --- the markdown and apidocs bundles: qits-landing-app's docs reader (qits-2337) — a
+              // user-flows site's versions (two branches), the newest version's file list, then its
+              // story with a mermaid block and an image (recorded verbatim) and that image (raw
+              // bytes: status and headers only); an API-docs site's versions, file list and OpenAPI
+              // document (recorded verbatim). Their instants are pinned by the states and kept.
+              op(ProviderStates.A_MARKDOWN_DOCS_BUNDLE, "listDocsVersions", "GET", DOCS_SITE, 200)
+                  .build(),
+              op(ProviderStates.A_MARKDOWN_DOCS_BUNDLE, "getDocsVersion", "GET", DOCS_VERSION, 200)
+                  .build(),
+              op(ProviderStates.A_MARKDOWN_DOCS_BUNDLE, "getDocsFile", "GET", DOCS_FILE, 200)
+                  .textAnswer("md")
+                  .headers("Content-Length", "Content-Type", "ETag")
+                  .build(),
+              op(ProviderStates.A_MARKDOWN_DOCS_BUNDLE_IMAGE, "getDocsFile", "GET", DOCS_FILE, 200)
                   .raw()
+                  .headers("Content-Length", "Content-Type", "ETag")
+                  .build(),
+              op(ProviderStates.AN_APIDOCS_BUNDLE, "listDocsVersions", "GET", DOCS_SITE, 200).build(),
+              op(ProviderStates.AN_APIDOCS_BUNDLE, "getDocsVersion", "GET", DOCS_VERSION, 200).build(),
+              op(ProviderStates.AN_APIDOCS_BUNDLE, "getDocsFile", "GET", DOCS_FILE, 200)
+                  .textAnswer("yml")
+                  .headers("Content-Length", "Content-Type", "ETag")
+                  .build(),
+              // --- changelogs: qits-maintenance (ChangelogClient), the qits CLI (bump-message). The
+              // version's file list (getDocsVersion) and the CHANGELOG.md body itself (recorded
+              // verbatim) are qits-2337, the same way the markdown bundle's are above.
+              op(ProviderStates.CHANGELOGS, "listDocsVersions", "GET", CHANGELOG_SITE, 200).build(),
+              op(ProviderStates.CHANGELOGS, "getDocsVersion", "GET", CHANGELOG_VERSION, 200).build(),
+              op(ProviderStates.CHANGELOGS, "getDocsFile", "GET", CHANGELOG_FILE, 200)
+                  .textAnswer("md")
                   .headers("Content-Length", "Content-Type", "ETag")
                   .build(),
               op(ProviderStates.NO_CHANGELOG, "listDocsVersions", "GET", CHANGELOG_SITE, 404).build(),
@@ -893,13 +923,28 @@ class GoldenMasterRecordingTest {
               .build(),
           op(ProviderStates.AN_EMPTY_DOCS_CATALOG, "listDocsSites", "GET", DOCS_SITES, 200)
               .filtered("$.sites")
+              .build(),
+          // qits-2337: both sites name a git.repository.name, so listDocsSites' per-site
+          // latestRepository is in the recorded body.
+          op(
+                  ProviderStates.A_DOCS_CATALOG_NAMING_CONTRACT_REPOSITORIES,
+                  "listDocsSites",
+                  "GET",
+                  DOCS_SITES,
+                  200)
+              .filtered("$.sites")
               .build());
 
   /**
    * The states whose instants are recorded as answered rather than frozen: each pins them to fixed
    * values itself, so the recording stays byte-stable while the newest-first order stays visible.
    */
-  static final Set<String> KEPT_INSTANTS = Set.of(ProviderStates.A_DOCS_CATALOG_OF_EVERY_KIND);
+  static final Set<String> KEPT_INSTANTS =
+      Set.of(
+          ProviderStates.A_DOCS_CATALOG_OF_EVERY_KIND,
+          ProviderStates.A_MARKDOWN_DOCS_BUNDLE,
+          ProviderStates.A_MARKDOWN_DOCS_BUNDLE_IMAGE,
+          ProviderStates.AN_APIDOCS_BUNDLE);
 
   /** Every interaction this test records. */
   static List<Interaction> allInteractions() {
