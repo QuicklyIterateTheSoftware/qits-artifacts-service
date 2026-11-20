@@ -1,0 +1,13 @@
+{
+  "packageType": "maven",
+  "packageName": "eu.wohlben.qits:contract-maven",
+  "versions": [
+    {
+      "version": "2100.2.0",
+      "createdAt": "2026-01-01T00:00:00Z",
+      "sizeBytes": 909,
+      "specVersion": "1.6",
+      "digest": "sha256:0ae7ddf8aa022aac25243775b3812921e67ffb7541eeebf2c27941172e5fce5d"
+    }
+  ]
+}

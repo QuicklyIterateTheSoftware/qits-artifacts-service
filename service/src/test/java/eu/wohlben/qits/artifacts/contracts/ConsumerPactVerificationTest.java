@@ -382,6 +382,11 @@ class ConsumerPactVerificationTest {
     return states.params(ProviderStates.AN_IMAGE_WITH_AN_UNTAGGED_MANIFEST);
   }
 
+  @State(ProviderStates.A_MAVEN_PACKAGE_WITH_AN_SBOM)
+  Map<String, String> aMavenPackageWithAnSbom() {
+    return states.params(ProviderStates.A_MAVEN_PACKAGE_WITH_AN_SBOM);
+  }
+
   @State(ProviderStates.A_DOCS_SITE_PUBLISHED_BY_TWO_RELEASES)
   Map<String, String> aDocsSitePublishedByTwoReleases() {
     return states.params(ProviderStates.A_DOCS_SITE_PUBLISHED_BY_TWO_RELEASES);

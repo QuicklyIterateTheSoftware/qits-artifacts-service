@@ -154,6 +154,33 @@ paths:
                 format: binary
         "404":
           description: No such file.
+  /artifacts/sboms/{packageType}/{packageName}:
+    get:
+      operationId: listSbomVersions
+      summary: "Every stored SBOM version of one package, newest first."
+      parameters:
+      - name: packageType
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: packageName
+        in: path
+        required: true
+        allowReserved: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: "{packageType, packageName, versions:[{version, createdAt,\
+            \ sizeBytes, specVersion, digest}]}; never an empty list — a package is\
+            \ known only by a stored document."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SbomVersionList"
+        "404":
+          description: No SBOM for the package.
   /artifacts/sboms/{packageType}/{packageName}/-/{version}:
     get:
       operationId: getSbom
@@ -167,6 +194,7 @@ paths:
       - name: packageName
         in: path
         required: true
+        allowReserved: true
         schema:
           type: string
       - name: version
@@ -191,6 +219,7 @@ paths:
       - name: packageName
         in: path
         required: true
+        allowReserved: true
         schema:
           type: string
       - name: version
@@ -215,6 +244,7 @@ paths:
       - name: packageName
         in: path
         required: true
+        allowReserved: true
         schema:
           type: string
       - name: version
@@ -1228,6 +1258,41 @@ paths:
         - qits:agent
         - qits:system
         - qits:ci-run
+  /artifacts/api/repositories/{repo}/maven-packages/{coordinate}/versions:
+    get:
+      operationId: listMavenVersionSummaries
+      parameters:
+      - name: coordinate
+        in: path
+        required: true
+        schema:
+          type: string
+          pattern: .+
+      - name: repo
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListMavenVersionsResponse"
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+      summary: Versions
+      tags:
+      - Maven Browse Controller
+      security:
+      - SecurityScheme:
+        - qits:admin
+        - qits:agent
+        - qits:system
+        - qits:ci-run
   /artifacts/api/repositories/{repo}/packages:
     get:
       operationId: listNpmPackages
@@ -1380,6 +1445,42 @@ components:
           type: array
           items:
             type: string
+    SbomVersionList:
+      type: object
+      required:
+      - packageType
+      - packageName
+      - versions
+      properties:
+        packageType:
+          type: string
+        packageName:
+          type: string
+        versions:
+          type: array
+          items:
+            $ref: "#/components/schemas/SbomVersionEntry"
+    SbomVersionEntry:
+      type: object
+      required:
+      - version
+      - createdAt
+      - sizeBytes
+      - specVersion
+      - digest
+      properties:
+        version:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        sizeBytes:
+          type: integer
+          format: int64
+        specVersion:
+          type: string
+        digest:
+          type: string
     ApplicationPurgeReport:
       type: object
       properties:
@@ -1980,6 +2081,13 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/MavenPackageSummary"
+    ListMavenVersionsResponse:
+      type: object
+      properties:
+        versions:
+          type: array
+          items:
+            $ref: "#/components/schemas/MavenVersionSummary"
     ListNpmPackagesResponse:
       type: object
       properties:
@@ -2012,6 +2120,20 @@ components:
         sizeBytes:
           type: integer
           format: int64
+    MavenVersionSummary:
+      type: object
+      properties:
+        version:
+          type: string
+        files:
+          type: array
+          items:
+            type: string
+        sizeBytes:
+          type: integer
+          format: int64
+        publishedAt:
+          $ref: "#/components/schemas/Instant"
     PackageSummary:
       type: object
       properties:
@@ -2099,4 +2221,4 @@ components:
       description: Authentication
 info:
   title: qits-artifacts API
-  version: 2026.1119.190120
+  version: 2026.1119.235639
