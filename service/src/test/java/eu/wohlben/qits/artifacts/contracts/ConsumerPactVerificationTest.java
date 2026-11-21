@@ -124,7 +124,7 @@ class ConsumerPactVerificationTest {
                 + wrong.reason());
       }
     }
-    context.setTarget(new RawPathTarget(base.getHost(), base.getPort(), consumer));
+    context.setTarget(new CallerTarget(base.getHost(), base.getPort(), consumer));
   }
 
   @TestTemplate
@@ -134,19 +134,21 @@ class ConsumerPactVerificationTest {
   }
 
   /**
-   * The target, sending {@code :} and {@code @} in the path raw, as the consumers' own clients send
-   * them.
+   * The target, naming the caller of a bearer-less interaction.
    *
-   * <p>pact-jvm percent-encodes both, and the Vert.x wires match the raw path: {@code %3A} in a
-   * maven name ({@code eu.wohlben.qits:x}) or {@code %40} in {@code @changelog/<repository>} would
-   * be a 404 no real caller ever gets. Both characters are legal in a path segment (RFC 3986 pchar),
-   * and java.net.http, curl and the browsers send them unencoded.
+   * <p>The path goes out as pact-jvm writes it, {@code :} and {@code @} percent-encoded. Until
+   * qits-2409 this target turned {@code %3A} and {@code %40} back into {@code :} and {@code @},
+   * because the Vert.x wires matched only the literal spelling. That rewrite hid the very request
+   * qits-landing-app's generated client sends ({@code eu.wohlben.qits%3Ax}, {@code %40qits%2Fx}),
+   * so a 404 no pact caught reached the live store. The wires now take both spellings; the
+   * literal one is pinned by the route tests ({@code SbomRegistryTest}, {@code DocsRegistryTest},
+   * {@code ContentHashRoutesTest}), and the encoded one by this verification.
    */
-  static final class RawPathTarget extends HttpTestTarget {
+  static final class CallerTarget extends HttpTestTarget {
 
     private final String consumer;
 
-    RawPathTarget(String host, int port, String consumer) {
+    CallerTarget(String host, int port, String consumer) {
       super(host, port);
       this.consumer = consumer;
     }
@@ -154,8 +156,6 @@ class ConsumerPactVerificationTest {
     @Override
     public ProviderResponse executeInteraction(Object client, Object request) {
       if (request instanceof HttpRequest http) {
-        http.setPath(
-            http.getPath().replace("%3A", ":").replace("%3a", ":").replace("%40", "@"));
         if (!http.containsHeader("Authorization")) {
           // An interaction without a bearer names no caller of its own, so the suite names the one
           // the consumer is (epic qits-543, qits-1358) rather than leaning on a forward-auth dev
