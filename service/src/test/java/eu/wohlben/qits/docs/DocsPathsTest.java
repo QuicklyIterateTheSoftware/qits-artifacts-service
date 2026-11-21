@@ -112,6 +112,73 @@ class DocsPathsTest {
     assertTrue(matches(DocsPaths.SITE, "/artifacts/docs/docs/JSONStream"));
   }
 
+  // --- the percent-encoded spelling -------------------------------------------------------------
+
+  @Test
+  void anEncodedSiteNameMatchesOnEveryRouteAndCapturesItsRawSpelling() {
+    // normalizedPath() keeps %40 and %2F as received, and a generated client sends exactly those.
+    // The group is the RAW spelling here — the decoding is pathParam's, which DocsRegistryTest
+    // proves over the wire.
+    assertEquals(
+        "%40qits%2Fui-components",
+        group(DocsPaths.SITE, "/artifacts/docs/docs/%40qits%2Fui-components", "name"));
+    String bundle = "/artifacts/docs/docs/%40qits%2Fui-components/-/2026.807.0";
+    assertEquals("%40qits%2Fui-components", group(DocsPaths.BUNDLE, bundle, "name"));
+    assertEquals("2026.807.0", group(DocsPaths.BUNDLE, bundle, "version"));
+    String file = bundle + "/assets/iframe-BPG5Eshk.js";
+    assertEquals("%40qits%2Fui-components", group(DocsPaths.FILE, file, "name"));
+    assertEquals("assets/iframe-BPG5Eshk.js", group(DocsPaths.FILE, file, "path"));
+    // And the encoded spelling does not re-open the overlap the grammar rests on.
+    assertFalse(matches(DocsPaths.SITE, bundle));
+    assertFalse(matches(DocsPaths.SITE, file));
+    assertFalse(matches(DocsPaths.BUNDLE, file));
+  }
+
+  @Test
+  void spellingsMayBeMixedAndEitherHexCaseIsAccepted() {
+    assertEquals(
+        "%40qits/ui-components",
+        group(DocsPaths.SITE, "/artifacts/docs/docs/%40qits/ui-components", "name"));
+    assertEquals(
+        "@qits%2fui-components",
+        group(DocsPaths.SITE, "/artifacts/docs/docs/@qits%2fui-components", "name"));
+    assertEquals(
+        "someproject%2fsomelib",
+        group(DocsPaths.SITE, "/artifacts/docs/docs/someproject%2fsomelib", "name"));
+    assertEquals(
+        "a%2Fb/c%2fd", group(DocsPaths.SITE, "/artifacts/docs/docs/a%2Fb/c%2fd", "name"), "four deep");
+    assertFalse(
+        matches(DocsPaths.SITE, "/artifacts/docs/docs/a%2Fb%2Fc%2Fd%2Fe"),
+        "an encoded separator spends the four-segment cap like a literal one");
+  }
+
+  @Test
+  void theEncodedSpellingNeverMakesADotSegmentOrABareSeparatorAName() {
+    // The safety structure, in the spelling normalizedPath() does NOT collapse: %2F is no separator
+    // to it, so `..` between two of them reaches the regex intact. %2E%2E is decoded to `..` before
+    // matching, which is why the dotted form is the one asserted.
+    for (String name :
+        new String[] {
+          "a%2F..%2Fb", "a%2f..%2fb", "%2F..%2Fb", "a/..%2Fb", "a%2F..", "..", "%2E%2E", "a%2F%2E%2E",
+          "%2F", "a%2F", "%40", "%40%2Fb", "-", "a%2F-"
+        }) {
+      assertFalse(matches(DocsPaths.SITE, "/artifacts/docs/docs/" + name), name);
+      assertFalse(matches(DocsPaths.BUNDLE, "/artifacts/docs/docs/" + name + "/-/1.0.0"), name);
+      assertFalse(
+          matches(DocsPaths.FILE, "/artifacts/docs/docs/" + name + "/-/1.0.0/index.html"), name);
+    }
+    // The /-/ separator is literal only. Encoded, it is no separator, and the bare `-` it wraps is no
+    // segment, so the path is no route rather than a name with a version folded into it.
+    assertFalse(matches(DocsPaths.BUNDLE, "/artifacts/docs/docs/%40qits%2Fui%2F-%2F1.0.0"));
+    assertFalse(matches(DocsPaths.SITE, "/artifacts/docs/docs/%40qits%2Fui%2F-%2F1.0.0"));
+    assertFalse(matches(DocsPaths.FILE, "/artifacts/docs/docs/%40qits%2Fui%2F-%2F1.0.0/index.html"));
+    // No colon in a site name, in either spelling — that is SbomPaths' segment, not this one.
+    assertFalse(matches(DocsPaths.SITE, "/artifacts/docs/docs/a:b"));
+    assertFalse(matches(DocsPaths.SITE, "/artifacts/docs/docs/a%3Ab"));
+    // The repository is never encoded: it is one lowercase word.
+    assertFalse(matches(DocsPaths.SITE, "/artifacts/docs/docs%2Fui-components"));
+  }
+
   @Test
   void everyGroupIsNamedOrNonCapturing() {
     // vertx-web compares Matcher.groupCount() against the named groups it scraped from the pattern

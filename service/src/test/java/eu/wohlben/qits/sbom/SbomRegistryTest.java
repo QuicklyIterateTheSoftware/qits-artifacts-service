@@ -139,6 +139,69 @@ class SbomRegistryTest {
   }
 
   @Test
+  void aPercentEncodedNameAnswersExactlyWhatTheLiteralOneDoes() {
+    // A generated client (the landing app's) builds its path with encodeURIComponent, so it asks
+    // for eu.wohlben.qits%3Aqits-eventstream and %40qits%2Fui-components. normalizedPath() keeps
+    // those escapes, the grammar admits them, and pathParam decodes them — so both spellings are
+    // one identity, never a 404 and never a second package.
+    String version = version();
+    String mavenEncoded = MAVEN_NAME.replace(":", "%3A");
+    String npmEncoded = NPM_NAME.replace("@", "%40").replace("/", "%2F");
+
+    try (SbomClient sboms = client()) {
+      byte[] maven = TinySbom.document(MAVEN_NAME, version);
+      assertEquals(201, sboms.put("maven", MAVEN_NAME, version, maven).statusCode());
+      byte[] npm = TinySbom.document(NPM_NAME, version);
+      assertEquals(201, sboms.put("npm", NPM_NAME, version, npm).statusCode());
+
+      for (String[] spelling :
+          new String[][] {{"maven", MAVEN_NAME, mavenEncoded}, {"npm", NPM_NAME, npmEncoded}}) {
+        HttpResponse<byte[]> literal = sboms.get(spelling[0], spelling[1], version);
+        HttpResponse<byte[]> encoded = sboms.get(spelling[0], spelling[2], version);
+        assertEquals(200, literal.statusCode());
+        assertEquals(literal.statusCode(), encoded.statusCode(), spelling[2]);
+        assertArrayEquals(literal.body(), encoded.body(), spelling[2]);
+        assertEquals(
+            literal.headers().firstValue("docker-content-digest"),
+            encoded.headers().firstValue("docker-content-digest"));
+
+        HttpResponse<String> literalList = sboms.get(spelling[0], spelling[1]);
+        HttpResponse<String> encodedList = sboms.get(spelling[0], spelling[2]);
+        assertEquals(200, literalList.statusCode(), literalList.body());
+        assertEquals(literalList.statusCode(), encodedList.statusCode(), encodedList.body());
+        assertEquals(literalList.body(), encodedList.body(), "the listing names the decoded package");
+      }
+
+      // A publish in the encoded spelling lands on the same identity: first-write-wins converges.
+      HttpResponse<String> again = sboms.put("npm", npmEncoded, version, npm);
+      assertEquals(200, again.statusCode(), again.body());
+      assertEquals(NPM_NAME, new JsonObject(again.body()).getString("packageName"));
+
+      // Mixed spellings and lowercase hex are the same name too.
+      assertArrayEquals(npm, sboms.get("npm", "%40qits/ui-components", version).body());
+      assertArrayEquals(maven, sboms.get("maven", MAVEN_NAME.replace(":", "%3a"), version).body());
+    }
+  }
+
+  @Test
+  void anEncodedDotSegmentOrSeparatorIsNoRoute() {
+    // %2F is no separator to normalizedPath(), so nothing collapses `..` between two of them — the
+    // grammar is what refuses it, by never letting a segment begin with a dot.
+    try (SbomClient sboms = client()) {
+      for (String path :
+          new String[] {
+            "/artifacts/sboms/npm/a%2F..%2Fb",
+            "/artifacts/sboms/npm/a%2F%2E%2E%2Fb",
+            "/artifacts/sboms/npm/%40qits%2Fui%2F-%2F1.0.0"
+          }) {
+        HttpResponse<String> refused = sboms.getAbsolute(path);
+        assertEquals(404, refused.statusCode(), path);
+        assertTrue(refused.body().contains("not a route"), path + ": " + refused.body());
+      }
+    }
+  }
+
+  @Test
   void aHeadCarriesTheSameContentLengthAsTheGet() {
     // HEAD is the GET's twin, not a derivation: Vert.x does not derive one, so a missing twin is a
     // 404 for every client that probes before downloading.

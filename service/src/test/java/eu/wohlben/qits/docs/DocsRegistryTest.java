@@ -118,6 +118,65 @@ class DocsRegistryTest {
   }
 
   @Test
+  void aPercentEncodedSiteNameAnswersExactlyWhatTheLiteralOneDoes() {
+    // A generated client builds its path with encodeURIComponent, so it asks for
+    // %40qits%2Fui-<salt>. normalizedPath() keeps those escapes, the grammar admits them, and
+    // pathParam decodes them — so both spellings are one site on every route.
+    String salt = salt();
+    String site = "@qits/ui-" + salt;
+    String encoded = site.replace("@", "%40").replace("/", "%2F");
+
+    try (DocsClient client = client()) {
+      assertEquals(201, client.publish(site, "1.0.0", TinyBundle.storybookLike(salt).toTarGz()).statusCode());
+
+      HttpResponse<String> literalList = client.versions(site);
+      HttpResponse<String> encodedList = client.versions(encoded);
+      assertEquals(200, literalList.statusCode(), literalList.body());
+      assertEquals(literalList.statusCode(), encodedList.statusCode(), encodedList.body());
+      assertEquals(literalList.body(), encodedList.body());
+
+      HttpResponse<String> literalVersion = client.version(site, "1.0.0");
+      HttpResponse<String> encodedVersion = client.version(encoded, "1.0.0");
+      assertEquals(200, literalVersion.statusCode(), literalVersion.body());
+      assertEquals(literalVersion.statusCode(), encodedVersion.statusCode(), encodedVersion.body());
+      assertEquals(literalVersion.body(), encodedVersion.body());
+
+      HttpResponse<byte[]> literalFile = client.file(site, "1.0.0", "index.html");
+      HttpResponse<byte[]> encodedFile = client.file(encoded, "1.0.0", "index.html");
+      assertEquals(200, literalFile.statusCode());
+      assertEquals(literalFile.statusCode(), encodedFile.statusCode());
+      assertArrayEquals(literalFile.body(), encodedFile.body());
+
+      // Mixed spelling and lowercase hex name the same site.
+      assertEquals(200, client.file("%40qits/ui-" + salt, "1.0.0", "index.html").statusCode());
+      assertEquals(200, client.file("@qits%2fui-" + salt, "1.0.0", "index.html").statusCode());
+
+      // A publish in the encoded spelling is a republish of the same version, not a second site.
+      HttpResponse<String> again =
+          client.publish(encoded, "1.0.0", TinyBundle.storybookLike(salt + "b").toTarGz());
+      assertEquals(409, again.statusCode(), again.body());
+    }
+  }
+
+  @Test
+  void anEncodedDotSegmentOrSeparatorIsNoRoute() {
+    // %2F is no separator to normalizedPath(), so nothing collapses `..` between two of them — the
+    // grammar is what refuses it, by never letting a segment begin with a dot.
+    try (DocsClient client = client()) {
+      for (String path :
+          new String[] {
+            "/artifacts/docs/docs/a%2F..%2Fb",
+            "/artifacts/docs/docs/a%2F%2E%2E%2Fb/-/1.0.0",
+            "/artifacts/docs/docs/%40qits%2Fui%2F-%2F1.0.0"
+          }) {
+        HttpResponse<String> refused = client.getAbsolute(path);
+        assertEquals(404, refused.statusCode(), path);
+        assertTrue(refused.body().contains("not a route"), path + ": " + refused.body());
+      }
+    }
+  }
+
+  @Test
   void aChunkedPublishIsAcceptedToo() {
     // No Content-Length — what curl --upload-file sends, and the shape the global wire ceiling does
     // not gate. The route's own cap is the only bound, so this path has to work.

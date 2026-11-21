@@ -196,6 +196,38 @@ class ContentHashRoutesTest {
     assertEquals(HASH_B, newest.getString("contentHash"));
   }
 
+  // --- the percent-encoded spelling -------------------------------------------------------------
+
+  @Test
+  void aPercentEncodedNameAnswersExactlyWhatTheLiteralOneDoes() {
+    // A generated client builds its path with encodeURIComponent: %3A for the maven colon, %40 and
+    // %2F for an npm scope. The grammar admits the escapes and pathParam decodes them.
+    String artifact = artifact();
+    assertEquals(201, deployPom(artifact, "1.0.0", HASH_A).statusCode());
+    String name = npmName();
+    assertEquals(201, publish(name, "1.0.0", "latest", HASH_B).statusCode());
+
+    String[][] spellings = {
+      {"maven", GROUP + ":" + artifact, GROUP + "%3A" + artifact},
+      {"maven", GROUP + ":" + artifact, GROUP + "%3a" + artifact},
+      {"npm", name, name.replace("@", "%40").replace("/", "%2F")},
+      {"npm", name, name.replace("@", "%40")},
+    };
+    for (String[] spelling : spellings) {
+      for (String version : new String[] {"1.0.0", "newest"}) {
+        HttpResponse<String> literal = read(spelling[0], spelling[1], version);
+        HttpResponse<String> encoded = read(spelling[0], spelling[2], version);
+        assertEquals(200, literal.statusCode(), literal.body());
+        assertEquals(literal.statusCode(), encoded.statusCode(), spelling[2] + ": " + encoded.body());
+        assertEquals(literal.body(), encoded.body(), spelling[2]);
+      }
+    }
+
+    HttpResponse<String> dotted = read("npm", "a%2F..%2Fb", "newest");
+    assertEquals(404, dotted.statusCode());
+    assertTrue(dotted.body().contains("not a route"), dotted.body());
+  }
+
   // --- refusals ---------------------------------------------------------------------------------
 
   @Test

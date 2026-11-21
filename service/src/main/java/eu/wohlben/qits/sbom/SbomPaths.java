@@ -39,6 +39,25 @@ package eu.wohlben.qits.sbom;
  * wire the one place the identity is written differently. The colon sits <em>inside</em> one
  * segment; it never separates two.
  *
+ * <p><b>A name is accepted in two spellings, literal and percent-encoded, and they mean the same
+ * name.</b> Matching runs against {@code normalizedPath()}, and in vertx-web that decodes only the
+ * unreserved escapes — {@code %3A}, {@code %40} and {@code %2F} reach the regex exactly as sent. A
+ * generated client builds its path with {@code encodeURIComponent}, so the landing app asks for
+ * {@code maven/eu.wohlben.qits%3Aqits-eventstream} and {@code npm/%40qits%2Fui-components}, and a
+ * grammar that admitted only the literal characters answered both with the catch-all 404. So
+ * {@link #AT}, {@link #COLON} and {@link #SLASH} each take the character or its escape, either hex
+ * case, and a request may mix them. Once a route has matched, {@code pathParam(…)} hands the handler
+ * the group <em>decoded</em>, so the handler sees one name whichever spelling arrived and nothing
+ * below the grammar changes. {@code NpmPaths} accepts {@code (?:/|%2[fF])} for the same reason.
+ *
+ * <p>The escapes are admitted in exactly the three places the characters are and nowhere else, so
+ * the decoded name always satisfies the literal grammar: a segment still begins with {@code @} or an
+ * alphanumeric however its separator was spelled, which keeps a bare {@code -} — and a {@code ..},
+ * also when it arrives as {@code %2F..%2F} or as {@code %2F%2E%2E%2F}, which {@code normalizedPath()}
+ * decodes to dots without collapsing — from ever being a name segment. The {@code /-/} separator is
+ * literal only: an encoded {@code %2F-%2F} is no separator, and since a bare {@code -} is no segment
+ * either, such a path matches no route at all.
+ *
  * <p>The package type is matched loosely on purpose — see {@link #PACKAGE_TYPE}.
  */
 final class SbomPaths {
@@ -64,26 +83,41 @@ final class SbomPaths {
    */
   private static final String PACKAGE_TYPE = "(?<packageType>[a-z]{2,16})";
 
+  /** {@code @} or its escape — a scope marker, only ever a segment's optional first character. */
+  private static final String AT = "(?:@|%40)";
+
+  /** {@code :} or its escape, either hex case — legal inside a segment, never at its start. */
+  private static final String COLON = "(?::|%3[aA])";
+
+  /** {@code /} or its escape, either hex case — what separates two name segments. */
+  private static final String SLASH = "(?:/|%2[fF])";
+
   /**
-   * One component of a package name. The leading {@code @} is optional and the character after it is
-   * not: that is the rule that makes a bare {@code -} unmatchable and the {@code /-/} separator
-   * unambiguous.
+   * One component of a package name. The leading {@link #AT} is optional and the character after it
+   * is not: that is the rule that makes a bare {@code -} and a {@code ..} unmatchable and the {@code
+   * /-/} separator unambiguous.
    *
-   * <p>{@code :} is in the class because a maven coordinate is one segment carrying two names. It
-   * cannot re-open the separator question: the class only says what may appear <em>after</em> the
+   * <p>{@link #COLON} is in the tail because a maven coordinate is one segment carrying two names. It
+   * cannot re-open the separator question: the tail only says what may appear <em>after</em> the
    * mandatory alphanumeric or {@code @} first character.
+   *
+   * <p>The 128 bound counts <b>decoded characters</b>: an escape is one repetition of the tail, so
+   * {@code %3A} costs what {@code :} costs, and a name is as long in either spelling.
    */
-  private static final String SEGMENT = "(?:@?[A-Za-z0-9][A-Za-z0-9._~:-]{0,127})";
+  private static final String SEGMENT =
+      "(?:" + AT + "?[A-Za-z0-9](?:[A-Za-z0-9._~-]|" + COLON + "){0,127})";
 
   /**
    * {@code <packageName>} — {@code eu.wohlben.qits:qits-eventstream}, {@code @qits/ui-components},
-   * {@code qits/qits-artifacts}, or a bare name.
+   * {@code qits/qits-artifacts}, or a bare name — or the same name percent-encoded, which {@code
+   * pathParam("name")} returns decoded.
    *
    * <p>Bounded at four segments, {@code DocsPaths.NAME}'s cap and for its reason: not a technical
    * limit, but a depth cap that keeps the matcher's work bounded on a hostile path, and four is
-   * already deeper than any name qits-ci can declare.
+   * already deeper than any name qits-ci can declare. The cap counts segments, so an encoded {@link
+   * #SLASH} spends it exactly as a literal one does.
    */
-  private static final String NAME = "(?<name>" + SEGMENT + "(?:/" + SEGMENT + "){0,3})";
+  private static final String NAME = "(?<name>" + SEGMENT + "(?:" + SLASH + SEGMENT + "){0,3})";
 
   /** The version. Wide enough for calver and for a semver prerelease, {@code DocsPaths}' shape. */
   private static final String VERSION = "(?<version>[A-Za-z0-9][A-Za-z0-9._+-]{0,127})";

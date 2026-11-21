@@ -32,9 +32,23 @@ package eu.wohlben.qits.docs;
  * the other, and it is the kind of property that stays true until someone loosens a character class
  * — so {@code DocsPathsTest} pins it.
  *
- * <p>Unlike npm's, this grammar accepts <b>no percent-encoded separator</b>. npm needs one because
- * its CLI sends {@code @scope%2fname} for a packument; the publishers here are {@code curl} in a
- * pipeline and qits-docs, both of which send a real slash.
+ * <p><b>A site name is accepted in two spellings, literal and percent-encoded, and they mean the
+ * same name.</b> Matching runs against {@code normalizedPath()}, and in vertx-web that decodes only
+ * the unreserved escapes — {@code %40} and {@code %2F} reach the regex exactly as sent. {@code curl}
+ * in a pipeline and qits-docs send a real slash, but a generated client builds its path with {@code
+ * encodeURIComponent}: the landing app asks for {@code docs/%40qits%2Fui-components}, and a grammar
+ * that admitted only the literal characters answered it with the catch-all 404. So {@link #AT} and
+ * {@link #SLASH} each take the character or its escape, either hex case, and a request may mix
+ * them. Once a route has matched, {@code pathParam(…)} hands the handler the group <em>decoded</em>,
+ * so the handler sees one site whichever spelling arrived. {@code NpmPaths} accepts {@code
+ * (?:/|%2[fF])} for the same reason — its CLI sends {@code @scope%2fname} for a packument.
+ *
+ * <p>The escapes are admitted in exactly the places the characters are and nowhere else, so the
+ * decoded name always satisfies the literal grammar: a segment still begins with {@code @} or an
+ * alphanumeric however its separator was spelled, which keeps a bare {@code -} — and a {@code ..},
+ * also when it arrives as {@code %2F..%2F} or as {@code %2F%2E%2E%2F}, which {@code normalizedPath()}
+ * decodes to dots without collapsing — from ever being a name segment. The {@code /-/} separator and
+ * the slash before {@link #PATH} are literal only.
  */
 final class DocsPaths {
 
@@ -51,20 +65,32 @@ final class DocsPaths {
   /** The {@code artifact_repository} row, the first segment after {@link #BASE}. */
   private static final String REPOSITORY = "(?<repository>[a-z0-9][a-z0-9._-]{0,63})";
 
-  /**
-   * One component of a site name. The leading {@code @} is optional and the character after it is
-   * not: that is the rule that makes a bare {@code -} unmatchable and the {@code /-/} separator
-   * unambiguous.
-   */
-  private static final String SEGMENT = "(?:@?[A-Za-z0-9][A-Za-z0-9._~-]{0,127})";
+  /** {@code @} or its escape — a scope marker, only ever a segment's optional first character. */
+  private static final String AT = "(?:@|%40)";
+
+  /** {@code /} or its escape, either hex case — what separates two name segments. */
+  private static final String SLASH = "(?:/|%2[fF])";
 
   /**
-   * {@code <site>} — {@code ui-components}, {@code @qits/ui-components}, or a deeper project path.
+   * One component of a site name. The leading {@link #AT} is optional and the character after it is
+   * not: that is the rule that makes a bare {@code -} and a {@code ..} unmatchable and the {@code
+   * /-/} separator unambiguous.
+   *
+   * <p>No {@code :} and no escape in the tail — {@code SbomPaths}' segment admits a colon for maven
+   * coordinates, and no site name carries one — so the 128 bound counts characters, sent and decoded
+   * alike.
+   */
+  private static final String SEGMENT = "(?:" + AT + "?[A-Za-z0-9][A-Za-z0-9._~-]{0,127})";
+
+  /**
+   * {@code <site>} — {@code ui-components}, {@code @qits/ui-components}, or a deeper project path,
+   * in either spelling; {@code pathParam("name")} returns it decoded.
    *
    * <p>Bounded at four segments. Not a technical limit — a depth cap keeps the matcher's work
    * bounded on a hostile path, and four is already deeper than any namespacing this platform has.
+   * The cap counts segments, so an encoded {@link #SLASH} spends it exactly as a literal one does.
    */
-  private static final String NAME = "(?<name>" + SEGMENT + "(?:/" + SEGMENT + "){0,3})";
+  private static final String NAME = "(?<name>" + SEGMENT + "(?:" + SLASH + SEGMENT + "){0,3})";
 
   /** The version. Wide enough for calver and for a semver prerelease, {@code DaemonPaths}' shape. */
   private static final String VERSION = "(?<version>[A-Za-z0-9][A-Za-z0-9._+-]{0,127})";

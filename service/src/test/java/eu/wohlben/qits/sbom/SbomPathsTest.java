@@ -130,6 +130,81 @@ class SbomPathsTest {
     assertTrue(matches(SbomPaths.PACKAGE, "/artifacts/sboms/npm/JSONStream"));
   }
 
+  // --- the percent-encoded spelling -------------------------------------------------------------
+
+  @Test
+  void anEncodedNameMatchesAndCapturesItsRawSpelling() {
+    // normalizedPath() keeps %3A, %40 and %2F as received, and a generated client sends exactly
+    // those. The group is the RAW spelling here — the decoding is pathParam's, which
+    // SbomRegistryTest proves over the wire.
+    String maven = "/artifacts/sboms/maven/eu.wohlben.qits%3Aqits-eventstream/-/2026.901.120000";
+    assertEquals("eu.wohlben.qits%3Aqits-eventstream", group(SbomPaths.DOCUMENT, maven, "name"));
+    assertEquals("2026.901.120000", group(SbomPaths.DOCUMENT, maven, "version"));
+    assertEquals(
+        "eu.wohlben.qits%3Aqits-eventstream",
+        group(SbomPaths.PACKAGE, "/artifacts/sboms/maven/eu.wohlben.qits%3Aqits-eventstream", "name"));
+
+    assertEquals(
+        "%40qits%2Fui-components",
+        group(SbomPaths.PACKAGE, "/artifacts/sboms/npm/%40qits%2Fui-components", "name"));
+    assertEquals(
+        "%40qits%2Fui-components",
+        group(SbomPaths.DOCUMENT, "/artifacts/sboms/npm/%40qits%2Fui-components/-/1.0.0", "name"));
+  }
+
+  @Test
+  void spellingsMayBeMixedAndEitherHexCaseIsAccepted() {
+    assertEquals(
+        "%40qits/ui-components",
+        group(SbomPaths.PACKAGE, "/artifacts/sboms/npm/%40qits/ui-components", "name"));
+    assertEquals(
+        "@qits%2fui-components",
+        group(SbomPaths.PACKAGE, "/artifacts/sboms/npm/@qits%2fui-components", "name"));
+    assertEquals(
+        "eu.wohlben.qits%3aqits-eventstream",
+        group(SbomPaths.PACKAGE, "/artifacts/sboms/maven/eu.wohlben.qits%3aqits-eventstream", "name"));
+    assertEquals(
+        "a%2Fb/c%2fd", group(SbomPaths.PACKAGE, "/artifacts/sboms/npm/a%2Fb/c%2fd", "name"), "four deep");
+    assertFalse(
+        matches(SbomPaths.PACKAGE, "/artifacts/sboms/npm/a%2Fb%2Fc%2Fd%2Fe"),
+        "an encoded separator spends the four-segment cap like a literal one");
+  }
+
+  @Test
+  void theSegmentBoundCountsDecodedCharacters() {
+    // An escape is one repetition of the segment's tail, so a name is exactly as long in either
+    // spelling: 128 characters is the ceiling, and the escaped colon does not cost three.
+    String literal = "a" + ":".repeat(127);
+    String encoded = "a" + "%3A".repeat(127);
+    assertTrue(matches(SbomPaths.PACKAGE, "/artifacts/sboms/maven/" + literal));
+    assertTrue(matches(SbomPaths.PACKAGE, "/artifacts/sboms/maven/" + encoded));
+    assertFalse(matches(SbomPaths.PACKAGE, "/artifacts/sboms/maven/" + literal + ":"));
+    assertFalse(matches(SbomPaths.PACKAGE, "/artifacts/sboms/maven/" + encoded + "%3A"));
+  }
+
+  @Test
+  void theEncodedSpellingNeverMakesADotSegmentOrABareSeparatorAName() {
+    // The safety structure, in the spelling normalizedPath() does NOT collapse: %2F is no separator
+    // to it, so `..` between two of them reaches the regex intact. %2E%2E is decoded to `..` before
+    // matching, which is why the dotted form is the one asserted.
+    for (String name :
+        new String[] {
+          "a%2F..%2Fb", "a%2f..%2fb", "%2F..%2Fb", "a/..%2Fb", "a%2F..", "..", "%2E%2E", "a%2F%2E%2E",
+          "%2F", "a%2F", "%40", "%40%2Fb", "-", "a%2F-", "%3Aqits"
+        }) {
+      assertFalse(matches(SbomPaths.PACKAGE, "/artifacts/sboms/npm/" + name), name);
+      assertFalse(matches(SbomPaths.DOCUMENT, "/artifacts/sboms/npm/" + name + "/-/1.0.0"), name);
+    }
+    // The /-/ separator is literal only. Encoded, it is no separator, and the bare `-` it wraps is no
+    // segment, so the path is no route at all rather than a name with a version folded into it.
+    assertFalse(matches(SbomPaths.DOCUMENT, "/artifacts/sboms/npm/%40qits%2Fui%2F-%2F1.0.0"));
+    assertFalse(matches(SbomPaths.PACKAGE, "/artifacts/sboms/npm/%40qits%2Fui%2F-%2F1.0.0"));
+    assertFalse(matches(SbomPaths.DOCUMENT, "/artifacts/sboms/npm/%40qits%2Fui/-%2F1.0.0"));
+    // An escape outside the three admitted ones is no character of a name.
+    assertFalse(matches(SbomPaths.PACKAGE, "/artifacts/sboms/npm/a%20b"));
+    assertFalse(matches(SbomPaths.PACKAGE, "/artifacts/sboms/npm/a%40b"), "@ only ever leads");
+  }
+
   @Test
   void everyGroupIsNamedOrNonCapturing() {
     // vertx-web compares Matcher.groupCount() against the named groups it scraped from the pattern
