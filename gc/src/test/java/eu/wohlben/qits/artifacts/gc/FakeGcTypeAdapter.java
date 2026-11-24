@@ -44,7 +44,7 @@ final class FakeGcTypeAdapter implements GcTypeAdapter {
   /**
    * The same, in a named repository — one type can hold several.
    *
-   * <p>Exists for the scoping cases: what a per-repository plan is a filter <em>over</em> is a
+   * <p>Exists for the scoping cases: what a repository's figures are a filter <em>over</em> is a
    * type's plan across every repository of that type, and an adapter that could only speak for one
    * could not produce the store shape those cases are about.
    */

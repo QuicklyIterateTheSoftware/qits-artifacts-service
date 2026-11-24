@@ -287,7 +287,7 @@ public interface GcStrategy {
     /**
      * This type's plan as it applies to <b>one</b> repository, and nothing else of the type moves.
      *
-     * <p><b>Per-repository collection is this filter, never a second planner.</b> Both own-engine
+     * <p><b>Per-repository figures are this filter, never a second planner.</b> Both own-engine
      * adapters qualify their identity groups with the repository name, so no rule of either engine
      * can reach across two repositories — which is what makes "plan the whole type, then read one
      * repository's share off it" produce exactly the plan a repository-only run would have produced.

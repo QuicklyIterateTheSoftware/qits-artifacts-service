@@ -1409,7 +1409,7 @@ implies.
 
 #### Pins may arrive in the request
 
-`POST /artifacts/api/gc/plan` and both sweeps take an optional body — `{"pins": {"deployments": <the
+`POST /artifacts/api/gc/plan`, `POST /artifacts/api/gc/repositories` and the sweep take an optional body — `{"pins": {"deployments": <the
 verbatim body of GET /deployments/api/pins>, "ciDaemon": <the verbatim body of GET
 /ci/api/daemon>, "dependencies": <GET /maintenance/api/pins>, "workspaceLaunches": <GET
 /workspaces/api/pins>, "projectLaunches": <GET /projects/api/pins>}}` — and use those documents instead of the readers above. They are parsed by the
@@ -1424,7 +1424,7 @@ truths. Nothing about the fail-closed rule softens: a member the caller left out
 exactly as an unreachable service does. A deployments document of `{"pins":[]}` is the opposite and
 is a real answer — a platform with nothing deployed, pinning nothing, and a run may proceed on it. A body that is not that shape is a `400` rather
 than a quiet fall back to the readers. **`POST /gc/plan` accepts `qits:admin` or `qits:system`** —
-the `GET` takes `qits:admin`, `qits:agent`, `qits:system` or `qits:ci-run` and both sweeps stay `qits:system` — because the caller that needs
+the `GET` takes `qits:admin`, `qits:agent`, `qits:system` or `qits:ci-run` and the sweep stays `qits:system` — because the caller that needs
 it is a machine: the orchestrator authenticates as `qits:system` and never holds `qits:admin`, and
 it is the same machine already allowed to run the sweep. Being a `POST` also
 puts it inside `AdminWriteGuard`, so once `qits.auth.machine.required` is on it needs the machine

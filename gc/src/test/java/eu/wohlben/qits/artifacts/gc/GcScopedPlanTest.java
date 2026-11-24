@@ -12,7 +12,7 @@ import java.util.Set;
 import org.junit.jupiter.api.Test;
 
 /**
- * Reading one repository's share off a type's plan — the whole of per-repository collection.
+ * Reading one repository's share off a type's plan — the whole of the per-repository figures.
  *
  * <p>Plain JUnit, because there is no store in the question: a scoped plan is an algebraic reading
  * of a plan the engines already produced, and the reason it is safe is that both engines record

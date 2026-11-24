@@ -37,11 +37,11 @@ import org.junit.jupiter.api.Test;
 class GcPlanControllerTest {
 
   /**
-   * A repository of this suite's own, because the per-repository routes need a row to be about.
+   * A repository of this suite's own, because the repository listing needs a row to assert on.
    *
    * <p>The service module's suite has no table reset and never self-seeds, so which repositories
    * exist depends on which other suites ran first. Naming one here — {@code ensure} is idempotent
-   * and additive — is what makes these two cases assertions rather than a reading of suite order.
+   * and additive — is what makes those cases assertions rather than a reading of suite order.
    */
   private static final String REPO = "gc-scope-case";
 
@@ -312,72 +312,10 @@ class GcPlanControllerTest {
   }
 
   @Test
-  void oneRepositorysPlanIsItsOwnUrlAndAnUnknownNameIsA404() {
-    // Scope is a path segment, and this is the half of that decision a test can show: a name that
-    // is not a repository answers 404. A query parameter that went missing would have answered the
-    // whole store instead, which on the sweep route is the difference between collecting one
-    // repository and collecting the platform.
-    given()
-        .header("Authorization", SuiteBearers.operator())
-        .when()
-        .get("/artifacts/api/gc/repositories/no-such-repository/plan")
-        .then()
-        .statusCode(404)
-        .body("message", org.hamcrest.Matchers.containsString("no-such-repository"));
-
-    given()
-        .header("Authorization", SuiteBearers.operator())
-        .when()
-        .get("/artifacts/api/gc/repositories/" + REPO + "/plan")
-        .then()
-        .statusCode(200)
-        .body("repository", is(REPO))
-        .body("type", is("oci-images"))
-        .body("dryRun", is(true))
-        .body("executable", is(false))
-        .body("graceWindow", is("PT6H"))
-        .body("pins", hasSize(5))
-        .body("configuration.type", notNullValue())
-        .body("dead", hasSize(0))
-        .body("sweep.blobCount", is(0))
-        .body("structural.blobCount", is(0))
-        .body("untouchable.reason", notNullValue());
-  }
-
-  @Test
-  void aScopedSweepRefusesTheWholeRunTooWhileThePinSourcesCannotAnswer() {
-    // The abort rule does not shrink with the scope. One repository is not a smaller blast radius
-    // at the blob layer — bytes it releases can be the last local reference to content a pin names
-    // by digest — so a run with an unreadable qits-platform-deployments stops before the census here exactly as it
-    // does on the whole-store route, and says which source failed.
-    given()
-        .header("Authorization", SuiteBearers.platform())
-        .when()
-        .post("/artifacts/api/gc/repositories/" + REPO + "/sweep")
-        .then()
-        .statusCode(200)
-        .body("repository", is(REPO))
-        .body("type", is("oci-images"))
-        .body("dryRun", is(false))
-        .body("executedAt", notNullValue())
-        .body("aborted", org.hamcrest.Matchers.containsString("qits-platform-deployments"))
-        .body("aborted", org.hamcrest.Matchers.containsString("qits-ci"))
-        .body("aborted", org.hamcrest.Matchers.containsString("qits-workspaces"))
-        .body("aborted", org.hamcrest.Matchers.containsString("qits-projects"))
-        .body("pins", hasSize(5))
-        .body("deleted", hasSize(0))
-        .body("withheldByGraceWindow", hasSize(0))
-        .body("sweep.blobsUnlinked", is(0))
-        .body("sweep.unlinkedBlobIds", hasSize(0))
-        .body("untouchable.reason", org.hamcrest.Matchers.containsString("not computed"));
-  }
-
-  @Test
   void readingAndExecutingStayTwoDifferentUrls() {
-    // A GET must never sweep: the reviewed-report-then-invoke order is carried by the verbs. The
-    // scoped pair carries it the same way, and adds the one a path segment buys: a name that is not
-    // a repository can never widen into the whole store. POST /gc/plan is a reader too — it exists
-    // to carry supplied pins in a body — so it answers a report, never a deletion.
+    // A GET must never sweep: the reviewed-report-then-invoke order is carried by the verbs. POST
+    // /gc/plan is a reader too — it exists to carry supplied pins in a body — so it answers a
+    // report, never a deletion.
     given()
         .header("Authorization", SuiteBearers.operator())
         .when()
@@ -391,26 +329,6 @@ class GcPlanControllerTest {
         .get("/artifacts/api/gc/sweep")
         .then()
         .statusCode(405);
-    // …and so is POST /gc/repositories/{repository}/plan, its scoped twin (qits-2138).
-    given()
-        .header("Authorization", SuiteBearers.operator())
-        .when()
-        .post("/artifacts/api/gc/repositories/" + REPO + "/plan")
-        .then()
-        .statusCode(200)
-        .body("dryRun", is(true));
-    given()
-        .header("Authorization", SuiteBearers.operator())
-        .when()
-        .get("/artifacts/api/gc/repositories/" + REPO + "/sweep")
-        .then()
-        .statusCode(405);
-    given()
-        .header("Authorization", SuiteBearers.platform())
-        .when()
-        .post("/artifacts/api/gc/repositories/no-such-repository/sweep")
-        .then()
-        .statusCode(404);
   }
 
   /** The deployer's answer, verbatim as {@code GET /deployments/api/pins} spells it. */
@@ -635,26 +553,12 @@ class GcPlanControllerTest {
         .body("sweep.blobsUnlinked", is(0))
         .body("sweep.bytesReclaimed", is(0))
         .body("pins.source", org.hamcrest.Matchers.hasItem("supplied: qits-ci"));
-
-    given()
-        .header("Authorization", SuiteBearers.platform())
-        .contentType(io.restassured.http.ContentType.JSON)
-        .body(body())
-        .when()
-        .post("/artifacts/api/gc/repositories/" + REPO + "/sweep")
-        .then()
-        .statusCode(200)
-        .body("repository", is(REPO))
-        .body("aborted", nullValue())
-        .body("deleted", hasSize(0))
-        .body("pins.url", everyItem(is("")));
   }
 
   @Test
-  void theRepositoryReadsTakeSuppliedPinsAsThePlanDoes() {
+  void theRepositoryListingTakesSuppliedPinsAsThePlanDoes() {
     // qits-2138: qits-orchestrator is the one component that can read the pin sources once they
-    // go private, so the per-repository reads take its set exactly as POST /gc/plan does — and
-    // name it as supplied.
+    // go private, so the repository listing takes its set exactly as POST /gc/plan does.
     given()
         .header("Authorization", SuiteBearers.platform())
         .contentType(io.restassured.http.ContentType.JSON)
@@ -666,44 +570,11 @@ class GcPlanControllerTest {
         .body("executable", is(true))
         .body("pinFailures", hasSize(0))
         .body("repositories.find { it.repository == '" + REPO + "' }.error", nullValue());
-
-    given()
-        .header("Authorization", SuiteBearers.operator())
-        .contentType(io.restassured.http.ContentType.JSON)
-        .body(body())
-        .when()
-        .post("/artifacts/api/gc/repositories/" + REPO + "/plan")
-        .then()
-        .statusCode(200)
-        .body("repository", is(REPO))
-        .body("dryRun", is(true))
-        .body("executable", is(true))
-        .body("pinFailures", hasSize(0))
-        .body("error", nullValue())
-        .body(
-            "pins.source",
-            org.hamcrest.Matchers.containsInAnyOrder(
-                "supplied: qits-platform-deployments",
-                "supplied: qits-ci",
-                "supplied: qits-platform-maintenance",
-                "supplied: qits-workspaces",
-                "supplied: qits-projects"))
-        .body("pins.url", everyItem(is("")));
-
-    // An unknown repository is still a 404, whatever the body carries.
-    given()
-        .header("Authorization", SuiteBearers.platform())
-        .contentType(io.restassured.http.ContentType.JSON)
-        .body(body())
-        .when()
-        .post("/artifacts/api/gc/repositories/no-such-repository/plan")
-        .then()
-        .statusCode(404);
   }
 
   @Test
-  void theRepositoryReadsRefuseASuppliedSetMissingASource() {
-    // The fail-closed rule holds on both twins: a member left out is that source unanswered.
+  void theRepositoryListingRefusesASuppliedSetMissingASource() {
+    // The fail-closed rule holds on the listing too: a member left out is that source unanswered.
     String partial = body(DEPLOYMENTS, CI_DAEMON, DEPENDENCIES, WORKSPACE_LAUNCHES, null);
     given()
         .header("Authorization", SuiteBearers.platform())
@@ -716,20 +587,6 @@ class GcPlanControllerTest {
         .body("executable", is(false))
         .body("pinFailures", hasSize(1))
         .body("pinFailures[0]", org.hamcrest.Matchers.containsString("projectLaunches"));
-
-    given()
-        .header("Authorization", SuiteBearers.platform())
-        .contentType(io.restassured.http.ContentType.JSON)
-        .body(partial)
-        .when()
-        .post("/artifacts/api/gc/repositories/" + REPO + "/plan")
-        .then()
-        .statusCode(200)
-        .body("executable", is(false))
-        .body("pinFailures", hasSize(1))
-        .body("pinFailures[0]", org.hamcrest.Matchers.containsString("projectLaunches"))
-        .body("pins.find { it.source == 'supplied: qits-projects' }.answered", is(false))
-        .body("pins.find { it.source == 'supplied: qits-ci' }.answered", is(true));
   }
 
   @Test
@@ -752,7 +609,7 @@ class GcPlanControllerTest {
             "pins.find { it.source == 'qits-workspaces' }.url",
             is("http://localhost:1/workspaces/api/pins"));
 
-    // The repository twins read over HTTP too, with no body or with {} (qits-2138).
+    // The repository listing's twin reads over HTTP too, with no body or with {} (qits-2138).
     given()
         .header("Authorization", SuiteBearers.operator())
         .when()
@@ -766,24 +623,11 @@ class GcPlanControllerTest {
         .contentType(io.restassured.http.ContentType.JSON)
         .body("{}")
         .when()
-        .post("/artifacts/api/gc/repositories/" + REPO + "/plan")
+        .post("/artifacts/api/gc/repositories")
         .then()
         .statusCode(200)
         .body("executable", is(false))
-        .body("pinFailures", hasSize(5))
-        .body("pins.find { it.source == 'qits-ci' }.url", is("http://localhost:1/ci/api/daemon"));
-
-    // An empty JSON object is the SPA's scoped sweep, which posts {} rather than nothing.
-    given()
-        .header("Authorization", SuiteBearers.platform())
-        .contentType(io.restassured.http.ContentType.JSON)
-        .body("{}")
-        .when()
-        .post("/artifacts/api/gc/repositories/" + REPO + "/sweep")
-        .then()
-        .statusCode(200)
-        .body("aborted", org.hamcrest.Matchers.containsString("qits-platform-deployments"))
-        .body("pins.find { it.source == 'qits-ci' }.url", is("http://localhost:1/ci/api/daemon"));
+        .body("pinFailures", hasSize(5));
   }
 
   @Test
@@ -813,14 +657,6 @@ class GcPlanControllerTest {
         .body("{\"pins\": not json}")
         .when()
         .post("/artifacts/api/gc/repositories")
-        .then()
-        .statusCode(400);
-    given()
-        .header("Authorization", SuiteBearers.operator())
-        .contentType(io.restassured.http.ContentType.JSON)
-        .body("{\"pins\": 5}")
-        .when()
-        .post("/artifacts/api/gc/repositories/" + REPO + "/plan")
         .then()
         .statusCode(400);
   }

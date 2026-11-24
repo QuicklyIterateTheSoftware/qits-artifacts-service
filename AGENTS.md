@@ -334,8 +334,9 @@ collection" section is the contract; these are the rules that get "helpfully" re
   until a sweep deletes something the page called referenced. `ArtifactExplorerService.storeSummary`
   delegates to it; the explorer's own tests are the byte-exactness proof.
 - **Per repository is a FILTER over the one plan, never a second planner.** `GET /gc/repositories`
-  and `GET /gc/repositories/{repo}/plan` exist, and neither applies a rule of its own: a
-  repository's figures are `GcStrategy.Plan.scopedTo(name)` — its share of its type's plan —
+  (and its `POST` twin over supplied pins) is the only per-repository surface: one run of the
+  whole-store plan, read per `artifact_repository` row, and it applies no rule of its own — a
+  repository's figures are `GcStrategy.Plan.scopedTo(name)`, its share of its type's plan,
   reconciled against the same census. That is sound because **no rule of either engine reaches
   across two repositories**: both own-engine adapters qualify their identity group with the
   repository name (`OciImagesGcAdapter.group()` is `repository + "/" + image`), and the cache engine
@@ -344,27 +345,18 @@ collection" section is the contract; these are the rules that get "helpfully" re
   javadoc and pinned by `GcScopedPlanTest`: a blob condemned in repositories A **and** B stays
   **retained** in each scoped plan, because the other one's row is standing in that view. So
   `blobsRetained` is widened, never `blobsReleased` narrowed — and the scoped plan still states the
-  type's whole post-plan live set, which is what lets `BlobSweep` consume it unchanged.
-- **A scoped sweep narrows what is planned, never what is protected.**
-  `POST /gc/repositories/{repo}/sweep` deletes that repository's identity rows through the same
-  per-type funnels — the adapters needed no change, because every `GcIdentity` carries its
-  repository and their delete loops already dispatch on it — and then runs the *same* whole-store
-  blob reconciliation with only that plan applied. Three belts, none of which knows what a
-  repository is. Two rules that look like candidates for a per-repository relaxation and are not:
-  the **whole-run abort** on an unreadable pin source holds identically at repository scope (one
-  repository is not a smaller blast radius at the blob layer — its released bytes can be the last
-  local reference to content a pin names by digest), and a repository whose type nobody collects
-  answers a **receipt with its reason and zeros**, not an error status. The one ordering
-  difference from the whole-store run is deliberate: the *name* is resolved before the pins are
-  read, because a repository that does not exist is a fact about the request and an aborted receipt
-  for it would claim a run was attempted.
+  type's whole post-plan live set, which is what lets `BlobSweep` reconcile it unchanged.
+  **There is no per-repository plan or sweep** (qits-2509): `GET`/`POST
+  /gc/repositories/{repo}/plan` and `POST /gc/repositories/{repo}/sweep` were removed once
+  qits-2477 had removed their last callers (qits-orchestrator's cleanup plan/sweep and the landing
+  app's cleanup page). A sweep is always the whole store's.
 - **The per-repository figures do not add up, and that is the honest answer.** Σ(per-repo) ≤ the
-  global sweep figure: a blob two repositories both condemn dies in a whole-store run and in
-  neither scoped one. Proportional attribution was rejected — a fraction of a blob frees nothing,
-  and it would be the first number in this feature matching no operation anyone can run. Both
-  figures ship per repository: `structural` (no grace — what the rule condemns) and grace-applied
-  (what a run now would unlink, plus what the window withholds). The listing column shows the
-  structural one, matching `GcTypePlan`'s per-type semantics.
+  global sweep figure: a blob two repositories both condemn dies in a whole-store run, yet neither
+  repository's share frees it alone. Proportional attribution was rejected — a fraction of a blob
+  frees nothing, and it would be the first number in this feature matching no operation anyone can
+  run. Both figures ship per repository: `structural` (no grace — what the rule condemns) and
+  grace-applied (what a run now would unlink, plus what the window withholds). The listing column
+  shows the structural one, matching `GcTypePlan`'s per-type semantics.
 - **Row-less blobs are untouchable, structurally.** A blob becomes a candidate only by *losing* its
   last identity row to a strategy's own deletion, so one that never had a row cannot be reached. This
   is not an allowlist and must not become one: 124 MiB of this store has no row, and one of those
@@ -445,7 +437,7 @@ collection" section is the contract; these are the rules that get "helpfully" re
   names. `GET /gc/plan` must **never** 500 on it — it answers `executable: false` with
   `pinFailures` and the pin-dependent types refused.
 - **Pins may be supplied in the request, and the parsers are shared.** `POST /gc/plan` (the `GET`'s
-  twin) and both sweeps take an optional
+  twin), `POST /gc/repositories` and the sweep take an optional
   `{"pins":{"deployments":…,"ciDaemon":…,"dependencies":…,"workspaceLaunches":…,
   "projectLaunches":…}}`, each member the
   peer's response verbatim, read by `CdHttpDeploymentPins.parse` / `CiHttpDaemonPins.parse` /
@@ -503,11 +495,10 @@ collection" section is the contract; these are the rules that get "helpfully" re
   deleted chunk row's space stays inside `blob_chunk`'s files — PostgreSQL reuses it and never
   returns it to the filesystem — so `GcSweepOutcome.bytesReclaimed` is the data size of what was
   unlinked, and a run that "reclaimed" 15 GiB used to leave the volume exactly as full.
-  `GcSweepExecutor` calls the library's `BlobCompaction.compact()` after `BlobSweep.execute` on both
-  executed paths (whole store and one repository — compaction is store-wide either way), and the
-  receipt's `disk` (`GcDiskReport`) carries what it measured: blob tables and database bytes before
-  and after, segments drained, dropped and held. The dry run, an aborted run and a scoped run whose
-  type nothing collects never reach it, and report `disk: null`. It must run outside any
+  `GcSweepExecutor` calls the library's `BlobCompaction.compact()` after `BlobSweep.execute` on the
+  executed path (compaction is store-wide), and the receipt's `disk` (`GcDiskReport`) carries what
+  it measured: blob tables and database bytes before and after, segments drained, dropped and held.
+  The dry run and an aborted run never reach it, and report `disk: null`. It must run outside any
   transaction — the library refuses one — which is why neither the executor nor the controller is
   `@Transactional`; and a compaction failure is a logged warning and `disk: null`, never a failed
   sweep, because the deletes have already happened and the receipt is their only record.

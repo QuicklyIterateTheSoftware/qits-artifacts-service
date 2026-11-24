@@ -4,7 +4,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import eu.wohlben.qits.artifacts.control.LiveBlobCensus;
@@ -15,7 +14,6 @@ import eu.wohlben.qits.blobstore.entity.RepositoryTypeProfile;
 import eu.wohlben.qits.artifacts.gc.dto.GcIdentity;
 import eu.wohlben.qits.artifacts.gc.dto.GcPlanReport;
 import eu.wohlben.qits.artifacts.gc.dto.GcPlanSummary;
-import eu.wohlben.qits.artifacts.gc.dto.GcRepositoryPlanReport;
 import eu.wohlben.qits.artifacts.gc.dto.GcRepositoryPlanSummary;
 import eu.wohlben.qits.artifacts.gc.dto.GcTypePlan;
 import io.quarkus.test.junit.QuarkusTest;
@@ -497,39 +495,6 @@ class GcPlanTest extends GcFixture {
     assertEquals("CiVideosGcStrategy", clips.strategy());
     assertNull(clips.error(), "zero rows: the stub plans nothing rather than refusing");
     assertTrue(clips.note().startsWith(GcRules.EXCLUDED_NOTE), clips.note());
-  }
-
-  @Test
-  void oneRepositorysPlanCarriesEverySectionAReviewNeedsAndRefusesAnUnknownName() throws Exception {
-    // The review artifact for a scoped sweep. It is the whole-store report's shape at one
-    // repository — configuration echo, pins provenance, both blob figures, the row-less pool — and
-    // it has to be, because the operator invoking a scoped sweep reads this and nothing else. Here
-    // it is a refusal, which is the deployed behaviour under a broken pin source: zeros with the
-    // reason attached rather than an empty plan.
-    seed();
-
-    GcRepositoryPlanReport report = planner.planForRepository("qits");
-
-    assertEquals("qits", report.repository());
-    assertEquals("oci-images", report.type());
-    assertTrue(report.dryRun());
-    assertFalse(report.executable(), "no qits-platform-deployments and no qits-ci here");
-    assertEquals(5, report.pinFailures().size());
-    assertEquals(5, report.pins().size(), "the provenance of a keep-set is half of what is reviewed");
-    assertEquals("oci-images", report.configuration().type());
-    assertEquals("own", report.configuration().strategy());
-    assertEquals("OciImageGcStrategy", report.strategy());
-    assertTrue(report.error().contains("live pins unavailable"), report.error());
-    assertEquals(List.of(), report.dead());
-    assertEquals(0, report.sweep().blobCount());
-    assertEquals(0, report.structural().blobCount());
-    assertEquals("PT6H", report.graceWindow());
-    assertNotNull(report.untouchable().reason());
-
-    assertThrows(
-        eu.wohlben.qits.blobstore.error.NotFoundException.class,
-        () -> planner.planForRepository("no-such-repository"),
-        "a name that is not a repository is a 404, never a wider scope");
   }
 
   private static GcRepositoryPlanSummary repositorySummary(GcPlanReport report, String name) {

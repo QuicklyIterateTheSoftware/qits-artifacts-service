@@ -1,6 +1,6 @@
 [submodule "qits-artifacts-frontend"]
 	path = service/src/main/webui
-	url = https://github.com/QuicklyIterateTheSoftware/qits-artifacts-frontend.git
+	url = ../qits-artifacts-frontend.git
 	ignore = all
 	update = merge
 	branch = main

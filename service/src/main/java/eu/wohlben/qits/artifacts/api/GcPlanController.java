@@ -7,14 +7,11 @@ import eu.wohlben.qits.artifacts.gc.GcSuppliedPins;
 import eu.wohlben.qits.artifacts.gc.GcSweepExecutor;
 import eu.wohlben.qits.artifacts.gc.dto.GcPlanReport;
 import eu.wohlben.qits.artifacts.gc.dto.GcRepositoriesPlanResponse;
-import eu.wohlben.qits.artifacts.gc.dto.GcRepositoryPlanReport;
-import eu.wohlben.qits.artifacts.gc.dto.GcRepositorySweepReport;
 import eu.wohlben.qits.artifacts.gc.dto.GcSweepReport;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.GET;
 import jakarta.ws.rs.POST;
 import jakarta.ws.rs.Path;
-import jakarta.ws.rs.PathParam;
 import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.core.MediaType;
 import org.eclipse.microprofile.openapi.annotations.Operation;
@@ -33,15 +30,11 @@ import org.eclipse.microprofile.openapi.annotations.parameters.RequestBody;
  * deleted over an in-grace blob would strand the blob as row-less and untouchable). It landed after
  * the user reviewed the dry-run, and nothing executes without the {@code POST}.
  *
- * <p><b>The same order exists per repository</b>, under {@code /gc/repositories}: the listing's
- * figures, one repository's plan in full, and the scoped sweep behind them. Scope is a <b>path
- * segment</b> rather than a query parameter, and that is a decision about the destructive half of
- * the surface: a dropped or mistyped {@code ?repository=} would silently widen a scoped call into a
- * whole-store one, while a mistyped segment is a 404 and can never widen into anything. Nothing
- * about the rules changes with scope — a repository's plan is its share of its type's one plan,
- * reconciled against the same census, never a second policy — and nothing about the safety changes
- * either: the abort on an unreadable pin is still whole-run, and the blob unlinks are still
- * reconciled over the whole store, so a blob another repository names is never a candidate.
+ * <p><b>Per repository is a reading, not a scope.</b> {@code /gc/repositories} answers every
+ * repository's figures from one run of the same plan — a repository's share of its type's one
+ * plan, reconciled against the same census, never a second policy. There is no per-repository plan
+ * or sweep (removed by qits-2509 once qits-2477 had removed their last callers): a sweep is always
+ * the whole store's.
  *
  * <p><b>The guard, honestly.</b> The sweep is a write, and {@code gc} sits in {@code
  * ArtifactsTokenFilter}'s guarded prefix set, so the {@code POST} inherits the {@code
@@ -53,9 +46,8 @@ import org.eclipse.microprofile.openapi.annotations.parameters.RequestBody;
  * store younger than the grace window it deletes nothing, provably.
  *
  * <p><b>Pins may arrive in the request.</b> {@code POST /gc/plan} is the {@code GET}'s twin for
- * that and nothing else — as {@code POST /gc/repositories} and {@code POST
- * /gc/repositories/{repository}/plan} are for their {@code GET}s (qits-2138) — and both sweeps take
- * the same optional body: {@code {"pins":
+ * that and nothing else — as {@code POST /gc/repositories} is for its {@code GET} (qits-2138) — and
+ * the sweep takes the same optional body: {@code {"pins":
  * {"deployments": …, "ciDaemon": …, "dependencies": …, "workspaceLaunches": …, "projectLaunches":
  * …}}}, each member the
  * peer's response verbatim. It is how
@@ -141,8 +133,8 @@ public class GcPlanController {
    *
    * <p>What the explorer's repository listing reads. It costs exactly what {@code /gc/plan} costs —
    * one census, one pin fetch — and is a stripped reading of that report rather than a second
-   * computation of it: identity lists and blob digests are left out here and answered per
-   * repository below. A route that answered one repository at a time would make a listing cost N
+   * computation of it: identity lists and blob digests are left out here, and {@code /gc/plan}
+   * carries them per type. A route that answered one repository at a time would make a listing cost N
    * censuses and 2N cross-service calls, and would read the live pins N times in a run that is
    * supposed to read them once.
    */
@@ -177,48 +169,6 @@ public class GcPlanController {
   }
 
   /**
-   * One repository's plan in full: the identities that would die and the ones that would not, each
-   * with its rule, the two blob figures, the configuration echo, the pins provenance and the
-   * row-less pool.
-   *
-   * <p>This is the review artifact for a scoped sweep, and it is a separate URL from the sweep for
-   * the same reason the global pair is: a report that could not be read without side effects would
-   * be the one report nobody could review. 404 for a repository that does not exist — a path
-   * segment cannot be dropped the way a query parameter can, so a mistyped name here can never
-   * silently widen into something else.
-   */
-  @GET
-  @Path("/repositories/{repository}/plan")
-  @Operation(hidden = true)
-  @jakarta.annotation.security.RolesAllowed({"qits:admin", "qits:agent", "qits:system", "qits:ci-run"})
-  public GcRepositoryPlanReport repositoryPlan(@PathParam("repository") String repository) {
-    return planner.planForRepository(repository);
-  }
-
-  /**
-   * The same plan, over pins the caller supplied: the review artifact for a scoped sweep that
-   * qits-orchestrator runs with the pins it read (qits-2138), so the plan and the sweep see one pin
-   * set. It reads and deletes nothing; 404 for a repository that does not exist, as the {@code
-   * GET}; with no body, or no {@code pins}, it answers what the {@code GET} answers.
-   */
-  @POST
-  @Path("/repositories/{repository}/plan")
-  // Named, unlike its GET: qits-orchestrator's pact cites it (qits-2138).
-  @Operation(operationId = "planGcRepositoryWithSuppliedPins")
-  @jakarta.annotation.security.RolesAllowed({"qits:admin", "qits:system"})
-  public GcRepositoryPlanReport repositoryPlanWithSuppliedPins(
-      @PathParam("repository") String repository,
-      @RequestBody(
-              required = false,
-              content =
-                  @Content(
-                      mediaType = MediaType.APPLICATION_JSON,
-                      schema = @Schema(type = SchemaType.OBJECT)))
-          String body) {
-    return planner.planForRepository(repository, suppliedPins(body));
-  }
-
-  /**
    * Executes one sweep: a fresh plan, its identity deletions, the blob unlinks, and the receipt —
    * what was deleted per type, what was unlinked, what the grace window withheld, and the
    * untouchable pool restated.
@@ -239,42 +189,6 @@ public class GcPlanController {
                       schema = @Schema(type = SchemaType.OBJECT)))
           String body) {
     return executor.sweep(suppliedPins(body));
-  }
-
-  /**
-   * Executes one sweep of <b>one repository</b>: a fresh plan of its type, scoped to it, its
-   * identity deletions, the blob unlinks, and the receipt.
-   *
-   * <p>The plan it applies is computed inside this request and scoped inside it too — there is no
-   * way to submit one, at this scope any more than at the other. That rule is not a formality here:
-   * a stored plan is a plan on stale facts, and a per-repository invocation is exactly the shape
-   * someone would be tempted to hand a reviewed plan back to.
-   *
-   * <p>A {@code POST} and nothing else, so a crawler or a probing {@code GET} can never delete a
-   * byte, and the scope is a path segment so a request that loses it is a 404 rather than a
-   * whole-store sweep. 404 for a repository that does not exist; a repository whose type nobody
-   * collects is <b>not</b> an error — it answers a receipt with its reason and zeros.
-   *
-   * <p><b>Scope does not narrow the abort rule.</b> A pin source that cannot answer ends this run
-   * before the census with nothing deleted, exactly as it ends a whole-store run, because blobs
-   * dedupe globally and one repository's released bytes can be the last local reference to content
-   * a pin names by digest.
-   */
-  @POST
-  @Path("/repositories/{repository}/sweep")
-  // Named since qits-2138: qits-orchestrator's pact cites it, with the pins it read.
-  @Operation(operationId = "sweepGcRepository")
-  @jakarta.annotation.security.RolesAllowed("qits:system")
-  public GcRepositorySweepReport repositorySweep(
-      @PathParam("repository") String repository,
-      @RequestBody(
-              required = false,
-              content =
-                  @Content(
-                      mediaType = MediaType.APPLICATION_JSON,
-                      schema = @Schema(type = SchemaType.OBJECT)))
-          String body) {
-    return executor.sweep(repository, suppliedPins(body));
   }
 
   /**

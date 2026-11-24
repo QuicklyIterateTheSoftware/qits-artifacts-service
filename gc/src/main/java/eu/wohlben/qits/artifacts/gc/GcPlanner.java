@@ -7,7 +7,6 @@ import eu.wohlben.qits.blobstore.control.RepositoryTypeProfiles;
 import eu.wohlben.qits.blobstore.entity.RepositoryTypeProfile;
 import eu.wohlben.qits.artifacts.gc.dto.GcPlanReport;
 import eu.wohlben.qits.artifacts.gc.dto.GcRepositoriesPlanResponse;
-import eu.wohlben.qits.artifacts.gc.dto.GcRepositoryPlanReport;
 import eu.wohlben.qits.artifacts.gc.dto.GcRepositoryPlanSummary;
 import eu.wohlben.qits.artifacts.gc.dto.GcSweepPlan;
 import eu.wohlben.qits.artifacts.gc.dto.GcTypeConfiguration;
@@ -51,11 +50,11 @@ import java.util.Map;
  *
  * <p><b>Per repository is a reading of the same run, never a second planner.</b> The type loop is
  * the only place a rule is ever applied; a repository's figures are its share of its type's plan
- * ({@link GcStrategy.Plan#scopedTo}) reconciled against the same census. So the listing, the
- * whole-store report and a single repository's detail report cannot disagree — there is one plan
- * underneath all three. The rows come from {@code artifact_repository} rather than from the planned
- * identities, because a repository with nothing to collect must still appear: derived from
- * identities, an empty repository would silently vanish from the list.
+ * ({@link GcStrategy.Plan#scopedTo}) reconciled against the same census. So the listing and the
+ * whole-store report cannot disagree — there is one plan underneath both. The rows come from
+ * {@code artifact_repository} rather than from the planned identities, because a repository with
+ * nothing to collect must still appear: derived from identities, an empty repository would
+ * silently vanish from the list.
  */
 @ApplicationScoped
 public class GcPlanner {
@@ -122,60 +121,6 @@ public class GcPlanner {
         report.pinFailures(),
         report.graceWindow(),
         report.repositories());
-  }
-
-  /**
-   * One repository's plan in full — the review artifact a scoped sweep is authorised from.
-   *
-   * <p>Only the strategy claiming that repository's type is asked to plan, and its answer is then
-   * scoped. Every other type contributes its whole census live set to the reconciliation exactly as
-   * it does in a full report, which is what makes the figures here identical to this repository's
-   * row in {@link #planForRepositories()} rather than merely similar.
-   *
-   * @throws eu.wohlben.qits.blobstore.error.NotFoundException no repository of that name
-   */
-  public GcRepositoryPlanReport planForRepository(String name) {
-    return planForRepository(name, null);
-  }
-
-  /**
-   * The same plan, over pins the caller supplied — null fetches them, exactly as {@link
-   * #planForRepository(String)} does (qits-2138). The repository is resolved first, so an unknown
-   * name is a 404 whatever the body carried.
-   *
-   * @throws eu.wohlben.qits.blobstore.error.NotFoundException no repository of that name
-   */
-  public GcRepositoryPlanReport planForRepository(String name, GcSuppliedPins supplied) {
-    ArtifactRepository row = repositories.require(name);
-    GcPins pins = pinSources.fetch(supplied);
-    LiveBlobCensus.Census taken = census.take();
-    String type = row.type;
-    Outcome outcome = outcomeOf(type, claiming(registered(), type), taken, pins);
-
-    GcStrategy.Plan scoped = outcome.plan() == null ? null : outcome.plan().scopedTo(name);
-    GcSweepPlan structural =
-        scoped == null ? nothing() : sweep.planForOneType(taken, type, scoped, false);
-    GcSweepPlan matured =
-        scoped == null ? nothing() : sweep.planForOneType(taken, type, scoped, true);
-
-    return new GcRepositoryPlanReport(
-        name,
-        RepositoryTypeProfile.wireNameOf(type),
-        taken.takenAt(),
-        true,
-        iso(sweep.graceWindow()),
-        pins.complete(),
-        pins.failures(),
-        pins.sources(),
-        GcRules.line(config, type),
-        outcome.strategy(),
-        outcome.note(),
-        outcome.error(),
-        scoped == null ? List.of() : scoped.dead(),
-        scoped == null ? List.of() : scoped.kept(),
-        matured,
-        structural,
-        sweep.untouchable(taken));
   }
 
   /** What CDI found. Empty is the shipped state and a supported one. */
@@ -301,10 +246,8 @@ public class GcPlanner {
   /**
    * One type's answer: the plan, or the honest reason there is none.
    *
-   * <p>Factored out rather than duplicated, because the whole-store report and a single
-   * repository's report have to agree about what happened to a type — an unclaimed type, a
-   * collision, a pin refusal and a strategy that threw are four different sentences, and two copies
-   * of them would eventually be two different sentences.
+   * <p>An unclaimed type, a collision, a pin refusal and a strategy that threw are four different
+   * sentences, and the per-type line and every repository row of that type read the same one.
    */
   private Outcome outcomeOf(
       String type,
@@ -350,11 +293,6 @@ public class GcPlanner {
   private static List<GcStrategy> claiming(
       Collection<GcStrategy> strategies, String type) {
     return strategies.stream().filter(strategy -> type.equals(strategy.type())).toList();
-  }
-
-  /** The empty attribution for a repository whose type produced no plan at all. */
-  private static GcSweepPlan nothing() {
-    return new GcSweepPlan(0, 0L, 0, 0L, List.of());
   }
 
   private static String names(List<GcStrategy> claiming) {
