@@ -668,10 +668,9 @@ class GoldenMasterRecordingTest {
                   .drop(STORE_WIDE_LISTS)
                   .zeroNumbers()
                   .build(),
-              // qits-2138: the per-repository surface over the same supplied set — the listing, one
-              // repository's plan and its scoped sweep — once the pin sources are the orchestrator's
-              // alone to read. Every row but the state's is another suite's, so the lists are
-              // filtered to the state's repository and daemon and every figure is store-wide.
+              // qits-2138: the repository listing over the same supplied set, once the pin sources
+              // are the orchestrator's alone to read. Every row but the state's is another suite's,
+              // so the list is filtered to the state's repository and every figure is store-wide.
               op(
                       ProviderStates.A_REPOSITORY_WITH_UNPINNED_IDENTITIES,
                       "planGcRepositoriesWithSuppliedPins",
@@ -680,47 +679,6 @@ class GoldenMasterRecordingTest {
                       200)
                   .json("application/json", ProviderStates.GC_PINS)
                   .filtered("$.repositories", "repository")
-                  .zeroNumbers()
-                  .build(),
-              op(
-                      ProviderStates.A_REPOSITORY_WITH_UNPINNED_IDENTITIES,
-                      "planGcRepositoryWithSuppliedPins",
-                      "POST",
-                      "/artifacts/api/gc/repositories/{repository}/plan",
-                      200)
-                  .json("application/json", ProviderStates.GC_PINS)
-                  .filtered("$.kept", "daemon")
-                  // qits-2329: the whole plan a reviewer reads, as qits-landing-app renders it — the
-                  // dead beside the kept, both filtered to the state's daemon; the two blob figures
-                  // with their store-wide blob ids emptied. Only the row-less pool stays dropped.
-                  .alsoFiltered("$.dead")
-                  .emptied("$.sweep.blobIds", "$.structural.blobIds")
-                  .drop("untouchable")
-                  .zeroNumbers()
-                  .build(),
-              // qits-2329: the same plan where the rule condemns nothing — dead records as [].
-              op(
-                      ProviderStates.A_REPOSITORY_WITH_NOTHING_TO_COLLECT,
-                      "planGcRepositoryWithSuppliedPins",
-                      "POST",
-                      "/artifacts/api/gc/repositories/{repository}/plan",
-                      200)
-                  .json("application/json", ProviderStates.GC_PINS)
-                  .filtered("$.kept", "daemon")
-                  .alsoFiltered("$.dead")
-                  .emptied("$.sweep.blobIds", "$.structural.blobIds")
-                  .drop("untouchable")
-                  .zeroNumbers()
-                  .build(),
-              op(
-                      ProviderStates.A_REPOSITORY_WITH_UNPINNED_IDENTITIES,
-                      "sweepGcRepository",
-                      "POST",
-                      "/artifacts/api/gc/repositories/{repository}/sweep",
-                      200)
-                  .json("application/json", ProviderStates.GC_PINS)
-                  .filtered("$.withheldByGraceWindow", "daemon")
-                  .drop("untouchable")
                   .zeroNumbers()
                   .build(),
               // a pin the store cannot file refuses the whole run: aborted, nothing deleted

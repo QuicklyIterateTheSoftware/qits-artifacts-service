@@ -69,7 +69,8 @@ public record GcSuppliedPins(
   public static final String PROJECTS_SOURCE = "supplied: qits-projects";
 
   /**
-   * The optional request body of {@code POST /gc/plan} and the two sweeps, read into this.
+   * The optional request body of {@code POST /gc/plan}, {@code POST /gc/repositories} and the
+   * sweep, read into this.
    *
    * <pre>
    * {"pins": {"deployments":       &lt;verbatim body of GET /deployments/api/pins&gt;,

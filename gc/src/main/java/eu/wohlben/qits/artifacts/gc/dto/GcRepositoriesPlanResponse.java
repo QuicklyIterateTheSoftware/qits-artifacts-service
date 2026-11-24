@@ -14,9 +14,9 @@ import java.util.List;
  * <p>It is a <b>derivation</b> of the whole-store plan, not a second computation of it — the same
  * relationship {@code GcPlanSummary} has to the report it summarises. One run, one census, one pin
  * fetch, then the per-repository shares read off it. The identity lists and the blob digests are
- * left out here and answered per repository by the detail route: the full plan at live scale
- * carries every kept identity with its rule sentence and every digest in full, which is the right
- * amount of detail to review one repository and the wrong amount to draw a table.
+ * left out here: the full plan at live scale carries every kept identity with its rule sentence and
+ * every digest in full, which is the right amount of detail to review a run and the wrong amount to
+ * draw a table.
  *
  * @param generatedAt when the census behind these figures was taken — the same instant the whole
  *     plan reports, because it is the same census

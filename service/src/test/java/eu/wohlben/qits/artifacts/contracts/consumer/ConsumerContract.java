@@ -27,10 +27,10 @@ import java.util.function.Function;
  * minting the bearer those five reads carry (qits-1410). {@link #CLIENTS} names the class that
  * makes each, and {@code OutboundCallsGuardTest} holds that list to the code.
  *
- * <p><b>One trigger per GC row, not five.</b> The five GC routes ({@code GET /gc/plan}, {@code GET
- * /gc/repositories}, {@code GET /gc/repositories/{repository}/plan}, and the two sweeps when no
- * pins are supplied) all reach the identical {@code GcPinSources.fetch()}, so the rows name the
- * plan route that the others are built on. A call with pins supplied in the body makes no request.
+ * <p><b>One trigger per GC row, not one per route.</b> The GC routes ({@code GET /gc/plan},
+ * {@code GET /gc/repositories}, and {@code POST /gc/plan}, {@code POST /gc/repositories} and
+ * {@code POST /gc/sweep} when no pins are supplied) all reach the identical {@code
+ * GcPinSources.fetch()}, so the rows name the plan route that the others are built on. A call with pins supplied in the body makes no request.
  *
  * <p><b>Every row is bound to a recording</b>: the provider's {@code <app>-golden-masters}, pinned
  * in the pom, records the state and the operationId each row names. A row whose state the pinned

@@ -103,7 +103,6 @@ class MachineReadAccessTest {
     as(reader).when().get(BASE + "/store/summary").then().statusCode(200);
     as(reader).when().get(BASE + "/gc/plan").then().statusCode(200);
     as(reader).when().get(BASE + "/gc/repositories").then().statusCode(200);
-    as(reader).when().get(BASE + "/gc/repositories/qits/plan").then().statusCode(200);
     as(reader).when().get(BASE + "/repositories/qits/images").then().statusCode(200);
     as(reader).when().get(BASE + "/repositories/npm/packages").then().statusCode(200);
     as(reader).when().get(BASE + "/repositories/maven/maven-packages").then().statusCode(200);

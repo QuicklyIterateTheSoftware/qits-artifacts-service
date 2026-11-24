@@ -322,11 +322,6 @@ class ConsumerPactVerificationTest {
     return states.params(ProviderStates.A_REPOSITORY_WITH_UNPINNED_IDENTITIES);
   }
 
-  @State(ProviderStates.A_REPOSITORY_WITH_NOTHING_TO_COLLECT)
-  Map<String, String> aRepositoryWithNothingToCollect() {
-    return states.params(ProviderStates.A_REPOSITORY_WITH_NOTHING_TO_COLLECT);
-  }
-
   @State(ProviderStates.PIN_SOURCES_SILENT)
   Map<String, String> pinSourcesSilent() {
     return states.params(ProviderStates.PIN_SOURCES_SILENT);

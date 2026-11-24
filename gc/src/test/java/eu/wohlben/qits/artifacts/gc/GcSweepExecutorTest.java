@@ -4,12 +4,10 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import eu.wohlben.qits.artifacts.control.OciMediaTypes;
 import eu.wohlben.qits.blobstore.entity.ArtifactRecord;
-import eu.wohlben.qits.blobstore.entity.ArtifactRepository;
 import eu.wohlben.qits.artifacts.entity.NpmDistTag;
 import eu.wohlben.qits.artifacts.entity.NpmVersion;
 import eu.wohlben.qits.artifacts.entity.OciManifest;
@@ -20,12 +18,10 @@ import eu.wohlben.qits.artifacts.control.DaemonBinariesProfile;
 import eu.wohlben.qits.artifacts.control.NpmPackagesProfile;
 import eu.wohlben.qits.artifacts.control.OciImagesProfile;
 import eu.wohlben.qits.blobstore.entity.RepositoryTypeProfile;
-import eu.wohlben.qits.blobstore.error.NotFoundException;
 import eu.wohlben.qits.artifacts.gc.dto.GcDiskReport;
 import eu.wohlben.qits.artifacts.gc.dto.GcIdentity;
 import eu.wohlben.qits.artifacts.gc.dto.GcPlanReport;
 import eu.wohlben.qits.artifacts.gc.dto.GcRepositoryPlanSummary;
-import eu.wohlben.qits.artifacts.gc.dto.GcRepositorySweepReport;
 import eu.wohlben.qits.artifacts.gc.dto.GcSweepReport;
 import eu.wohlben.qits.artifacts.gc.dto.GcTypePlan;
 import eu.wohlben.qits.artifacts.gc.dto.GcTypeSweepResult;
@@ -440,65 +436,17 @@ class GcSweepExecutorTest extends GcFixture {
   }
 
   @Test
-  void aScopedSweepDeletesOneRepositorysRowsAndNeverBytesItsTwinStillNames() throws Exception {
-    // Per-repository collection, executed, with the hazard it exists to survive in the middle of
-    // it: two npm repositories hold the same tarball bytes, and both their prereleases are cold, so
-    // a whole-store run would free those bytes. Scoped to one repository it must not — the other's
-    // row is standing — while content only this repository names still goes. The scoped plan's
-    // retained set is what stops it before the re-census or the store's guard ever have to.
-    ArtifactRepository npm = repositoryService.ensure("npm", NpmPackagesProfile.KEY);
-    repositoryService.ensure("npm2", NpmPackagesProfile.KEY);
-    String releaseBlob = agedBlob(91);
-    String release2Blob = agedBlob(92);
-    String sharedBlob = agedBlob(93);
-    String mineOnlyBlob = agedBlob(94);
-    versionRow("npm", PKG, RELEASE, releaseBlob, daysAgo(400));
-    versionRow("npm", PKG, SUPERSEDED, sharedBlob, daysAgo(400));
-    versionRow("npm", PKG, OLDER, mineOnlyBlob, daysAgo(400));
-    versionRow("npm2", PKG, RELEASE, release2Blob, daysAgo(400));
-    versionRow("npm2", PKG, SUPERSEDED, sharedBlob, daysAgo(400));
-
-    GcRepositorySweepReport report =
-        executor.execute(npm, census.take(), List.of(npmStrategy), GcPins.none());
-
-    assertEquals("npm", report.repository());
-    assertEquals("npm-packages", report.type());
-    assertFalse(report.dryRun());
-    assertNull(report.aborted());
-    assertNull(report.error());
-    assertEquals(
-        List.of(PKG + "@" + OLDER, PKG + "@" + SUPERSEDED),
-        identities(report.deleted()).stream().sorted().toList(),
-        "both of this repository's cold prereleases, and neither of the other's");
-
-    detachEntities();
-    assertTrue(npmVersions.findOne("npm", PKG, SUPERSEDED).isEmpty(), "this repository's row goes");
-    assertTrue(
-        npmVersions.findOne("npm2", PKG, SUPERSEDED).isPresent(),
-        "the twin's identically cold row is out of scope and is not touched");
-    assertTrue(npmVersions.findOne("npm2", PKG, RELEASE).isPresent());
-
-    assertEquals(List.of(mineOnlyBlob), report.sweep().unlinkedBlobIds());
-    assertFalse(blobStore.exists(mineOnlyBlob), "content only this repository named is freed");
-    assertTrue(
-        blobStore.exists(sharedBlob),
-        "and content the twin still rows survives, which a whole-store run would have freed");
-    assertTrue(blobStore.exists(releaseBlob), "the only release survives on the belt");
-    assertTrue(blobStore.exists(release2Blob));
-  }
-
-  @Test
-  void aScopedRunWhosePinSourcesCannotAnswerAbortsWholeAndRefusesAnUnknownRepository()
+  void aRunWhosePinSourcesCannotAnswerAbortsWholeBeforeTheCensusAndDeletesNothing()
       throws Exception {
-    // The abort rule does not shrink with the scope, and it must not: blobs dedupe globally, so
-    // the bytes one repository releases can be the last local reference to content qits-ci pins by
-    // digest. This suite's pin urls are closed ports, so this is the deployed behaviour under a
-    // broken dependency rather than a simulated one.
+    // The abort rule, over a store that holds something a run would otherwise take: blobs dedupe
+    // globally, so the bytes one type releases can be the last local reference to content qits-ci
+    // pins by digest. This suite's pin urls are closed ports, so this is the deployed behaviour
+    // under a broken dependency rather than a simulated one.
     repositoryService.ensure("npm", NpmPackagesProfile.KEY);
     String coldBlob = agedBlob(95);
     versionRow("npm", PKG, SUPERSEDED, coldBlob, daysAgo(400));
 
-    GcRepositorySweepReport report = executor.sweep("npm");
+    GcSweepReport report = executor.sweep();
 
     assertNotNull(report.aborted());
     assertTrue(report.aborted().contains("qits-platform-deployments"), report.aborted());
@@ -506,7 +454,9 @@ class GcSweepExecutorTest extends GcFixture {
     assertTrue(report.aborted().contains("qits-platform-maintenance"), report.aborted());
     assertTrue(report.aborted().contains("qits-workspaces"), report.aborted());
     assertTrue(report.aborted().contains("qits-projects"), report.aborted());
-    assertEquals(List.of(), report.deleted());
+    assertTrue(
+        report.types().stream().allMatch(type -> type.deleted().isEmpty()),
+        "no type deleted anything");
     assertEquals(0, report.sweep().blobsUnlinked());
     assertEquals(5, report.pins().size(), "an aborted receipt still says how it read its pins");
     assertTrue(
@@ -516,30 +466,6 @@ class GcSweepExecutorTest extends GcFixture {
     detachEntities();
     assertTrue(npmVersions.findOne("npm", PKG, SUPERSEDED).isPresent(), "nothing was deleted");
     assertTrue(blobStore.exists(coldBlob));
-
-    assertThrows(
-        NotFoundException.class,
-        () -> executor.sweep("no-such-repository"),
-        "a name that is not a repository is a 404, never a wider sweep");
-  }
-
-  @Test
-  void aRepositoryWhoseTypeNobodyCollectsGetsAReceiptSayingSoRatherThanAnError() throws Exception {
-    // "Report rather than throw", at repository scope. A row of an unclaimed type is a legitimate
-    // thing to ask about, and the honest answer is a receipt with the reason and zeros — not a
-    // status code the caller has to interpret. The explorer never offers the button for such a row,
-    // and the route does not depend on that.
-    ArtifactRepository shots = repositoryService.ensure("shots", CiScreenshotsProfile.KEY);
-
-    GcRepositorySweepReport report =
-        executor.execute(shots, census.take(), List.of(npmStrategy), GcPins.none());
-
-    assertNull(report.strategy());
-    assertEquals("no strategy registered for ci-screenshots", report.note());
-    assertNull(report.error());
-    assertEquals(List.of(), report.deleted());
-    assertEquals(0, report.sweep().blobsUnlinked());
-    assertNotNull(report.untouchable().reason(), "a census WAS taken, so the pool is a reading");
   }
 
   @Test
@@ -619,11 +545,6 @@ class GcSweepExecutorTest extends GcFixture {
     assertEquals(1, partitionCount(closed), "the closed segment is still there");
     assertEquals(open, openSegment());
     assertTrue(blobStore.exists(doomed));
-
-    GcRepositorySweepReport scopedAbort = executor.sweep(DAEMON_REPO);
-    assertNotNull(scopedAbort.aborted());
-    assertNull(scopedAbort.disk(), "nor does an aborted scoped run");
-    assertEquals(1, partitionCount(closed));
   }
 
   // --- wiring ----------------------------------------------------------------------------------
@@ -697,7 +618,7 @@ class GcSweepExecutorTest extends GcFixture {
     versionRow("npm", packageName, version, blobId, createdAt);
   }
 
-  /** The same, in a named repository — the scoping cases need two of them at once. */
+  /** The same, in a named repository. */
   private void versionRow(
       String repository, String packageName, String version, String blobId, Instant createdAt) {
     QuarkusTransaction.requiringNew()

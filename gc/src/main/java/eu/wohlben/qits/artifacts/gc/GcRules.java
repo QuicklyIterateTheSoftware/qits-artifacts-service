@@ -71,7 +71,7 @@ final class GcRules {
     return List.copyOf(lines);
   }
 
-  /** One type's line of that echo — what a report about a single repository carries. */
+  /** One type's line of that echo. */
   static GcTypeConfiguration line(GcTypeConfig config, String type) {
     String wireName = RepositoryTypeProfile.wireNameOf(type);
     GcPolicy policy;

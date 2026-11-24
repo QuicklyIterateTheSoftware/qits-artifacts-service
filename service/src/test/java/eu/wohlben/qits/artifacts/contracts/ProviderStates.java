@@ -122,17 +122,11 @@ public class ProviderStates {
   public static final String PIN_SOURCES_SILENT = "a registry whose pin sources do not answer";
   /**
    * qits-2138: {@link #UNPINNED_IDENTITIES}, named for the one repository they sit in — the daemon
-   * repository — so qits-orchestrator's per-repository plan and sweep have a {@code {repository}}
-   * to address, and the listing a row to be filtered to.
+   * repository — so the listing qits-orchestrator reads ({@code POST /gc/repositories}) has a row
+   * to be filtered to.
    */
   public static final String A_REPOSITORY_WITH_UNPINNED_IDENTITIES =
       "a repository with unpinned identities";
-  /**
-   * qits-2329: the daemon repository holding only what the last-two rule keeps, so one
-   * repository's plan condemns nothing — the "nothing to delete" answer qits-landing-app renders.
-   */
-  public static final String A_REPOSITORY_WITH_NOTHING_TO_COLLECT =
-      "a repository with nothing to collect";
   public static final String A_MAVEN_ARTIFACT = "a maven artifact published at a version";
   public static final String NO_MAVEN_ARTIFACT = "no maven artifact published at the version";
   public static final String AN_NPM_PACKAGE = "an npm package published at a version";
@@ -1156,7 +1150,6 @@ public class ProviderStates {
     states.put(UNPINNED_IDENTITIES, this::unpinnedIdentities);
     states.put(PIN_SOURCES_SILENT, this::pinSourcesSilent);
     states.put(A_REPOSITORY_WITH_UNPINNED_IDENTITIES, this::aRepositoryWithUnpinnedIdentities);
-    states.put(A_REPOSITORY_WITH_NOTHING_TO_COLLECT, this::aRepositoryWithNothingToCollect);
     states.put(A_MAVEN_ARTIFACT, this::aMavenArtifact);
     states.put(NO_MAVEN_ARTIFACT, this::noMavenArtifact);
     states.put(AN_NPM_PACKAGE, this::anNpmPackage);
@@ -1912,19 +1905,6 @@ public class ProviderStates {
             "contract-daemon " + CONDEMNED_DAEMON_VERSION,
             Instant.parse("2020-01-01T00:00:00Z"));
     QuarkusTransaction.requiringNew().run(() -> daemonBinaries.persist(condemned));
-    Map<String, String> params = new TreeMap<>();
-    params.put("daemon", DAEMON);
-    params.put("repository", DAEMONS);
-    return new Setup(params, List.of());
-  }
-
-  /**
-   * Only the two versions {@link #seedTwoDaemonVersions()} writes, both among the last two releases
-   * the rule keeps whatever the pins say: the repository's plan has nothing in {@code dead}
-   * (qits-2329). Named as {@link #aRepositoryWithUnpinnedIdentities()} is.
-   */
-  private Setup aRepositoryWithNothingToCollect() {
-    seedTwoDaemonVersions();
     Map<String, String> params = new TreeMap<>();
     params.put("daemon", DAEMON);
     params.put("repository", DAEMONS);
