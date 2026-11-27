@@ -59,7 +59,7 @@
     </modules>
 
     <properties>
-        <qits.auth-core.version>2026.1106.507</qits.auth-core.version>
+        <qits.auth-core.version>2026.1126.172511</qits.auth-core.version>
         <!-- The platform's shared rules, test scope only (qits-1754). ProviderStateCoverageTest is
              what this repo takes it for. Published by qits-integrations-quarkus, like qits-auth-core
              above. -->
@@ -69,7 +69,7 @@
              way quarkus-opentelemetry already does for the REST client. Published by
              libs/qits-integrations-quarkus, same publisher as qits-auth-core and qits-db-core
              above. -->
-        <qits.http-core.version>2026.1106.507</qits.http-core.version>
+        <qits.http-core.version>2026.1126.172511</qits.http-core.version>
         <!-- qits-telemetry-core (epic qits-428): the three OTLP/HTTP exporters as CDI beans whose
              header supplier carries the `qits` oidc client's current bearer, so spans, logs and
              metrics reach qits-observability at its edge host. Published by
@@ -86,8 +86,8 @@
              reactor and ships on its version. The coordinate is unchanged, the config keys are
              unchanged, and the store's packages are eu.wohlben.qits.blobstore.* — so the pins
              cannot be moved one at a time. -->
-        <qits.blobstore.version>2026.1115.51934</qits.blobstore.version>
-        <qits.registries.version>2026.1115.51934</qits.registries.version>
+        <qits.blobstore.version>2026.1126.194145</qits.blobstore.version>
+        <qits.registries.version>2026.1126.194145</qits.registries.version>
         <!-- The platform's datasource resilience baseline: qits-db-core carries PatientPgDriver,
              which the datasource block in the artifacts jar's microprofile-config.properties names,
              and DbRetry. Published by libs/qits-integrations-quarkus, so it is one of the few
@@ -130,7 +130,7 @@
         <qits.docs-service-pacts-qits-artifacts-service.version>2026.1010.143012</qits.docs-service-pacts-qits-artifacts-service.version>
         <qits.ci-service-pacts-qits-artifacts-service.version>2026.1019.100328</qits.ci-service-pacts-qits-artifacts-service.version>
         <qits.bootstrap-cli-pacts-qits-artifacts-service.version>2026.1023.225504</qits.bootstrap-cli-pacts-qits-artifacts-service.version>
-        <qits.maintenance-service-pacts-qits-artifacts-service.version>2026.1019.73752</qits.maintenance-service-pacts-qits-artifacts-service.version>
+        <qits.maintenance-service-pacts-qits-artifacts-service.version>2026.1126.192119</qits.maintenance-service-pacts-qits-artifacts-service.version>
         <qits.orchestrator-service-pacts-qits-artifacts-service.version>2026.1123.72319</qits.orchestrator-service-pacts-qits-artifacts-service.version>
         <qits.platform-access-monorepo-pacts-qits-artifacts-service.version>2026.1113.220814</qits.platform-access-monorepo-pacts-qits-artifacts-service.version>
         <qits.deployments-service-pacts-qits-artifacts-service.version>2026.1107.180656</qits.deployments-service-pacts-qits-artifacts-service.version>
@@ -139,12 +139,12 @@
              qits-1149): what each pin source and the idp record for their provider states. Test
              scope, read off the classpath by ProviderGoldenMasters. Moved by qits-maintenance like
              every other pin; do not hand-edit them to chase a release. -->
-        <qits.deployments-golden-masters.version>2026.1119.141022</qits.deployments-golden-masters.version>
+        <qits.deployments-golden-masters.version>2026.1126.12943</qits.deployments-golden-masters.version>
         <qits.ci-golden-masters.version>2026.1119.60052</qits.ci-golden-masters.version>
-        <qits.maintenance-golden-masters.version>2026.1124.131229</qits.maintenance-golden-masters.version>
-        <qits.workspaces-golden-masters.version>2026.1123.125658</qits.workspaces-golden-masters.version>
-        <qits.projects-golden-masters.version>2026.1122.200309</qits.projects-golden-masters.version>
-        <qits.idp-golden-masters.version>2026.1123.194348</qits.idp-golden-masters.version>
+        <qits.maintenance-golden-masters.version>2026.1126.192119</qits.maintenance-golden-masters.version>
+        <qits.workspaces-golden-masters.version>2026.1126.230805</qits.workspaces-golden-masters.version>
+        <qits.projects-golden-masters.version>2026.1127.50902</qits.projects-golden-masters.version>
+        <qits.idp-golden-masters.version>2026.1125.71255</qits.idp-golden-masters.version>
         <qits.maven.repository.url>https://registry.qits.wohlben.eu/artifacts/maven/maven</qits.maven.repository.url>
         <maven.compiler.release>25</maven.compiler.release>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
