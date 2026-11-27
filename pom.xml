@@ -59,7 +59,7 @@
     </modules>
 
     <properties>
-        <qits.auth-core.version>2026.1127.155354</qits.auth-core.version>
+        <qits.auth-core.version>2026.1127.174457</qits.auth-core.version>
         <!-- The platform's shared rules, test scope only (qits-1754). ProviderStateCoverageTest is
              what this repo takes it for. Published by qits-integrations-quarkus, like qits-auth-core
              above. -->
@@ -69,7 +69,7 @@
              way quarkus-opentelemetry already does for the REST client. Published by
              libs/qits-integrations-quarkus, same publisher as qits-auth-core and qits-db-core
              above. -->
-        <qits.http-core.version>2026.1127.155354</qits.http-core.version>
+        <qits.http-core.version>2026.1127.174457</qits.http-core.version>
         <!-- qits-telemetry-core (epic qits-428): the three OTLP/HTTP exporters as CDI beans whose
              header supplier carries the `qits` oidc client's current bearer, so spans, logs and
              metrics reach qits-observability at its edge host. Published by
